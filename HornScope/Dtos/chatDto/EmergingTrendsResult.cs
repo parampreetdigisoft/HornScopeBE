@@ -1,11 +1,14 @@
 namespace HornScope.Dtos.chatDto
 {
-    public class EmergingTrendProgramCard
+    public class EmergingTrendCountryCard
     {
         public string ImagePath { get; set; } = string.Empty;
-        public string ProgramName { get; set; } = string.Empty;
+        public string Country { get; set; } = string.Empty;
 
-        public string Location { get; set; } = string.Empty;
+        public string CountryCode { get; set; } = string.Empty;
+
+        public string Region { get; set; } = string.Empty;
+
         public string Type { get; set; } = string.Empty;
 
         public string Title { get; set; } = string.Empty;
@@ -35,7 +38,7 @@ namespace HornScope.Dtos.chatDto
 
         public string SubHeadline { get; set; } = string.Empty;
 
-        public List<EmergingTrendProgramCard> Programs { get; set; } = new();
+        public List<EmergingTrendCountryCard> Countries { get; set; } = new();
     }
 
     public class ChatEmergingTrendsResponse

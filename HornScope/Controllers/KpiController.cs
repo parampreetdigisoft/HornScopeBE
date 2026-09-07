@@ -1,13 +1,16 @@
 
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using HornScope.Common.Models;
-using HornScope.Dtos.ClientDto;
+using HornScope.Dtos.CountryUserDto;
 using HornScope.Dtos.kpiDto;
 using HornScope.Enums;
 using HornScope.IServices;
 using HornScope.Models;
+using HornScope.Services;
+
+using System.Security.Claims;
 
 namespace HornScope.Controllers
 {
@@ -40,8 +43,8 @@ namespace HornScope.Controllers
         }
 
         [HttpGet]
-        [Route("getAnalyticalLayerResults")]
-        public async Task<IActionResult> GetAnalyticalLayerResults([FromQuery] GetAnalyticalLayerRequestDto request)
+        [Route("GetAnalyticalLayerResults")]
+        public async Task<IActionResult> GetAnalyticalLayerResults([FromQuery] GetAnalyticalLayerRequestDto response)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -57,15 +60,15 @@ namespace HornScope.Controllers
             }
 
             var tierName = GetTierFromClaims();
-            if (tierName == null && userRole == UserRole.ProgramUser)
+            if (tierName == null && userRole == UserRole.CountryUser)
                 return Unauthorized("You Don't have access.");
 
-            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.ProgramUser)
+            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CountryUser)
             {
                 return Unauthorized("You Don't have access.");
             }
 
-            var result = await _kpiService.GetAnalyticalLayerResults(request, userId.GetValueOrDefault(), userRole, userPlan);
+            var result = await _kpiService.GetAnalyticalLayerResults(response, userId.GetValueOrDefault(), userRole, userPlan);
             if (result == null)
             {
                 return Unauthorized("You Don't have access.");
@@ -73,7 +76,6 @@ namespace HornScope.Controllers
 
             return Ok(result);
         }
-
         [HttpGet]
         [Route("GetAllKpi")]
         public async Task<IActionResult> GetAllKpi()
@@ -96,9 +98,9 @@ namespace HornScope.Controllers
         }
 
         [HttpPost]
-        [Route("ComparePrograms")]
+        [Route("CompareCountries")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> ComparePrograms([FromBody] CompareProgramsRequestDto r)
+        public async Task<IActionResult> CompareCountries([FromBody] CompareCountryRequestDto r)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -112,12 +114,12 @@ namespace HornScope.Controllers
             {
                 return Unauthorized("You Don't have access.");
             }
-           var result = await _kpiService.ComparePrograms(r, userId.GetValueOrDefault(), userRole, true);
+           var result = await _kpiService.CompareCountries(r, userId.GetValueOrDefault(), userRole, true);
             return Ok(result);
         }
 
-        [HttpGet("ExportComparePrograms")]
-        public async Task<IActionResult> ExportComparePrograms( string programs, string? kpis, DateTime updatedAt)
+        [HttpGet("ExportCompareCountries")]
+        public async Task<IActionResult> ExportCompareCountries( string countries, string? kpis, DateTime updatedAt)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -130,7 +132,7 @@ namespace HornScope.Controllers
             if (!Enum.TryParse<UserRole>(role, true, out var userRole))
                 return Unauthorized("You Don't have access.");
 
-            var climateProgramIDs = programs.Split(',')
+            var countryIds = countries.Split(',')
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Select(int.Parse)
                 .ToList();
@@ -145,14 +147,14 @@ namespace HornScope.Controllers
                     .ToList();
             }
 
-            var request = new CompareProgramsRequestDto
+            var request = new CompareCountryRequestDto
             {
-                Programs = climateProgramIDs,
+                Countries = countryIds,
                 Kpis = kpiIds,
                 UpdatedAt = updatedAt
             };
 
-            var content = await _kpiService.ExportComparePrograms(request, userId.Value, userRole);
+            var content = await _kpiService.ExportCompareCountries(request, userId.Value, userRole);
 
             return File(content.Item2,
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -178,10 +180,10 @@ namespace HornScope.Controllers
             }
 
             var tierName = GetTierFromClaims();
-            if (tierName == null && userRole == UserRole.ProgramUser)
+            if (tierName == null && userRole == UserRole.CountryUser)
                 return Unauthorized("You Don't have access.");
 
-            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.ProgramUser)
+            if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var userPlan) && userRole == UserRole.CountryUser)
             {
                 return Unauthorized("You Don't have access.");
             }
@@ -222,30 +224,9 @@ namespace HornScope.Controllers
             return Ok(result);
         }
 
-        [HttpGet]
-        [Route("GetAllKpiPillarMapping")]
-        public async Task<IActionResult> GetAllKpiPillarMapping()
-        {
-            var userId = GetUserIdFromClaims();
-            if (userId == null)
-                return Unauthorized("User ID not found in token.");
-
-            var role = GetRoleFromClaims();
-            if (role == null)
-                return Unauthorized("You Don't have access.");
-
-            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
-            {
-                return Unauthorized("You Don't have access.");
-            }
-
-            var result = await _kpiService.GetAllKpiPillarMapping(userId.GetValueOrDefault(), userRole);
-            return Ok(result);
-        }
-
         [HttpPost]
         [Route("SummarizeKpiPerformance")]
-        [Authorize(Roles = "Admin, Analyst, ProgramUser")]
+        [Authorize(Roles = "Admin, Analyst, CountryUser")]
         public async Task<IActionResult> SummarizeKpiPerformance([FromBody] SummarizeKpiRequestDto request)
         {
             var userId = GetUserIdFromClaims();

@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text.RegularExpressions;
 
-
 namespace HornScope.Common.Implementation
 {
     public class CommonStaticMethods

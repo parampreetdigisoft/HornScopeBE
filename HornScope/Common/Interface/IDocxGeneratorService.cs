@@ -13,20 +13,20 @@ namespace HornScope.Common.Interface
     /// </summary>
     public interface IDocxGeneratorService
     {
-        Task<byte[]> GenerateProgramDetailsDocx(
-            AiProgramSummeryDto program,
-            List<AiProgramPillarResponse> pillars,
+        Task<byte[]> GenerateCountryDetailsDocx(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerProgramHistoryReportDto> peerPrograms,
+            List<PeerCountryHistoryReportDto> peerCountries,
             UserRole userRole);
 
         Task<byte[]> GeneratePillarDetailsDocx(
-            AiProgramPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole);
 
-        Task<byte[]> GenerateAllProgramsDetailsDocx(
-            List<AiProgramSummeryDto> programs,
-            Dictionary<int, List<AiProgramPillarResponse>> pillarsDict,
+        Task<byte[]> GenerateAllCountriesDetailsDocx(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole);
     }

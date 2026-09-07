@@ -51,7 +51,7 @@ namespace HornScope
                 client.Timeout = TimeSpan.FromHours(3); // supports very long API calls
             });
 
-            ServiceRegistration.AddDependencyInjection(services);
+               ServiceRegistration.AddDependencyInjection(services);     
 
             services.AddCors(options =>
             {
@@ -60,12 +60,12 @@ namespace HornScope
                     builder.WithOrigins(
                         "http://localhost:4200",
                         "https://localhost:4200",
-                        "http://HornScope.org",
-                        "https://HornScope.org",
-                        "http://admin.HornScope.org",
-                        "https://admin.HornScope.org",
-                        "http://www.HornScope.org",
-                        "https://www.HornScope.org"
+                        "http://HornScope.ai",
+                        "https://HornScope.ai",
+                        "http://admin.HornScope.ai",
+                        "https://admin.HornScope.ai",
+                        "http://www.HornScope.ai",
+                        "https://www.HornScope.ai"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()
@@ -91,7 +91,7 @@ namespace HornScope
             {
                 c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
-                    Title = "Veridian Climate Pulse Api",
+                    Title = "Africa Market Intelligence Api",
                     Version = "v1"
                 });
 
@@ -103,7 +103,7 @@ namespace HornScope
                     BearerFormat = "JWT",
                     In = Microsoft.OpenApi.Models.ParameterLocation.Header,
                     Description = "Enter 'Bearer' [space] and then your valid token.\nExample: Bearer abc123xyz"
-                                 });
+                });
 
                 c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
                 {
@@ -148,9 +148,9 @@ namespace HornScope
             services.AddAuthorization(options =>
             {
                 // CityUser with Standard or higher
-                options.AddPolicy("PaidProgramUserOnly", policy =>
+                options.AddPolicy("PaidCountryUserOnly", policy =>
                 {
-                    policy.RequireRole("ProgramUser");
+                    policy.RequireRole("CountryUser");
                     policy.RequireAssertion(context =>
                     {
                         var tier = context.User.FindFirst("Tier")?.Value;
@@ -164,7 +164,7 @@ namespace HornScope
                     policy.RequireRole("Admin"));
 
                 options.AddPolicy("StaffOnly", policy =>
-                    policy.RequireRole(UserRole.Admin.ToString(), UserRole.Analyst.ToString(), UserRole.Evaluator.ToString()));
+                    policy.RequireRole(UserRole.Admin.ToString(),UserRole.Analyst.ToString(), UserRole.Evaluator.ToString()));
             });
 
         }
@@ -185,9 +185,9 @@ namespace HornScope
             // Enable middleware to serve Swagger UI (HTML, JS, CSS, etc.)
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Veridian Climate Pulse Api");
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Africa Market Intelligence Api");
                 c.RoutePrefix = string.Empty; // Swagger UI at root URL (e.g. https://localhost:5001/)
-            });
+            });           
 
             app.UseHttpsRedirection();
 

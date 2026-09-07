@@ -2,7 +2,7 @@
 {
     public class GetDashboardModeResult
     {
-        public int? ClimateProgramID { get; set; }
+        public int? CountryID { get; set; }
         public int? PillarID { get; set; }
         public int? QuestionID { get; set; }
         public decimal? QuestionScore { get; set; }

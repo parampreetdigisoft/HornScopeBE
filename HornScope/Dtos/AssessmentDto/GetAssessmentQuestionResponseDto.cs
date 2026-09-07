@@ -1,4 +1,3 @@
-using HornScope.Enums;
 using HornScope.Models;
 
 namespace HornScope.Dtos.AssessmentDto

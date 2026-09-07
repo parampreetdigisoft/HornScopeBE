@@ -3,7 +3,7 @@ namespace HornScope.Models
     public class AssistantChatHistory
     {
         public int ChatID { get; set; }
-        public int? ClimateProgramID { get; set; }
+        public int? CountryID { get; set; }
         public int? PillarID { get; set; }
         public int? QuestionID { get; set; }
         public int UserID { get; set; }

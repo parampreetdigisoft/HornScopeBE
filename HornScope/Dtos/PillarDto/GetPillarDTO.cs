@@ -1,6 +1,6 @@
 ﻿namespace HornScope.Dtos.PillarDto
 {
-    public class GetPillarDTO
+    public class GetPillarDto
     {
         public int PillarID { get; set; }
         public string PillarName { get; set; }
@@ -12,5 +12,6 @@
         public string? PillarCode { get; set; }
         public bool IsActive { get; set; } = true;
         public int QuestionCount { get; set; }
+
     }
 }

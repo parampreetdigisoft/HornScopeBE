@@ -29,37 +29,37 @@ namespace HornScope.Services
             _docx = docx;
         }
 
-        public Task<byte[]> GenerateProgramDetails(
-            AiProgramSummeryDto program,
-            List<AiProgramPillarResponse> pillars,
+        public Task<byte[]> GenerateCountryDetails(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerProgramHistoryReportDto> peerProgram,
+            List<PeerCountryHistoryReportDto> peercountry,
             UserRole userRole,
         HornScope.IServices.DocumentFormat format = HornScope.IServices.DocumentFormat.Pdf)
         {
              var result = format == HornScope.IServices.DocumentFormat.Docx
-                ? _docx.GenerateProgramDetailsDocx(program, pillars, kpis, peerProgram, userRole)
-                : _pdf.GenerateProgramDetailsPdf(program, pillars, kpis, peerProgram, userRole);
+                ? _docx.GenerateCountryDetailsDocx(country, pillars, kpis, peercountry, userRole)
+                : _pdf.GenerateCountryDetailsPdf(country, pillars, kpis, peercountry, userRole);
 
             return result;
         }
 
         public Task<byte[]> GeneratePillarDetails(
-            AiProgramPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole,
             HornScope.IServices.DocumentFormat format = HornScope.IServices.DocumentFormat.Pdf)
             => format == HornScope.IServices.DocumentFormat.Docx
                 ? _docx.GeneratePillarDetailsDocx(pillarData, userRole)
                 : _pdf.GeneratePillarDetailsPdf(pillarData, userRole);
 
-        public Task<byte[]> GenerateAllProgramsDetails(
-            List<AiProgramSummeryDto> programs,
-            Dictionary<int, List<AiProgramPillarResponse>> pillarsDict,
+        public Task<byte[]> GenerateAllCountriesDetails(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole,
             HornScope.IServices.DocumentFormat format = HornScope.IServices.DocumentFormat.Pdf)
             => format == HornScope.IServices.DocumentFormat.Docx
-                ? _docx.GenerateAllProgramsDetailsDocx(programs, pillarsDict, kpis, userRole)
-                : _pdf.GenerateAllProgramsDetailsPdf(programs, pillarsDict, kpis, userRole);
+                ? _docx.GenerateAllCountriesDetailsDocx(countries, pillarsDict, kpis, userRole)
+                : _pdf.GenerateAllCountriesDetailsPdf(countries, pillarsDict, kpis, userRole);
     }
 }

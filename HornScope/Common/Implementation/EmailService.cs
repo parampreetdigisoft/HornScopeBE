@@ -1,5 +1,6 @@
 using HornScope.Common.Interface;
 using HornScope.Common.Models.settings;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
@@ -16,7 +17,7 @@ namespace HornScope.Common.Implementation
 {
     public class EmailService : IEmailService
     {
-        public const string LogoContentId = "vcp-logo";
+        public const string LogoContentId = "ami-logo";
 
         private readonly Mailsetting _smtpSettings;
         private readonly IRazorViewEngine _razorViewEngine;
@@ -50,20 +51,36 @@ namespace HornScope.Common.Implementation
                     DeliveryMethod = SmtpDeliveryMethod.Network,
                     TargetName = "STARTTLS/" + _smtpSettings.Host
                 };
-
                 var htmlContent = await RenderRazorViewToStringAsync(viewNamePath, model);
                 using var mailMessage = new MailMessage
                 {
                     From = new MailAddress(_smtpSettings.SenderEmail, _smtpSettings.SenderName),
                     Subject = subject,
-                    Body = "Veridian Climate Pulse notification.",
-                    IsBodyHtml = false
+                    IsBodyHtml = true
                 };
 
                 mailMessage.To.Add(toEmail);
 
-                var htmlView = AlternateView.CreateAlternateViewFromString(htmlContent, Encoding.UTF8, MediaTypeNames.Text.Html);
-                AttachLogo(htmlView);
+                var htmlView = AlternateView.CreateAlternateViewFromString(
+                    htmlContent,
+                    Encoding.UTF8,
+                    MediaTypeNames.Text.Html);
+
+                var webRoot = string.IsNullOrWhiteSpace(_env.WebRootPath)
+                    ? Path.Combine(_env.ContentRootPath, "wwwroot")
+                    : _env.WebRootPath;
+                var logoPath = Path.Combine(webRoot, "assets", "images", "Logo-market.png");
+
+                if (File.Exists(logoPath))
+                {
+                    var logo = new LinkedResource(logoPath, new ContentType("image/png"))
+                    {
+                        ContentId = LogoContentId,
+                        TransferEncoding = TransferEncoding.Base64
+                    };
+                    htmlView.LinkedResources.Add(logo);
+                }
+
                 mailMessage.AlternateViews.Add(htmlView);
 
                 await Task.Run(() => client.Send(mailMessage));
@@ -74,22 +91,6 @@ namespace HornScope.Common.Implementation
             {
                 return false;
             }
-        }
-        private void AttachLogo(AlternateView htmlView)
-        {
-            var logoPath = Path.Combine(_env.WebRootPath, "assets", "images", "vcp.png");
-            if (!File.Exists(logoPath))
-            {
-                return;
-            }
-
-            var logoResource = new LinkedResource(logoPath, "image/png")
-            {
-                ContentId = LogoContentId,
-                TransferEncoding = TransferEncoding.Base64
-            };
-            logoResource.ContentType.Name = "vcp.png";
-            htmlView.LinkedResources.Add(logoResource);
         }
 
         private async Task<string> RenderRazorViewToStringAsync(string viewName, object model)

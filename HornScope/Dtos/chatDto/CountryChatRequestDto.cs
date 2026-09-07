@@ -1,0 +1,21 @@
+namespace HornScope.Dtos.chatDto
+{
+    public class CountryChatRequestDto : ChatGlobalAskQuestionRequestDto
+    {
+        public int CountryID { get; set; }
+        public int? PillarID { get; set; }
+    }
+    public class ChatGlobalAskQuestionRequestDto
+    {
+        public string QuestionText { get; set; }
+        public string? HistoryText { get; set; }
+        public int? FAQID { get; set; }
+    }
+    public class CrossComparisionRequestDto
+    {
+        public List<int> CountryIDs { get; set; }
+        public string QuestionText { get; set; }
+        public string? HistoryText { get; set; }
+    }
+
+}

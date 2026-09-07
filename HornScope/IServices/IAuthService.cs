@@ -1,5 +1,5 @@
 using HornScope.Common.Models;
-using HornScope.Dtos.ProgramDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Dtos.EmailExistDto;
 using HornScope.Dtos.UserDtos;
 using HornScope.Models;
@@ -21,8 +21,8 @@ namespace HornScope.IServices
         Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser);
         Task<ResultResponseDto<object>> DeleteUser(int userId);
         Task<ResultResponseDto<UserResponseDto>> RefreshToken(int userId);
-        Task<ResultResponseDto<string>> SendMailForEditAssessment(SendRequestMailToUpdateProgram request);
-        Task<ResultResponseDto<UserResponseDto>> ClientSignUp(ClientSignUpDto request);
+        Task<ResultResponseDto<string>> SendMailForEditAssessment(SendRequestMailToUpdateCountry request);
+        Task<ResultResponseDto<UserResponseDto>> CountryUserSignUp(CountryUserSignUpDto request);
         Task<ResultResponseDto<object>> ConfirmMail(string passwordToken);
         Task<ResultResponseDto<object>> ContactUs(ContactUsRequestDto passwordToken);
         Task<ResultResponseDto<UserResponseDto>> TwofaVerification(string email, int otp);

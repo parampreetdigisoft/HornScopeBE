@@ -1,28 +1,26 @@
-using HornScope.Dtos.ClientDto;
-
+using HornScope.Dtos.CountryUserDto;
 namespace HornScope.Dtos.dashboard
 {
     public class DashboardModeResponseDto
     {
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int DashboardModeID { get; set; }
         public string ModeName { get; set; } = string.Empty;
         public string? Description { get; set; }
         public int Year { get; set; }
-        public decimal Vcp { get; set; }
-        public decimal AIProgramScore { get; set; }
-        public decimal ManualProgramScore { get; set; }
-        public decimal ManualValue{ get; set; }
-        public decimal VcpDirectionalMovement { get; set; }
-        public string VcpCondition { get; set; } = string.Empty;
+        public decimal Ami { get; set; }
+        public decimal AICountryScore { get; set; }
+        public decimal ManualCountryScore { get; set; }
+        public decimal ManualValue { get; set; }
+        public decimal AmiDirectionalMovement { get; set; }
+        public string AmiCondition { get; set; } = string.Empty;
         public string ManualCondition { get; set; } = string.Empty;
-        public string VcpDescriptor { get; set; } = string.Empty;
+        public string AmiDescriptor { get; set; } = string.Empty;
         public string ManualDescriptor { get; set; } = string.Empty;
-        public string VcpStrategicAction { get; set; } = string.Empty;
+        public string AmiStrategicAction { get; set; } = string.Empty;
         public List<SignalCardDto> Signals { get; set; } = new();
         public List<SignalCardDto> PrimarySignals { get; set; } = new();
         public List<SignalCardDto> SecondarySignals { get; set; } = new();
-        public List<NarrativeDto> Narratives { get; set; } = new();
     }
 
     public class DashboardQuestionScoreDto

@@ -6,8 +6,8 @@ namespace HornScope.IServices
 {
     public interface ISignalDashboardService
     {
-        Task<ResultResponseDto<DashboardModeResponseDto>> GetAmbitionDeliveryIndexDashboard(int climateProgramID, int userId, UserRole userRole);
-        Task<ResultResponseDto<DashboardModeResponseDto>> GetDiplomaticRiskDashboard(int climateProgramID, int userId, UserRole userRole);
-        Task<ResultResponseDto<DashboardModeResponseDto>> GetReadinessScorecardDashboard(int climateProgramID, int userId, UserRole userRole);
+        Task<ResultResponseDto<DashboardModeResponseDto>> GetPeaceStressTestDashboard(int countryID, int userId, UserRole userRole, int year);
+        Task<ResultResponseDto<DashboardModeResponseDto>> GetEarlyWarningDashboard(int countryID, int userId, UserRole userRole, int year);
+        Task<ResultResponseDto<DashboardModeResponseDto>> GetResilienceScorecard(int countryID, int userId, UserRole userRole, int year);
     }
 }

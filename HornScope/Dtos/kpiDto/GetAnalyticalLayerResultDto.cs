@@ -6,7 +6,7 @@ namespace HornScope.Dtos.kpiDto
     {
         public int LayerResultID { get; set; }
         public int LayerID { get; set; }
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int? InterpretationID { get; set; }
         public decimal? NormalizeValue { get; set; }       
         public decimal? CalValue5 { get; set; }
@@ -20,6 +20,6 @@ namespace HornScope.Dtos.kpiDto
         public string Purpose { get; set; } = string.Empty;       
         public string? CalText5 { get; set; }
         public ICollection<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = new List<FiveLevelInterpretation>();
-        public ClimateProgram? Program { get; set; }
+        public Country? Country { get; set; }
     }
 }

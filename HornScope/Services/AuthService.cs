@@ -1,22 +1,28 @@
+using DocumentFormat.OpenXml.InkML;
+using DocumentFormat.OpenXml.Spreadsheet;
+
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using System.Data;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
+
+using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
 using HornScope.Common.Models.settings;
 using HornScope.Data;
-using HornScope.Dtos.ProgramDto;
-using HornScope.Dtos.ClientDto;
+using HornScope.Dtos.CountryDto;
+using HornScope.Dtos.CountryUserDto;
 using HornScope.Dtos.EmailExistDto;
 using HornScope.Dtos.UserDtos;
 using HornScope.Enums;
 using HornScope.IServices;
 using HornScope.Models;
 using HornScope.Views.EmailModels;
+
+using System.Data;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 namespace HornScope.Services
 {
@@ -64,7 +70,6 @@ namespace HornScope.Services
         {
             return _context.Users.FirstOrDefault(u => u.Email == email && !u.IsDeleted);
         }
-
         public async Task<User?> GetByEmailAsync(string email)
         {
             try
@@ -77,12 +82,10 @@ namespace HornScope.Services
             }
             return null;
         }
-
         public bool VerifyPassword(string password, string hash)
         {
             return BCrypt.Net.BCrypt.Verify(password, hash);
         }
-
         public async Task<ResultResponseDto<object>> ForgotPassword(string email)
         {
             try
@@ -98,17 +101,17 @@ namespace HornScope.Services
                     var passwordToken = hash;
                     var token = passwordToken.Replace("+", " ");
 
-                    var url = user.Role != UserRole.ProgramUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                    var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
-                    var sub = "Password Update Link – Veridian Climate Pulse Platform";
+                    var sub = "Password Update Link – Africa Market Intelligence Platform";
                     var model = new EmailInvitationSendRequestDto
                     {
                         ResetPasswordUrl = passwordResetLink,
                         Title = sub,
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = url,
-                        MsgText= "A request was made to update the password for your Veridian Climate Pulse (VCP) account. To proceed, please use the secure link below:",
+                        MsgText= "A request was made to update the password for your Africa Market Intelligence (AMI) account. To proceed, please use the secure link below:",
                         IsShowBtnText=true,
                         IsLoginBtn=false,
                         BtnText= "Update Password",
@@ -134,7 +137,6 @@ namespace HornScope.Services
 
             }
         }
-
         public async Task<ResultResponseDto<object>> ChangePassword(string passwordToken, string password)
         {
             try
@@ -166,7 +168,6 @@ namespace HornScope.Services
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
         public async Task<ResultResponseDto<UserResponseDto>> Login(string email, string password)
         {
             try
@@ -179,9 +180,9 @@ namespace HornScope.Services
                 if (user.IsEmailConfirmed && !user.IsDeleted && user.Is2FAEnabled)
                 {
                     var r = await SendTwoFactorOTPAsync(user);
-                    if (r.Succeeded)
+                    if (r.Succeeded) 
                     {
-                        var sendOpt = new UserResponseDto {};
+                        var sendOpt = new UserResponseDto {};                        
                         return ResultResponseDto<UserResponseDto>.Success(sendOpt,
                           new string[] { "We've sent a one-time verification code (OTP) to your registered email address. Please check your inbox and enter the OTP to continue." });
                     }
@@ -209,7 +210,7 @@ namespace HornScope.Services
             {
                 string message = string.Empty;
 
-                if (user.Role != UserRole.ProgramUser)
+                if (user.Role != UserRole.CountryUser)
                 {
                     message = $"Your mail is not confirmed or de-activated by super {(user.Role == UserRole.Analyst ? "Admin" : "Analyst")}";
                 }
@@ -224,8 +225,8 @@ namespace HornScope.Services
             {
                 new Claim(ClaimTypes.Name, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
-                new Claim("Tier", user.Tier?.ToString() ?? ""),
-                new Claim("UserId", user!.UserID.ToString())
+                new Claim("Tier", user.Tier?.ToString() ?? ""),         
+                new Claim("UserId", user!.UserID.ToString())       
             };
             var tokenExpired = DateTime.UtcNow.AddHours(1);
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSetting.Key));
@@ -289,19 +290,19 @@ namespace HornScope.Services
                 var token = passwordToken.Replace("+", " ");
                 string roleName = inviteUser.Role.ToString();
 
-                if (inviteUser.Role == UserRole.ProgramUser)
+                if (inviteUser.Role == UserRole.CountryUser)
                 {
-                    roleName = "Program User";
+                    roleName = "Country User";
                 }
 
-                string sub = $"{roleName} Access Granted – Veridian Climate Pulse Platform";
-                var url = _appSettings.ApplicationUrl;
+                string sub = $"{roleName} Access Granted – Africa Market Intelligence Platform";
+                var url = _appSettings.ApplicationUrl; 
                 string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
-                var programName = string.Join(", ",
-                                         _context.ClimatePrograms
-                                         .Where(c => inviteUser.ClimateProgramID.Contains(c.ClimateProgramID))
-                                         .Select(c => c.ProgramName));
+                var countryName = string.Join(", ",
+                                         _context.Countries
+                                         .Where(c => inviteUser.CountryID.Contains(c.CountryID))
+                                         .Select(c => c.CountryName));
                 var invitedUser = _context.Users.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
 
                 var model = new EmailInvitationSendRequestDto
@@ -317,41 +318,41 @@ namespace HornScope.Services
                 {
                     UserRole.Analyst => "~/Views/EmailTemplates/AnalystSendInvitation.cshtml",
                     UserRole.Evaluator => "~/Views/EmailTemplates/EvaluatorSendInvitation.cshtml",
-                    UserRole.ProgramUser => "~/Views/EmailTemplates/ClientSendInvitation.cshtml",
+                    UserRole.CountryUser => "~/Views/EmailTemplates/CountryUserSendInvitation.cshtml",
                     _ => ""
                 };
 
                 var isMailSent = await _emailService.SendEmailAsync(inviteUser.Email, sub, viewNamePath, model);
                 user.ResetToken = token;
                 user.ResetTokenDate = DateTime.Now;
-                user.IsDeleted = false;
+                user.IsDeleted = false;                
                 _context.Users.Update(user);
-                if (inviteUser.Role != UserRole.ProgramUser)
+                if (inviteUser.Role != UserRole.CountryUser)
                 {
-                    foreach (var id in inviteUser.ClimateProgramID)
+                    foreach (var id in inviteUser.CountryID)
                     {
-                        var mapping = new StaffProgramMapping
+                        var mapping = new UserCountryMapping
                         {
                             UserID = user.UserID,
-                            ClimateProgramID = id,
+                            CountryID = id,
                             AssignedByUserId = inviteUser.InvitedUserID,
                             Role = user.Role
                         };
-                        _context.StaffProgramMappings.Add(mapping);
+                        _context.UserCountryMappings.Add(mapping);
                     }
                 }
-
+                
                 await _context.SaveChangesAsync();
-                if (inviteUser.Role == UserRole.ProgramUser)
+                if (inviteUser.Role == UserRole.CountryUser)
                 {
                     string tierName = inviteUser.Tier?.ToString();
-                    var kpiPayload = new AddClientKpisProgramAndPillar
+                    var kpiPayload = new AddCountryUserKpisCountryAndPillar
                     {
-                        Programs = inviteUser.IsAllPrograms ? new List<int>() : (inviteUser.ClimateProgramID ?? new List<int>()),
+                        Countries = inviteUser.IsAllCountries ? new List<int>() : (inviteUser.CountryID ?? new List<int>()),
                         Pillars = inviteUser.Pillars,
-                        IsAllPrograms = inviteUser.IsAllPrograms
+                        IsAllCountries = inviteUser.IsAllCountries
                     };
-                    var response = await AddProgramUserKpisProgramAndPillar(kpiPayload, user.UserID, tierName);
+                    var response = await AddCountryUserKpisCountryAndPillar(kpiPayload, user.UserID, tierName);
                     if (!response.Succeeded)
                     {
                         return ResultResponseDto<object>.Failure(
@@ -366,11 +367,11 @@ namespace HornScope.Services
 
                     if (isExistingUser)
                     {
-                        msg = "This user already exists. An invitation has been sent to confirm their email and access the assigned program.";
+                        msg = "This user already exists. An invitation has been sent to confirm their email and access the assigned country.";
                     }
                     else
                     {
-                        msg = "User added successfully. An invitation has been sent to access the assigned program.";
+                        msg = "User added successfully. An invitation has been sent to access the assigned country.";
                     }
                     return ResultResponseDto<object>.Success(new { }, new string[] { msg });
                 }
@@ -382,7 +383,7 @@ namespace HornScope.Services
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
+        
         public async Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser)
         {
             try
@@ -409,105 +410,105 @@ namespace HornScope.Services
                 user.Tier = inviteUser.Tier;
                 _context.Users.Update(user);
 
-                // Determine added/deleted programs
-                var (programsToAdd, programsToDelete) = await GetProgramMappingChangesAsync(
+                // Determine added/deleted countries
+                var (countriesToAdd, countriesToDelete) = await GetCountryMappingChangesAsync(
                     user.UserID,
                     inviteUser.InvitedUserID,
                     inviteUser.Role,
-                    inviteUser.ClimateProgramID
+                    inviteUser.CountryID
                 );
 
-                // Handle program mappings based on role
-                if (inviteUser.Role == UserRole.ProgramUser)
+                // Handle country mappings based on role
+                if (inviteUser.Role == UserRole.CountryUser)
                 {
                     if (inviteUser.Tier == TieredAccessPlan.Premium)
                     {
                         var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
                         inviteUser.Pillars = allPillarIds;
 
-                        if (inviteUser.IsAllPrograms)
+                        if (inviteUser.IsAllCountries)
                         {
-                            inviteUser.ClimateProgramID = await _context.ClimatePrograms
+                            inviteUser.CountryID = await _context.Countries
                                 .Where(c => c.IsActive)
-                                .Select(c => c.ClimateProgramID)
+                                .Select(c => c.CountryID)
                                 .ToListAsync();
                         }
-                        else if (inviteUser.ClimateProgramID == null || inviteUser.ClimateProgramID.Count < 1)
+                        else if (inviteUser.CountryID == null || inviteUser.CountryID.Count < 1)
                         {
                             return ResultResponseDto<object>.Failure(new[]
                             {
-                                "Premium plan requires at least one program, or all programs."
+                                "Premium plan requires at least one country, or all countries."
                             });
                         }
 
                         // Recompute add/delete after Premium normalization
-                        (programsToAdd, programsToDelete) = await GetProgramMappingChangesAsync(
+                        (countriesToAdd, countriesToDelete) = await GetCountryMappingChangesAsync(
                             user.UserID,
                             inviteUser.InvitedUserID,
                             inviteUser.Role,
-                            inviteUser.ClimateProgramID
+                            inviteUser.CountryID
                         );
                     }
 
-                    // Delete old programs
-                    var existingPrograms = await _context.ClientProgramMappings
+                    // Delete old countries
+                    var existingCountries = await _context.PublicUserCountryMappings
                         .Where(m => m.UserID == user.UserID)
                         .ToListAsync();
-                    var programsToRemove = existingPrograms.Where(c => programsToDelete.Contains(c.ClimateProgramID)).ToList();
-                    _context.ClientProgramMappings.RemoveRange(programsToRemove);
+                    var countriesToRemove = existingCountries.Where(c => countriesToDelete.Contains(c.CountryID)).ToList();
+                    _context.PublicUserCountryMappings.RemoveRange(countriesToRemove);
 
-                    // Add new programs
+                    // Add new countries
                     var utcNow = DateTime.UtcNow;
-                    var newPrograms = programsToAdd.Select(c => new ClientProgramMapping
+                    var newCountries = countriesToAdd.Select(c => new PublicUserCountryMapping
                     {
                         UserID = user.UserID,
-                        ClimateProgramID = c,
+                        CountryID = c,
                         IsActive = true,
                         UpdatedAt = utcNow
                     });
-                    await _context.ClientProgramMappings.AddRangeAsync(newPrograms);
+                    await _context.PublicUserCountryMappings.AddRangeAsync(newCountries);
 
                     // Update Pillars
                     if (inviteUser.Pillars != null)
                     {
-                        var existingPillars = await _context.ClientPillarMappings
+                        var existingPillars = await _context.CountryUserPillarMappings
                             .Where(m => m.UserID == user.UserID)
                             .ToListAsync();
-                        _context.ClientPillarMappings.RemoveRange(existingPillars);
+                        _context.CountryUserPillarMappings.RemoveRange(existingPillars);
 
-                        var newPillars = inviteUser.Pillars.Select(p => new ClientPillarMapping
+                        var newPillars = inviteUser.Pillars.Select(p => new CountryUserPillarMapping
                         {
                             UserID = user.UserID,
                             PillarID = p,
                             IsActive = true,
                             UpdatedAt = utcNow
                         });
-                        await _context.ClientPillarMappings.AddRangeAsync(newPillars);
+                        await _context.CountryUserPillarMappings.AddRangeAsync(newPillars);
                     }
                 }
                 else
                 {
-                    // Other roles use StaffProgramMappings
-                    var existingMappings = _context.StaffProgramMappings
+                    // Other roles use UserCountryMappings
+                    var existingMappings = _context.UserCountryMappings
                         .Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
                         .ToList();
 
                     // Add missing
-                    var addMappings = programsToAdd.Select(c => new StaffProgramMapping
+                    var addMappings = countriesToAdd.Select(c => new UserCountryMapping
                     {
                         UserID = user.UserID,
-                        ClimateProgramID = c,
+                        CountryID = c,
                         AssignedByUserId = inviteUser.InvitedUserID,
                         Role = user.Role
                     });
-                    _context.StaffProgramMappings.AddRange(addMappings);
+                    _context.UserCountryMappings.AddRange(addMappings);
 
                     // Delete removed
-                    var deleteMappings = existingMappings.Where(m => programsToDelete.Contains(m.ClimateProgramID)).ToList();
+                    var deleteMappings = existingMappings.Where(m => countriesToDelete.Contains(m.CountryID)).ToList();
                     foreach (var m in deleteMappings)
                     {
                         m.IsDeleted = true;
-                        _context.StaffProgramMappings.Update(m);
+                        _context.UserCountryMappings.Update(m);
                     }
                 }
 
@@ -519,24 +520,24 @@ namespace HornScope.Services
                 string msg = "User updated successfully";
 
                 var invitedUser = userList.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
-                var mergedPrograms = (inviteUser.ClimateProgramID ?? new List<int>()).Concat(programsToAdd).ToList();
-                var programDetails = await _context.ClimatePrograms
-                    .Where(c => mergedPrograms.Contains(c.ClimateProgramID))
+                var mergedCountries = (inviteUser.CountryID ?? new List<int>()).Concat(countriesToDelete).ToList();
+                var countryDetails = await _context.Countries
+                    .Where(c => mergedCountries.Contains(c.CountryID))
                     .ToListAsync();
 
-                if (programsToAdd.Count > 0)
+                if (countriesToAdd.Count > 0)
                 {
                     isMailSent = true;
-                    var addedNames = string.Join(", ", programDetails.Where(c => programsToAdd.Contains(c.ClimateProgramID)).Select(c => c.ProgramName));
-                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested program assignment ({addedNames}) for your VCP account.";
+                    var addedNames = string.Join(", ", countryDetails.Where(c => countriesToAdd.Contains(c.CountryID)).Select(c => c.CountryName));
+                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested country assignment ({addedNames}) for your AMI account.";
                 }
 
-                if (programsToDelete.Count > 0)
+                if (countriesToDelete.Count > 0)
                 {
-                    var removedNames = string.Join(", ", programDetails.Where(c => programsToDelete.Contains(c.ClimateProgramID)).Select(c => c.ProgramName));
+                    var removedNames = string.Join(", ", countryDetails.Where(c => countriesToDelete.Contains(c.CountryID)).Select(c => c.CountryName));
                     msgText = isMailSent
-                        ? msgText + $" Additionally, you no longer have access to the programs ({removedNames}) for your VCP account."
-                        : $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following programs ({removedNames}) for your VCP account.";
+                        ? msgText + $" Additionally, you no longer have access to the countries ({removedNames}) for your AMI account."
+                        : $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following countries ({removedNames}) for your AMI account.";
                     isMailSent = true;
                 }
 
@@ -544,9 +545,9 @@ namespace HornScope.Services
                 {
                     var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                     var token = hash.Replace("+", " ");
-                    string roleName = inviteUser.Role == UserRole.ProgramUser ? "Program User" : inviteUser.Role.ToString();
-                    string sub = $"{roleName} Access Granted – Veridian Climate Pulse Platform";
-                    var url = user.Role != UserRole.ProgramUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                    string roleName = inviteUser.Role == UserRole.CountryUser ? "Country User" : inviteUser.Role.ToString();
+                    string sub = $"{roleName} Access Granted – Africa Market Intelligence Platform";
+                    var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
                     var model = new EmailInvitationSendRequestDto
@@ -563,7 +564,7 @@ namespace HornScope.Services
                     {
                         UserRole.Analyst => "~/Views/EmailTemplates/AnalystSendInvitation.cshtml",
                         UserRole.Evaluator => "~/Views/EmailTemplates/EvaluatorSendInvitation.cshtml",
-                        UserRole.ProgramUser => "~/Views/EmailTemplates/ClientSendInvitation.cshtml",
+                        UserRole.CountryUser => "~/Views/EmailTemplates/CountryUserSendInvitation.cshtml",
                         _ => ""
                     };
 
@@ -600,25 +601,25 @@ namespace HornScope.Services
                 user.IsDeleted = true;
                 _context.Users.Update(user);
 
-                if (user.Role == UserRole.ProgramUser)
+                if (user.Role == UserRole.CountryUser)
                 {
                     var utcNow = DateTime.UtcNow;
 
-                    // ?? Deactivate ClientProgramMappings
-                    var clientMappings = await _context.ClientProgramMappings
+                    // ?? Deactivate PublicUserCountryMappings
+                    var publicMappings = await _context.PublicUserCountryMappings
                         .Where(x => x.UserID == userId && x.IsActive)
                         .ToListAsync();
 
-                    foreach (var mapping in clientMappings)
+                    foreach (var mapping in publicMappings)
                     {
                         mapping.IsActive = false;
                         mapping.UpdatedAt = utcNow;
                     }
 
-                    _context.ClientProgramMappings.UpdateRange(clientMappings);
+                    _context.PublicUserCountryMappings.UpdateRange(publicMappings);
 
-                    // ?? Deactivate ClientPillarMappings
-                    var pillarMappings = await _context.ClientPillarMappings
+                    // ?? Deactivate CountryUserPillarMappings
+                    var pillarMappings = await _context.CountryUserPillarMappings
                         .Where(x => x.UserID == userId && x.IsActive)
                         .ToListAsync();
 
@@ -628,20 +629,20 @@ namespace HornScope.Services
                         mapping.UpdatedAt = utcNow;
                     }
 
-                    _context.ClientPillarMappings.UpdateRange(pillarMappings);
+                    _context.CountryUserPillarMappings.UpdateRange(pillarMappings);
                 }
                 else
                 {
                     // ?? Handle other roles (existing logic)
 
-                    var userMappings = await _context.StaffProgramMappings
+                    var userMappings = await _context.UserCountryMappings
                         .Where(x => x.UserID == userId && !x.IsDeleted)
                         .ToListAsync();
 
                     foreach (var m in userMappings)
                     {
                         m.IsDeleted = true;
-                        _context.StaffProgramMappings.Update(m);
+                        _context.UserCountryMappings.Update(m);
                     }
                 }
 
@@ -675,12 +676,11 @@ namespace HornScope.Services
                 return ResultResponseDto<UserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
         public async Task<ResultResponseDto<object>> CheckEmailExist(EmailExistRequestDto request)
         {
             try
             {
-                var user = _context.Users.FirstOrDefault(u => u.Email == request.Email.Trim() && !u.IsDeleted);
+                var user =  _context.Users.FirstOrDefault(u => u.Email == request.Email.Trim() && !u.IsDeleted);
                 bool exists = user != null && user.UserID != request.UserID;
 
                 if (exists)
@@ -693,7 +693,7 @@ namespace HornScope.Services
 
                 return ResultResponseDto<object>.Success(
                     messages: new[] { "Email is Valid" }
-
+                    
                 );
             }
             catch (Exception ex)
@@ -702,7 +702,6 @@ namespace HornScope.Services
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
         public async Task<ResultResponseDto<object>> InviteBulkUser(InviteBulkUserDto inviteUserList)
         {
             try
@@ -718,9 +717,9 @@ namespace HornScope.Services
                     .Where(u => emails.Contains(u.Email))
                     .ToDictionaryAsync(u => u.Email, u => u);
 
-                // Collect new users & program mappings
+                // Collect new users & country mappings
                 var newUsers = new List<User>();
-                var newMappings = new List<StaffProgramMapping>();
+                var newMappings = new List<UserCountryMapping>();
                 var emailTasks = new List<Task>();
 
                 foreach (var inviteUser in inviteUserList.users)
@@ -756,38 +755,38 @@ namespace HornScope.Services
                         return ResultResponseDto<object>.Failure(new[] { $"User {inviteUser.Email} already has a different role." });
                     }
 
-                    var existingProgramIds = _context.StaffProgramMappings
-                        .Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
-                        .Select(m => m.ClimateProgramID)
+                    var existingCountryIds = _context.UserCountryMappings
+						.Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
+                        .Select(m => m.CountryID)
                         .ToList();
 
-                    var programsToAdd = inviteUser.ClimateProgramID.Except(existingProgramIds).ToList();
-                    foreach (var programId in programsToAdd)
+                    var countriesToAdd = inviteUser.CountryID.Except(existingCountryIds).ToList();
+                    foreach (var countryId in countriesToAdd)
                     {
-                        newMappings.Add(new StaffProgramMapping
-                        {
+                        newMappings.Add(new UserCountryMapping
+						{
                             UserID = user.UserID,
-                            ClimateProgramID = programId,
+                            CountryID = countryId,
                             AssignedByUserId = inviteUser.InvitedUserID,
                             Role = user.Role
                         });
                     }
 
-                    if (programsToAdd.Count() > 0)
+                    if (countriesToAdd.Count() > 0)
                     {
                         // 5. Handle email invitation
                         var token = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email).Replace("+", " ");
-                        var url = user.Role != UserRole.ProgramUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                        var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
 
                         string resetLink = $"{url}/auth/reset-password?PasswordToken={token}";
 
-                        var programName = string.Join(", ",
-                         _context.ClimatePrograms
-                         .Where(c => programsToAdd.Contains(c.ClimateProgramID))
-                         .Select(c => c.ProgramName));
+                        var countryName = string.Join(", ",
+                         _context.Countries
+                         .Where(c => countriesToAdd.Contains(c.CountryID))
+                         .Select(c => c.CountryName));
                         var invitedUser = _context.Users.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
 
-                        string sub = $"{inviteUser.Role.ToString()} Access Granted – Veridian Climate Pulse Platform";
+                        string sub = $"{inviteUser.Role.ToString()} Access Granted – Africa Market Intelligence Platform";
                         var model = new EmailInvitationSendRequestDto
                         {
                             ResetPasswordUrl = resetLink,
@@ -813,13 +812,13 @@ namespace HornScope.Services
                 }
 
 
-                if (newMappings.Any()) await _context.StaffProgramMappings.AddRangeAsync(newMappings);
+                if (newMappings.Any()) await _context.UserCountryMappings.AddRangeAsync(newMappings);
                 await _context.SaveChangesAsync();
 
                 // 8. Send all emails in parallel
                 if (emailTasks.Any()) await Task.WhenAll(emailTasks);
 
-                return ResultResponseDto<object>.Success(new { }, new[] { "Users will get invitation link to see assigned programs." });
+                return ResultResponseDto<object>.Success(new { }, new[] { "Users will get invitation link to see assigned countries." });
             }
             catch (Exception ex)
             {
@@ -828,7 +827,7 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<string>> SendMailForEditAssessment(SendRequestMailToUpdateProgram request)
+        public async Task<ResultResponseDto<string>> SendMailForEditAssessment(SendRequestMailToUpdateCountry request)
         {
             try
             {
@@ -842,19 +841,20 @@ namespace HornScope.Services
                 else
                 {
                     var user = users.FirstOrDefault(x => x.UserID == request.UserID);
-                    var assessment = await _context.Assessments.Include(x => x.StaffProgramMapping).FirstOrDefaultAsync(x => x.StaffProgramMappingID == request.StaffProgramMappingID);
+                    var year = DateTime.Now.Year;
+                    var assessment = await _context.Assessments.Include(x => x.UserCountryMapping).FirstOrDefaultAsync(x => x.UserCountryMappingID == request.UserCountryMappingID && x.CreatedAt.Year== year);
                     if (assessment != null)
                     {
-                        var program = _context.ClimatePrograms.FirstOrDefault(x => x.ClimateProgramID == assessment.StaffProgramMapping.ClimateProgramID);
+                        var country = _context.Countries.FirstOrDefault(x => x.CountryID == assessment.UserCountryMapping.CountryID);
 
                         var url = string.Empty;
                         if (mailToUser.Role == UserRole.Admin)
                         {
-                            url = $"admin/assesment/2/{assessment.StaffProgramMapping.ClimateProgramID}";
+                            url = $"admin/assesment/2/{assessment.UserCountryMapping.CountryID}";
                         }
                         else
                         {
-                            url = $"analyst/evaluator-response/{request.UserID}/{assessment.StaffProgramMapping.ClimateProgramID}";
+                            url = $"analyst/evaluator-response/{request.UserID}/{assessment.UserCountryMapping.CountryID}";
                         }
 
                         string passwordResetLink = _appSettings.ApplicationUrl+"/" + url;
@@ -864,7 +864,7 @@ namespace HornScope.Services
                             Title = "Request to update assessment",
                             ApiUrl = _appSettings.ApiUrl,
                             ApplicationUrl = _appSettings.ApplicationUrl,
-                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update assessment of {program?.ProgramName} from their Veridian Climate Pulse account.",
+                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update assessment of {country?.CountryName} from their Africa Market Intelligence account.",
                             BtnText = "Give Access",
                             Mail = _appSettings.AdminMail
                         };
@@ -886,8 +886,7 @@ namespace HornScope.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
-        public async Task<ResultResponseDto<UserResponseDto>> ClientSignUp(ClientSignUpDto request)
+        public async Task<ResultResponseDto<UserResponseDto>> CountryUserSignUp(CountryUserSignUpDto request)
         {
             try
             {
@@ -939,7 +938,7 @@ namespace HornScope.Services
                         user.ResetTokenDate = DateTime.Now;
                     }
                 }
-                user.TemporaryEmail = user.Email;
+                user.TemporaryEmail = user.Email;                
 
                 _context.Users.Update(user);
 
@@ -952,26 +951,25 @@ namespace HornScope.Services
                 }
                 else if (isMailSend)
                 {
-                    return ResultResponseDto<UserResponseDto>.Success(new(), new[]
-                    {
-                        "We’ve sent you a verification link. Please check your email."
+                    return ResultResponseDto<UserResponseDto>.Success(new(), new[] 
+                    { 
+                        "We’ve sent you a verification link. Please check your email." 
                     });
                 }
                 else
                 {
-                    return ResultResponseDto<UserResponseDto>.Success(new(), new[]
-                    {
-                        "Email could not be sent. Please use 'Forgot Password' to generate a new one."
+                    return ResultResponseDto<UserResponseDto>.Success(new(), new[] 
+                    { 
+                        "Email could not be sent. Please use 'Forgot Password' to generate a new one." 
                     });
                 }
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error during user signup", ex);
-                return ResultResponseDto<UserResponseDto>.Failure(new[] { "Something went wrong. Please try again later." });
+                return ResultResponseDto<UserResponseDto>.Failure(new[] { "Something went wrong. Please try again later."});
             }
         }
-
         public async Task<ResultResponseDto<object>> ConfirmMail(string passwordToken)
         {
             try
@@ -1015,7 +1013,6 @@ namespace HornScope.Services
                     new string[] { "There is an error please try later" });
             }
         }
-
         public async Task<ResultResponseDto<object>> ContactUs(ContactUsRequestDto requestDto)
         {
             try
@@ -1028,7 +1025,7 @@ namespace HornScope.Services
                     ApplicationUrl = _appSettings.PublicApplicationUrl,
                     MsgText = requestDto.Message,
                     DescriptionAboutBtnText
-                        = $"This email was sent by {requestDto.Name} from {requestDto.Program}. You can reach them at: {requestDto.Email}.",
+                        = $"This email was sent by {requestDto.Name} from {requestDto.Country}. You can reach them at: {requestDto.Email}.",
                     IsLoginBtn = false,
                     IsShowBtnText = false,
                     Mail = _appSettings.AdminMail
@@ -1072,12 +1069,12 @@ namespace HornScope.Services
 
                 // 3?? Store hashed OTP + expiry
                 user.ResetToken = otp;
-                user.ResetTokenDate = DateTime.Now;
+                user.ResetTokenDate = DateTime.Now; 
 
                 _context.Users.Update(user);
                 await _context.SaveChangesAsync();
 
-                var url = user.Role != UserRole.ProgramUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                 // 4?? Send the OTP via email
                 var model = new EmailInvitationSendRequestDto
                 {
@@ -1090,7 +1087,7 @@ namespace HornScope.Services
                     IsLoginBtn = false,
                     IsShowBtnText = false,
                     Mail = _appSettings.AdminMail,
-                    DescriptionAboutBtnText = "You are receiving this email because a login attempt was made to your VCP account. " +
+                    DescriptionAboutBtnText = "You are receiving this email because a login attempt was made to your AMI account. " +
                                "If this was you, please use the above OTP to complete your sign-in. " +
                                "If you did not request this login, please secure your account immediately by resetting your password."
                 };
@@ -1192,7 +1189,7 @@ namespace HornScope.Services
 
                     user.ProfileImagePath = "/uploads/" + fileName;
                 }
-
+               
                 bool isMailSent = false;
                 if (requestDto.Email != user.Email)
                 {
@@ -1212,7 +1209,7 @@ namespace HornScope.Services
                         Title = "Verify Your Email",
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = _appSettings.PublicApplicationUrl,
-                        MsgText = "A request was made to update the Email for your Veridian Climate Pulse (VCP) account. Please verify your email or reset your password.",
+                        MsgText = "A request was made to update the Email for your Africa Market Intelligence (AMI) account. Please verify your email or reset your password.",
                         Mail = _appSettings.AdminMail,
                         BtnText = "Verify",
                         DescriptionAboutBtnText = "Please verify your email address by clicking the button above."
@@ -1223,13 +1220,13 @@ namespace HornScope.Services
                     );
 
                     if (isMailSent)
-                    {
+                    {                       
                         user.IsEmailConfirmed = false; // Require reconfirmation for new email                       
                         user.ResetToken = token;
                         user.ResetTokenDate = DateTime.Now;
                     }
                     else
-                    {
+                    {                        
                         return ResultResponseDto<UpdateUserResponseDto>.Failure(new List<string>()
                             { "Failed to send email confirmation. Please try again later." }
                         );
@@ -1263,7 +1260,7 @@ namespace HornScope.Services
                 {
                     messages.Add("Updated Successfully");
                 }
-                return ResultResponseDto<UpdateUserResponseDto>.Success(response, messages);
+                return ResultResponseDto<UpdateUserResponseDto>.Success(response, messages);               
             }
             catch (Exception ex)
             {
@@ -1271,88 +1268,7 @@ namespace HornScope.Services
                 return ResultResponseDto<UpdateUserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
-        //public async Task<ResultResponseDto<string>> AddProgramUserKpisProgramAndPillar(AddClientKpisProgramAndPillar payload, int userId, string tierName)
-        //{
-        //    try
-        //    {
-        //        if (string.IsNullOrWhiteSpace(tierName))
-        //            return ResultResponseDto<string>.Failure(new[] { "Access tier information is missing. Please log in again." });
-
-        //        if (!Enum.TryParse<TieredAccessPlan>(tierName, true, out var tier))
-        //            return ResultResponseDto<string>.Failure(new[] { "Invalid tier access. Please contact support team." });
-
-        //        var tierLimits = tier switch
-        //        {
-        //            TieredAccessPlan.Basic => new { Min = 5, Max = 7, Name = "Basic" },
-        //            TieredAccessPlan.Standard => new { Min = 8, Max = 12, Name = "Standard" },
-        //            TieredAccessPlan.Premium => new { Min = 13, Max = 23, Name = "Premium" },
-        //            _ => new { Min = 0, Max = 0, Name = "Unknown" }
-        //        };
-
-        //        if (tier != TieredAccessPlan.Premium)
-        //        {
-        //            bool isValid =
-        //                payload.Programs.Count >= tierLimits.Min && payload.Programs.Count <= tierLimits.Max &&
-        //                payload.Pillars.Count >= tierLimits.Min && payload.Pillars.Count <= tierLimits.Max;
-
-        //            if (!isValid)
-        //            {
-        //                return ResultResponseDto<string>.Failure(new[]
-        //                {
-        //                    $"Your {tierLimits.Name} plan allows between {tierLimits.Min} and {tierLimits.Max} selections per category (Program, Pillar, and KPI). Please adjust your selections accordingly."
-        //                });
-        //            }
-        //        }
-
-        //        //  Remove existing mappings
-        //        var existingPrograms = await _context.ClientProgramMappings
-        //            .Where(m => m.UserID == userId)
-        //            .ToListAsync();
-
-        //        var existingPillars = await _context.ClientPillarMappings
-        //            .Where(m => m.UserID == userId)
-        //            .ToListAsync();
-
-        //        _context.ClientProgramMappings.RemoveRange(existingPrograms);
-        //        _context.ClientPillarMappings.RemoveRange(existingPillars);
-
-        //        var utcNow = DateTime.UtcNow;
-
-        //        var newProgramMappings = payload.Programs.Select(programId => new ClientProgramMapping
-        //        {
-        //            ClimateProgramID = programId,
-        //            UserID = userId,
-        //            IsActive = true,
-        //            UpdatedAt = utcNow
-        //        });
-
-        //        var newPillarMappings = payload.Pillars.Select(pillarId => new ClientPillarMapping
-        //        {
-        //            PillarID = pillarId,
-        //            UserID = userId,
-        //            IsActive = true,
-        //            UpdatedAt = utcNow
-        //        });
-
-        //        await _context.ClientProgramMappings.AddRangeAsync(newProgramMappings);
-        //        await _context.ClientPillarMappings.AddRangeAsync(newPillarMappings);
-
-        //        await _context.SaveChangesAsync();
-
-        //        return ResultResponseDto<string>.Success("", new[] { "Your preferences have been saved successfully." });
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        await _appLogger.LogAsync("Error occurred in AddProgramUserKpisProgramAndPillar", ex);
-        //        return ResultResponseDto<string>.Failure(new[]
-        //        {
-        //            "Something went wrong while saving your selections. Please try again later."
-        //        });
-        //    }
-        //}
-
-        public async Task<ResultResponseDto<string>> AddProgramUserKpisProgramAndPillar(AddClientKpisProgramAndPillar payload, int userId, string tierName)
+        public async Task<ResultResponseDto<string>> AddCountryUserKpisCountryAndPillar(AddCountryUserKpisCountryAndPillar payload, int userId, string tierName)
         {
             try
             {
@@ -1363,22 +1279,25 @@ namespace HornScope.Services
                     return ResultResponseDto<string>.Failure(new[] { "Invalid tier access. Please contact support team." });
 
                 var allPillarIds = await _context.Pillars.Select(p => p.PillarID).ToListAsync();
-                var allProgramIds = await _context.ClimatePrograms.Where(c => c.IsActive).Select(c => c.ClimateProgramID).ToListAsync();
+                var allCountryIds = await _context.Countries
+                    .Where(c => c.IsActive)
+                    .Select(c => c.CountryID)
+                    .ToListAsync();
 
                 if (tier == TieredAccessPlan.Premium)
                 {
                     // Premium always receives every pillar
                     payload.Pillars = allPillarIds;
 
-                    if (payload.IsAllPrograms)
+                    if (payload.IsAllCountries)
                     {
-                        payload.Programs = allProgramIds;
+                        payload.Countries = allCountryIds;
                     }
-                    else if (payload.Programs == null || payload.Programs.Count < 1)
+                    else if (payload.Countries == null || payload.Countries.Count < 1)
                     {
                         return ResultResponseDto<string>.Failure(new[]
                         {
-                            "Premium plan requires at least one program, or all programs."
+                            "Premium plan requires at least one country, or all countries."
                         });
                     }
                 }
@@ -1391,43 +1310,43 @@ namespace HornScope.Services
                         _ => new { Min = 0, Max = 0, Name = "Unknown" }
                     };
 
-                    var programCount = payload.Programs?.Count ?? 0;
+                    var countryCount = payload.Countries?.Count ?? 0;
                     var pillarCount = payload.Pillars?.Count ?? 0;
-                    var programsOk = programCount >= 1;
+                    var countriesOk = countryCount >= 1;
                     var pillarsOk = pillarCount >= pillarLimits.Min && pillarCount <= pillarLimits.Max;
 
-                    if (!programsOk || !pillarsOk)
+                    if (!countriesOk || !pillarsOk)
                     {
                         return ResultResponseDto<string>.Failure(new[]
                         {
-                            $"Your {pillarLimits.Name} plan requires at least 1 program and between {pillarLimits.Min} and {pillarLimits.Max} pillars."
+                            $"Your {pillarLimits.Name} plan requires at least 1 country and between {pillarLimits.Min} and {pillarLimits.Max} pillars."
                         });
                     }
                 }
 
                 //  Remove existing mappings
-                var existingPrograms = await _context.ClientProgramMappings
+                var existingCountries = await _context.PublicUserCountryMappings
                     .Where(m => m.UserID == userId)
                     .ToListAsync();
 
-                var existingPillars = await _context.ClientPillarMappings
+                var existingPillars = await _context.CountryUserPillarMappings
                     .Where(m => m.UserID == userId)
                     .ToListAsync();
 
-                _context.ClientProgramMappings.RemoveRange(existingPrograms);
-                _context.ClientPillarMappings.RemoveRange(existingPillars);
+                _context.PublicUserCountryMappings.RemoveRange(existingCountries);
+                _context.CountryUserPillarMappings.RemoveRange(existingPillars);
 
                 var utcNow = DateTime.UtcNow;
 
-                var newProgramMappings = payload.Programs.Select(programId => new ClientProgramMapping
+                var newCountryMappings = payload.Countries.Select(countryId => new PublicUserCountryMapping
                 {
-                    ClimateProgramID = programId,
+                    CountryID = countryId,
                     UserID = userId,
                     IsActive = true,
                     UpdatedAt = utcNow
                 });
 
-                var newPillarMappings = payload.Pillars.Select(pillarId => new ClientPillarMapping
+                var newPillarMappings = payload.Pillars.Select(pillarId => new CountryUserPillarMapping
                 {
                     PillarID = pillarId,
                     UserID = userId,
@@ -1435,8 +1354,8 @@ namespace HornScope.Services
                     UpdatedAt = utcNow
                 });
 
-                await _context.ClientProgramMappings.AddRangeAsync(newProgramMappings);
-                await _context.ClientPillarMappings.AddRangeAsync(newPillarMappings);
+                await _context.PublicUserCountryMappings.AddRangeAsync(newCountryMappings);
+                await _context.CountryUserPillarMappings.AddRangeAsync(newPillarMappings);
 
                 await _context.SaveChangesAsync();
 
@@ -1444,7 +1363,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in AddProgramUserKpisProgramAndPillar", ex);
+                await _appLogger.LogAsync("Error occurred in AddCountryUserKpisCountryAndPillar", ex);
                 return ResultResponseDto<string>.Failure(new[]
                 {
                     "Something went wrong while saving your selections. Please try again later."
@@ -1452,21 +1371,21 @@ namespace HornScope.Services
             }
         }
 
-        private async Task<(List<int> programsToAdd, List<int> programsToDelete)> GetProgramMappingChangesAsync(int userId, int assignedByUserId,
-            UserRole role, List<int> newProgramIds)
+        private async Task<(List<int> countriesToAdd, List<int> countriesToDelete)> GetCountryMappingChangesAsync( int userId, int assignedByUserId,
+            UserRole role, List<int> newCountryIds)
         {
-            List<int> existingProgramIds;
+            List<int> existingCountryIds;
 
-            if (role == UserRole.ProgramUser)
+            if (role == UserRole.CountryUser)
             {
-                var existingPrograms = await _context.ClientProgramMappings
+                var existingCountries = await _context.PublicUserCountryMappings
                     .Where(m => m.UserID == userId && m.IsActive)
                     .ToListAsync();
 
-                existingProgramIds = existingPrograms.Select(x => x.ClimateProgramID).ToList();
+                existingCountryIds = existingCountries.Select(x => x.CountryID).ToList();
 
-                var updatePrograms = existingPrograms.Where(x => x.IsDeleted && newProgramIds.Contains(x.ClimateProgramID));
-                foreach (var c in updatePrograms)
+                var updateCountries = existingCountries.Where(x => x.IsDeleted && newCountryIds.Contains(x.CountryID));
+                foreach (var c in updateCountries)
                 {
                     c.IsDeleted = false;
                     _context.Update(c);
@@ -1474,24 +1393,24 @@ namespace HornScope.Services
             }
             else
             {
-                var existingPrograms = _context.StaffProgramMappings
+                var existingCountries = _context.UserCountryMappings
                     .Where(m => m.UserID == userId && m.AssignedByUserId == assignedByUserId)
                     .ToList();
-                existingProgramIds = existingPrograms.Select(x => x.ClimateProgramID).ToList();
+                existingCountryIds = existingCountries.Select(x => x.CountryID).ToList();
 
-                var updatePrograms = existingPrograms.Where(x => x.IsDeleted && newProgramIds.Contains(x.ClimateProgramID));
-                foreach (var c in updatePrograms)
+                var updateCountries = existingCountries.Where(x=>x.IsDeleted && newCountryIds.Contains(x.CountryID));
+                foreach(var c in updateCountries)
                 {
                     c.IsDeleted = false;
                     _context.Update(c);
                 }
             }
-            newProgramIds ??= new List<int>();
+            newCountryIds ??= new List<int>();
 
-            var programsToAdd = newProgramIds.Except(existingProgramIds).ToList();
-            var programsToDelete = existingProgramIds.Except(newProgramIds).ToList();
+            var countriesToAdd = newCountryIds.Except(existingCountryIds).ToList();
+            var countriesToDelete = existingCountryIds.Except(newCountryIds).ToList();
 
-            return (programsToAdd, programsToDelete);
+            return (countriesToAdd, countriesToDelete);
         }
 
         #endregion

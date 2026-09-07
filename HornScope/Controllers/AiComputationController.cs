@@ -1,11 +1,12 @@
 using AssessmentPlatform.Dtos.AiDto;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using HornScope.Dtos.AiDto;
+using HornScope.Dtos.AssessmentDto;
 using HornScope.IServices;
 using HornScope.Models;
 using System.Security.Claims;
-using HealthIntelligence.Dtos.AiDto;
 
 namespace HornScope.Controllers
 {
@@ -29,11 +30,10 @@ namespace HornScope.Controllers
 
             return null;
         }
-
-        //private string? GetTierFromClaims()
-        //{
-        //    return User.FindFirst("Tier")?.Value;
-        //}
+        private string? GetTierFromClaims()
+        {
+            return User.FindFirst("Tier")?.Value;
+        }
         private string? GetRoleFromClaims()
         {
             return User.FindFirst(ClaimTypes.Role)?.Value;
@@ -44,9 +44,8 @@ namespace HornScope.Controllers
         {
             return Ok(await _aIComputationService.GetAITrustLevels());
         }
-
-        [HttpGet("getAIPrograms")]
-        public async Task<IActionResult> GetAIPrograms([FromQuery] AiProgramSummaryRequestDto request)
+        [HttpGet("getAICountries")]
+        public async Task<IActionResult> GetAICountries([FromQuery] AiCountrySummeryRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -61,11 +60,11 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAIPrograms(request, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICountries(request, userId.Value, userRole));
         }
 
-        [HttpGet("getAIProgramPillars")]
-        public async Task<IActionResult> GetAIProgramPillars([FromQuery] AiProgramPillarRequestDto request)
+        [HttpGet("getAICountryPillars")]
+        public async Task<IActionResult> GetAICountryPillars([FromQuery] AiCountryPillarRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -80,11 +79,11 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAIProgramPillars(request.ClimateProgramID, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICountryPillars(request.CountryID, userId.Value, userRole, request.Year));
         }
 
         [HttpGet("getAIPillarQuestions")]
-        public async Task<IActionResult> GetAIPillarQuestions([FromQuery] AiProgramPillarSummeryRequestDto r)
+        public async Task<IActionResult> GetAIPillarQuestions([FromQuery] AiCountryPillarSummeryRequestDto r)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -102,9 +101,9 @@ namespace HornScope.Controllers
             return Ok(await _aIComputationService.GetAIPillarsQuestion(r, userId.Value, userRole));
         }
 
-        [HttpGet("aiProgramDetailsReport")]
-        [Authorize(Roles = "Admin, ProgramUser")]
-        public async Task<IActionResult> DownloadProgramReport([FromQuery] AiProgramSummeryRequestPdfDto request)
+        [HttpGet("aiCountryDetailsReport")]
+        [Authorize(Roles = "Admin, CountryUser")]
+        public async Task<IActionResult> DownloadCountryReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
             {
@@ -121,7 +120,7 @@ namespace HornScope.Controllers
                     return Unauthorized("You Don't have access.");
                 }
 
-                var programDetails = await _aIComputationService.GetProgramAiSummeryDetail(userId ?? 0, userRole, request.ClimateProgramID, request.ReportType);
+                var countryDetails = await _aIComputationService.GetCountryAiSummeryDetail(userId ?? 0, userRole, request.CountryID,request.Year, request.ReportType);
 
                 // Generate PDF               
 
@@ -129,17 +128,17 @@ namespace HornScope.Controllers
                 byte[] fileBytes;
                 string contentType;
 
-                fileBytes = await _aIComputationService.GenerateProgramDetailsReport(programDetails, userRole, userId ?? 0, request.Format, request.ReportType);
+                fileBytes = await _aIComputationService.GenerateCountryDetailsReport(countryDetails, userRole, userId ?? 0, request.Format, request.ReportType);
 
                 if (request.Format == IServices.DocumentFormat.Docx)
                 {
                     contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                    fileName = $"{programDetails.ProgramName}_Details_{DateTime.Now:yyyyMMdd}.docx";
+                    fileName = $"{countryDetails.CountryName}_Details_{DateTime.Now:yyyyMMdd}.docx";
                 }
                 else
                 {
                     contentType = "application/pdf";
-                    fileName = $"{programDetails.ProgramName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                    fileName = $"{countryDetails.CountryName}_Details_{DateTime.Now:yyyyMMdd}.pdf";
                 }
 
                 return File(fileBytes, contentType, fileName);
@@ -154,10 +153,9 @@ namespace HornScope.Controllers
                 });
             }
         }
-
         [HttpGet("aiPillarDetailsReport")]
-        [Authorize(Roles = "Admin, ProgramUser")]
-        public async Task<IActionResult> DownloadPillarReport([FromQuery] AiProgramSummeryRequestPdfDto request)
+        [Authorize(Roles = "Admin, CountryUser")]
+        public async Task<IActionResult> DownloadPillarReport([FromQuery] AiCountrySummeryRequestPdfDto request)
         {
             try
             {
@@ -173,11 +171,11 @@ namespace HornScope.Controllers
                 {
                     return Unauthorized("You Don't have access.");
                 }
-                if (userRole != UserRole.Admin && userRole != UserRole.ProgramUser)
+                if (userRole != UserRole.Admin && userRole != UserRole.CountryUser)
                     return Unauthorized("You Don't have access.");
 
 
-                var pillars = await _aIComputationService.GetAIProgramPillars(request.ClimateProgramID, userId.Value, userRole);
+                var pillars = await _aIComputationService.GetAICountryPillars(request.CountryID, userId.Value, userRole, request.Year);
 
                 var pillarDetails = pillars.Result.Pillars.FirstOrDefault(x => x.PillarID == request.PillarID);
                 if (pillarDetails != null)
@@ -218,8 +216,8 @@ namespace HornScope.Controllers
             }
         }
 
-        [HttpPost("getAICrossProgramPillars")]
-        public async Task<IActionResult> GetAICrossProgramPillars([FromBody] AiClimateProgramIDsDto aiClimateProgramIDsDto)
+        [HttpPost("getAICrossCountryPillars")]
+        public async Task<IActionResult> GetAICrossCountryPillars([FromBody] AiCountryIdsDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -234,12 +232,12 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAICrossProgramPillars(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICrossCountryPillars(aiCountryIdsDto, userId.Value, userRole));
         }
 
-        [HttpPost("changedAiProgramEvaluationStatus")]
+        [HttpPost("changedAiCountryEvaluationStatus")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> ChangedAiProgramEvaluationStatus([FromBody] ChangedAiProgramEvaluationStatusDto aiClimateProgramIDsDto)
+        public async Task<IActionResult> ChangedAiCountryEvaluationStatus([FromBody] ChangedAiCountryEvaluationStatusDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -254,13 +252,13 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.ChangedAiProgramEvaluationStatus(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.ChangedAiCountryEvaluationStatus(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpPost("regenerateAiSearch")]
         [Authorize(Roles = "Admin, Analyst")]
 
-        public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiClimateProgramIDsDto)
+        public async Task<IActionResult> RegenerateAiSearch([FromBody] RegenerateAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -275,12 +273,12 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.RegenerateAiSearch(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.RegenerateAiSearch(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpPost("addComment")]
         [Authorize(Policy = "StaffOnly")]
-        public async Task<IActionResult> AddComment([FromBody] AddCommentDto aiClimateProgramIDsDto)
+        public async Task<IActionResult> AddComment([FromBody] AddCommentDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -295,11 +293,11 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.AddComment(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.AddComment(aiCountryIdsDto, userId.Value, userRole));
         }
         [HttpPost("regeneratePillarAiSearch")]
         [Authorize(Roles = "Admin, Analyst")]
-        public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiClimateProgramIDsDto)
+        public async Task<IActionResult> RegeneratePillarAiSearch([FromBody] RegeneratePillarAiSearchDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -314,11 +312,11 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.RegeneratePillarAiSearch(aiCountryIdsDto, userId.Value, userRole));
         }
-        [HttpGet("aiAllProgramDetailsReport")]
-        [Authorize(Roles = "Admin, ProgramUser")]
-        public async Task<IActionResult> DownloadAllProgramPdf([FromQuery] DownloadReportDto request)
+        [HttpGet("aiAllCountryDetailsReport")]
+        [Authorize(Roles = "Admin, CountryUser")]
+        public async Task<IActionResult> DownloadAllCountryPdf([FromQuery] DownloadReportDto request)
         {
             try
             {
@@ -334,34 +332,35 @@ namespace HornScope.Controllers
                 {
                     return Unauthorized("You Don't have access.");
                 }
-
-                var programDetails = await _aIComputationService.GetAllProgramAiSummeryDetail(userId ?? 0, userRole);
+                var year = DateTime.Now.Year;
+                var countryDetails = await _aIComputationService.GetAllCountryAiSummeryDetail(userId ?? 0, userRole, year);
                 
-                if (programDetails.Count > 0)
+                if (countryDetails.Count > 0)
                 {
-                    if (request.ClimateProgramIDs?.Count > 0)
+                    if(request.CountryIDs?.Count > 0)
                     {
-                        programDetails = programDetails.Where(x => request.ClimateProgramIDs.Contains(x.ClimateProgramID)).ToList();
+                        countryDetails = countryDetails.Where(x => request.CountryIDs.Contains(x.CountryID)).ToList();
                     }
+
                     string fileName;
                     string contentType;
-                    var pdfBytes = await _aIComputationService.GenerateAllProgramDetailsReport(programDetails, userRole, userId.GetValueOrDefault(), request.Format);
+                    var pdfBytes = await _aIComputationService.GenerateAllCountryDetailsReport(countryDetails, userRole, userId.GetValueOrDefault(), year, request.Format);
 
                     if (request.Format == IServices.DocumentFormat.Docx)
                     {
                         contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                        fileName = $"Programs_Details_{DateTime.Now:yyyyMMdd}.docx";
+                        fileName = $"Countries_Details_{DateTime.Now:yyyyMMdd}.docx";
                     }
                     else
                     {
                         contentType = "application/pdf";
-                        fileName = $"Programs_Details_{DateTime.Now:yyyyMMdd}.pdf";
+                        fileName = $"Countries_Details_{DateTime.Now:yyyyMMdd}.pdf";
                     }
 
                     return File(pdfBytes, contentType, fileName);
                 }
 
-                return NotFound("No Program Found.");
+                return NotFound("No Country Found.");
 
             }
             catch (Exception ex)
@@ -374,10 +373,9 @@ namespace HornScope.Controllers
                 });
             }
         }
-
         [HttpPost("aiResultTransfer")]
         [Authorize(Roles = "Admin, Analyst")]
-        public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiClimateProgramIDsDto)
+        public async Task<IActionResult> AiResultTransfer([FromBody] AITransferAssessmentRequestDto aiCountryIdsDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -392,7 +390,7 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.AITransferAssessment(aiClimateProgramIDsDto, userId.Value, userRole));
+            return Ok(await _aIComputationService.AITransferAssessment(aiCountryIdsDto, userId.Value, userRole));
         }
 
         [HttpGet("reCalculateKpis")]
@@ -439,9 +437,9 @@ namespace HornScope.Controllers
             return Ok(await _aIComputationService.UploadAiDocuments(uploadAiDocumentRequest ,userId.Value, userRole));
         }
 
-        [HttpGet("getAIProgramDocuments")]
+        [HttpGet("getAICountryDocuments")]
         [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> GetAIProgramDocuments([FromQuery] AiProgramDocumentRequestDto uploadAiDocumentRequest)
+        public async Task<IActionResult> GetAICountryDocuments([FromQuery] AiCountryDocumentRequestDto uploadAiDocumentRequest)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -456,12 +454,12 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAIProgramDocuments(uploadAiDocumentRequest, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICountryDocuments(uploadAiDocumentRequest, userId.Value, userRole));
         }
 
-        [HttpGet("getAIProgramPillarDocuments")]
+        [HttpGet("getAICountryPillarDocuments")]
         [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> GetAIProgramPillarDocuments([FromQuery] AiProgramPillarDocumentRequestDto uploadAiDocumentRequest)
+        public async Task<IActionResult> GetAICountryPillarDocuments([FromQuery] AiCountryPillarDocumentRequestDto uploadAiDocumentRequest)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -476,12 +474,12 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _aIComputationService.GetAIProgramPillarDocuments(uploadAiDocumentRequest, userId.Value, userRole));
+            return Ok(await _aIComputationService.GetAICountryPillarDocuments(uploadAiDocumentRequest, userId.Value, userRole));
         }
 
         [HttpPost("deleteDocument")]
         [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> DeleteDocument([FromBody] DeleteProgramDocumentRequestDto uploadAiDocumentRequest)
+        public async Task<IActionResult> DeleteDocument([FromBody] DeleteCountryDocumentRequestDto uploadAiDocumentRequest)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -521,66 +519,6 @@ namespace HornScope.Controllers
             var result = await _aIComputationService.DownloadDocument(Id, userId.GetValueOrDefault(), userRole);
 
             return result;
-        }
-
-        [HttpPost("updateAIProgramScore")]
-        [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> UpdateAIProgramScore([FromBody] UpdateAIProgramScoreDto request)
-        {
-            var userId = GetUserIdFromClaims();
-            if (userId == null)
-                return Unauthorized("User ID not found in token.");
-
-            var role = GetRoleFromClaims();
-            if (role == null || !Enum.TryParse<UserRole>(role, true, out var userRole))
-                return Unauthorized("You Don't have access.");
-
-            return Ok(await _aIComputationService.UpdateAIProgramScore(request, userId.Value, userRole));
-        }
-
-        [HttpPost("updateAIPillarScore")]
-        [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> UpdateAIPillarScore([FromBody] UpdateAIPillarScoreDto request)
-        {
-            var userId = GetUserIdFromClaims();
-            if (userId == null)
-                return Unauthorized("User ID not found in token.");
-
-            var role = GetRoleFromClaims();
-            if (role == null || !Enum.TryParse<UserRole>(role, true, out var userRole))
-                return Unauthorized("You Don't have access.");
-
-            return Ok(await _aIComputationService.UpdateAIPillarScore(request, userId.Value, userRole));
-        }
-
-        [HttpPost("updateAIDataSourceCitation")]
-        [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> UpdateAIDataSourceCitation([FromBody] UpdateAIDataSourceCitationDto request)
-        {
-            var userId = GetUserIdFromClaims();
-            if (userId == null)
-                return Unauthorized("User ID not found in token.");
-
-            var role = GetRoleFromClaims();
-            if (role == null || !Enum.TryParse<UserRole>(role, true, out var userRole))
-                return Unauthorized("You Don't have access.");
-
-            return Ok(await _aIComputationService.UpdateAIDataSourceCitation(request, userId.Value, userRole));
-        }
-
-        [HttpPost("updateAIEstimatedQuestionScore")]
-        [Authorize(Roles = "Admin,Analyst")]
-        public async Task<IActionResult> UpdateAIEstimatedQuestionScore([FromBody] UpdateAIEstimatedQuestionScoreDto request)
-        {
-            var userId = GetUserIdFromClaims();
-            if (userId == null)
-                return Unauthorized("User ID not found in token.");
-
-            var role = GetRoleFromClaims();
-            if (role == null || !Enum.TryParse<UserRole>(role, true, out var userRole))
-                return Unauthorized("You Don't have access.");
-
-            return Ok(await _aIComputationService.UpdateAIEstimatedQuestionScore(request, userId.Value, userRole));
-        }
+        }        
     }
 }

@@ -12,28 +12,29 @@ namespace HornScope.Backgroundjob
         }
         public string Type { get; set; } = string.Empty;
         public int? UserID { get; set; }
-        public int? ClimateProgramID { get; set; }
-        public bool ProgramEnable { get; set; }
+        public int? CountryID { get; set; }
+        public bool CountryEnable { get; set; }
         public bool PillarEnable { get; set; }
         public bool QuestionEnable { get; set; }
         public bool ImmediateSummaryEnable { get; set; }
         public bool RegenerateMissingQuestionsEnable { get; set; }
-        public string InsertAnalyticalLayerResults(int climateProgramID = 0)
+        public string InsertAnalyticalLayerResults(int countryID = 0)
         {
-            ClimateProgramID = climateProgramID;
+            CountryID = countryID;
             Type = "InsertAnalyticalLayerResults";
             channelService.Write(this);
             return "Execution has been started";
         }
 
-        public Task AiResearchByClimateProgramID(int climateProgramID , bool programEnable,bool pillarEnable, bool questionEnable, bool regenerateMissingQuestionsEnable = false)
+        public Task AiResearchByCountryId(int countryID , bool countryEnable,bool pillarEnable, bool questionEnable,bool immediateSummaryEnable = false, bool regenerateMissingQuestionsEnable = false)
         {
-            this.ClimateProgramID = climateProgramID;
-            this.ProgramEnable = programEnable;
+            this.CountryID = countryID;
+            this.CountryEnable = countryEnable;
             this.PillarEnable = pillarEnable;
             this.QuestionEnable = questionEnable;
+            this.ImmediateSummaryEnable = immediateSummaryEnable;
             this.RegenerateMissingQuestionsEnable = regenerateMissingQuestionsEnable;
-            Type = "AiResearchByClimateProgramID";
+            Type = "AiResearchByCountryId";
             channelService.Write(this);
             return Task.CompletedTask;
         }

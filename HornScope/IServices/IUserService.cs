@@ -9,9 +9,9 @@ namespace HornScope.IServices
     public interface IUserService
     {
         User GetByEmail(string email);
-        Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedProgram(GetUserByRoleRequestDto requestDto, int userid, UserRole userRole);
+        Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCountry(GetUserByRoleRequestDto requestDto, int userid, UserRole userRole);
         Task<ResultResponseDto<List<PublicUserResponse>>> GetEvaluatorByAnalyst(GetAssignUserDto requestDto);
-        Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToProgram(int climateProgramID);
+        Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToCountry(int countryId);
         Task<ResultResponseDto<UpdateUserResponseDto>> GetUserInfo(int userId);
 
     }

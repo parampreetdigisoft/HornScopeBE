@@ -3,7 +3,7 @@ using System;
 
 namespace HornScope.Models
 {
-    public enum UserRole { Admin = 1, Analyst = 2, Evaluator = 3, ProgramUser = 4 }
+    public enum UserRole { Admin = 1, Analyst = 2, Evaluator = 3, CountryUser = 4 }
     public class User
     {
         public int UserID { get; set; }

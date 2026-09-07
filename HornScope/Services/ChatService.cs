@@ -1,6 +1,4 @@
 
-using DocumentFormat.OpenXml.Spreadsheet;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
@@ -53,40 +51,40 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutProgram(ProgramChatRequestDto request, int userId, UserRole userRole)
+        public async Task<ResultResponseDto<ChatResponseDto>> AskAboutCountry(CountryChatRequestDto request, int userId, UserRole userRole)
         {
             try
             {
-                if(userRole == UserRole.ProgramUser)
+                if(userRole == UserRole.CountryUser)
                 {
-                    var isValidProgram = _context.ClientProgramMappings.Where(x => x.UserID == userId).Any(c => c.ClimateProgramID == request.ClimateProgramID);
-                    if (!isValidProgram)
+                    var isValidCountry = _context.PublicUserCountryMappings.Where(x => x.UserID == userId).Any(c => c.CountryID == request.CountryID);
+                    if (!isValidCountry)
                     {
-                        return ResultResponseDto<ChatResponseDto>.Failure(new[] { "You don't have access to this program data." });
+                        return ResultResponseDto<ChatResponseDto>.Failure(new[] { "You don't have access to this country data." });
                     }
                 }
 
-                var r = new ChatProgramAskQuestionRequest
+                var r = new ChatCountryAskQuestionRequest
                 {
-                    ClimateProgramID = request.ClimateProgramID,
+                    CountryID = request.CountryID,
                     PillarID = request.PillarID,
                     QuestionText = request.QuestionText,
                     FAQID = request.FAQID,
                     HistoryText = request.HistoryText
                 };
 
-                var resutl = await _aIAnalyzeService.ChatProgramAsk(r);
+                var resutl = await _aIAnalyzeService.ChatCountryAsk(r);
           
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from VCP Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
                     );
                 }
 
                 return ResultResponseDto<ChatResponseDto>.Success(new ChatResponseDto
                 {
-                    ClimateProgramID = request.ClimateProgramID,
+                    CountryID = request.CountryID,
                     PillarID = request.PillarID,
                     QuestionText = request.QuestionText,
                     FAQID = request.FAQID,
@@ -95,7 +93,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("An error occurred while processing the AskAboutProgram request.", ex);
+                await _appLogger.LogAsync("An error occurred while processing the AskAboutCountry request.", ex);
                 return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
             }
         }
@@ -116,7 +114,7 @@ namespace HornScope.Services
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from VCP Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
                     );
                 }
 
@@ -138,25 +136,25 @@ namespace HornScope.Services
         {
             try
             {
-                if (userRole == UserRole.ProgramUser)
+                if (userRole == UserRole.CountryUser)
                 {
-                    var userClimateProgramIDs = _context.ClientProgramMappings
+                    var userCountryIds = _context.PublicUserCountryMappings
                         .Where(x=>x.UserID == userId)
-                        .Select(x => x.ClimateProgramID)
+                        .Select(x => x.CountryID)
                         .ToList();
 
-                    var isValidProgram = request.ClimateProgramIDs
-                        .All(id => userClimateProgramIDs.Contains(id));
+                    var isValidCountry = request.CountryIDs
+                        .All(id => userCountryIds.Contains(id));
 
-                    if (!isValidProgram)
+                    if (!isValidCountry)
                     {
                         return ResultResponseDto<ChatResponseDto>
-                            .Failure(new[] { "You don't have access to this program data." });
+                            .Failure(new[] { "You don't have access to this country data." });
                     }
                 }
                 var r = new CrossComparisionRequest
                 {  
-                    ClimateProgramIDs = request.ClimateProgramIDs,
+                    CountryIDs = request.CountryIDs,
                     QuestionText = request.QuestionText,
                     HistoryText = request.HistoryText
                 };
@@ -166,7 +164,7 @@ namespace HornScope.Services
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from VCP Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
                     );
                 }
 
@@ -183,179 +181,128 @@ namespace HornScope.Services
                 return ResultResponseDto<ChatResponseDto>.Failure(new[] { "An error occurred while processing your request. Please try again later." });
             }
         }
-
-        public async Task<ResultResponseDto<ChatProgramExecutiveSlidesResponse>> GetProgramSlides(int climateProgramID, int userId, UserRole userRole)
+        public async Task<ResultResponseDto<ChatCountryExecutiveSlidesResponse>> GetCountrySlides(int CountryId, int userId, UserRole userRole)
         {
-            string cacheKey = $"ProgramSlides_{climateProgramID}";
+            string cacheKey = $"CountrySlides_{CountryId}";
 
             try
             {
-                if (userRole == UserRole.ProgramUser && climateProgramID != 0)
+                if (userRole == UserRole.CountryUser)
                 {
-                    var isValidProgram = _context.ClientProgramMappings.Where(x => x.UserID == userId).Any(c => c.ClimateProgramID == climateProgramID);
-                    if (!isValidProgram)
+                    var isValidCountry = _context.PublicUserCountryMappings.Where(x => x.UserID == userId).Any(c => c.CountryID == CountryId);
+                    if (!isValidCountry)
                     {
-                        return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Failure(new[] { "You don't have access to this program data." });
+                        return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "You don't have access to this country data." });
                     }
                 }
 
-                var programRanking = await _commonService.GetProgramRankings(climateProgramID);
-                var progress = await _commonService.GetProgramProgressAsync(userId, (int)userRole, climateProgramID);
-                ProgramRankingResponseDto programResult;
-                List<PillarsUserHistroyResponseDto> pillars;
+                var year = DateTime.UtcNow.Year;
 
-                if (climateProgramID == 0)
+                var countryExists = await _commonService.GetCountriesRankings(CountryId, year);
+
+                var country = countryExists.FirstOrDefault(x=>x.CountryID == CountryId);
+
+                if (country == null)
                 {
-                    if (programRanking != null && programRanking.Any())
-                    {
-                        var averageScore = programRanking.Average(p => p.ProgramAIScore ?? 0);
-                        var totalProgramCount = programRanking.Count();
+                   return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(new[] { "Country not found." });
+                }                
 
+                var pillars = (
+                    from p in _context.Pillars.Where(x => x.IsActive && !x.IsDeleted)
 
-                        // Get active pillars from database
-                        var activePillars = await _context.Pillars
-                            .Where(x => x.IsActive && !x.IsDeleted)
-                            .Select(p => new { p.PillarID, p.PillarName, p.DisplayOrder, p.ImagePath })
-                            .ToListAsync();
+                    join x in _context.AIPillarScores
+                        .Where(a => a.CountryID == country.CountryID
+                                 && a.Year == country.DataYear)
+                    on p.PillarID equals x.PillarID into pillarScores
 
-                        // Calculate average pillar scores from progress data (across all programs)
-                        pillars = activePillars.Select(p => new PillarsUserHistroyResponseDto
-                        {
-                            PillarID = p.PillarID,
-                            PillarName = p.PillarName ?? "",
-                            DisplayOrder = p.DisplayOrder,
-                            PillarScore = progress
-                                .Where(prog => prog.PillarID == p.PillarID)
-                                .Any()
-                                ? progress.Where(prog => prog.PillarID == p.PillarID)
-                                    .Average(prog => prog.AIProgress)
-                                : 0,
-                            ImagePath = p.ImagePath
-                        })
-                        .OrderBy(p => p.DisplayOrder)
-                        .ToList();
+                    from score in pillarScores.DefaultIfEmpty()
 
-                        // Filter pillars by user access if ProgramUser
-                        if (userRole == UserRole.ProgramUser)
-                        {
-                            var validPillars = _context.ClientPillarMappings
-                                .Where(x => x.UserID == userId)
-                                .Select(x => x.PillarID)
-                                .ToList();
-                            pillars = pillars.Where(x => validPillars.Contains(x.PillarID)).ToList();
-                        }
-
-                        programResult = new ProgramRankingResponseDto
-                        {
-                            ClimateProgramID = 0,
-                            ProgramName = "All Programs Average",
-                            ProgramAIScore = averageScore,
-                            DataYear = programRanking.FirstOrDefault()?.DataYear,
-                            ProgramRank = 1,
-                            TotalProgram = totalProgramCount,
-                            Pillars = pillars
-                        };
-                    }
-                    else
-                    {
-                        return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Failure(new[] { "No programs found to calculate average." });
-                    }
-                }
-                else
-                {
-                    var program = programRanking.FirstOrDefault(x => x.ClimateProgramID == climateProgramID);
-                    if (program == null)
-                    {
-                        return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Failure(new[] { "Program not found." });
-                    }
-
-                    // Get pillar progress data for the specific program
-                    var programProgress = progress.Where(x => x.ClimateProgramID == climateProgramID).ToList();
-
-                    // Get active pillars from database
-                    var activePillars = await _context.Pillars
-                        .Where(x => x.IsActive && !x.IsDeleted)
-                        .Select(p => new { p.PillarID, p.PillarName, p.DisplayOrder, p.ImagePath })
-                        .ToListAsync();
-
-                    // Get pillar scores from progress data for the specific program
-                    pillars = activePillars.Select(p => new PillarsUserHistroyResponseDto
+                    select new PillarsUserHistroyResponseDto
                     {
                         PillarID = p.PillarID,
                         PillarName = p.PillarName ?? "",
                         DisplayOrder = p.DisplayOrder,
-                        PillarScore = programProgress
-                            .Where(prog => prog.PillarID == p.PillarID && prog.ClimateProgramID == climateProgramID)
-                            .Select(prog => prog.AIProgress)
-                            .FirstOrDefault(),
+                        PillarScore = score != null ? score.AIProgress ?? 0 : 0,
                         ImagePath = p.ImagePath
-                    })
-                    .OrderBy(p => p.DisplayOrder)
-                    .ToList();
-
-                    // Filter pillars by user access if ProgramUser
-                    if (userRole == UserRole.ProgramUser)
-                    {
-                        var validPillars = _context.ClientPillarMappings
-                            .Where(x => x.UserID == userId)
-                            .Select(x => x.PillarID)
-                            .ToList();
-                        pillars = pillars.Where(x => validPillars.Contains(x.PillarID)).ToList();
                     }
+                ).ToList();
 
-                    programResult = new ProgramRankingResponseDto
-                    {
-                        ClimateProgramID = program.ClimateProgramID,
-                        ProgramName = program.ProgramName,
-                        ProgramAIScore = program.ProgramAIScore,
-                        DataYear = program.DataYear,
-                        ProgramRank = program.ProgramRank,
-                        TotalProgram = program.TotalPrograms,
-                        Pillars = pillars
-                    };
-                }
-                if (_cache.TryGetValue(cacheKey, out ChatProgramExecutiveSlidesResponse cachedResult))
+                if (userRole == UserRole.CountryUser)
                 {
-                    cachedResult.Result.Program = programResult;
+                    var validPillars = _context.CountryUserPillarMappings.Where(x => x.UserID == userId).Select(x => x.PillarID);
+                    pillars = pillars.Where(x => validPillars.Contains(x.PillarID)).ToList();
+                }
+                
 
-                    return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Success(
+
+                var countryResult = new CountryRankingResponseDto
+                {
+                    Continent = country.Continent,
+                    CountryID = country.CountryID,
+                    CountryName = country.CountryName,
+                    CountryRank = country.CountryRank,
+                    CountryAIScore = country.CountryAIScore,
+                    DataYear = country.DataYear,
+                    Region = country.Region,
+                    RegionRank= country.RegionRank,
+                    TotalCountry = country.TotalCountry,
+                    TotalCountryInRegion = country.TotalCountryInRegion,
+                    Pillars = pillars.OrderBy(p => p.DisplayOrder).ToList()
+                };
+
+                if (_cache.TryGetValue(cacheKey, out ChatCountryExecutiveSlidesResponse cachedResult))
+                {
+                    cachedResult.Result.Country = countryResult;
+
+                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
                         cachedResult,
                         new List<string>
                         {
-                            "Program executive slides fetched successfully from cache."
+                            "Country executive slides fetched successfully from cache."
                         }
                     );
                 }
 
-                var response = new ChatProgramExecutiveSlidesResponse
-                {
-                    Success = true,
-                    Message = "Program executive slides fetched successfully.",
-                    Result = new ProgramExecutiveSlidesResult
-                    {
-                        Program = programResult,
-                        RecentPerformance = new PerformanceSummary(),
-                        CombinedRisks = new List<CombinedRiskItem>(),
-                        EarlyWarnings = new List<EarlyWarningItem>()
-                    }
-                };
+                // ? Fetch from AI service
+                var result = await _aIAnalyzeService.GetCountrySlides(CountryId);
 
-                return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Success(
-                    response,
+                if (result == null || result.Success != true)
+                {
+                    return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
+                        new[]
+                        {
+                            result?.Message ??
+                            "Failed to fetch Country executive slides from AMI Aevum."
+                        }
+                    );
+                }
+
+                // ? Store in cache
+                _cache.Set(cacheKey,  result,
+                    new MemoryCacheEntryOptions
+                    { 
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(12),
+                        SlidingExpiration = TimeSpan.FromHours(10),
+                        Priority = CacheItemPriority.High
+                    });
+
+                result.Result.Country = countryResult;
+                return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Success(
+                    result,
                     new List<string>
                     {
-                         "Program executive slides fetched successfully."
+                         "Country executive slides fetched successfully."
                     }
                 );
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync(
-                    "An error occurred while processing the GetProgramSlides request.",
+                    "An error occurred while processing the GetCountrySlides request.",
                     ex
                 );
 
-                return ResultResponseDto<ChatProgramExecutiveSlidesResponse>.Failure(
+                return ResultResponseDto<ChatCountryExecutiveSlidesResponse>.Failure(
                     new[]
                     {
                         "An error occurred while processing your request. Please try again later."

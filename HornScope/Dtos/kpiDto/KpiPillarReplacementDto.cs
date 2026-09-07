@@ -1,4 +1,4 @@
-﻿namespace HornScope.Dtos.kpiDto
+namespace HornScope.Dtos.kpiDto
 {
     public class KpiPillarReplacementDto
     {
@@ -7,5 +7,4 @@
         public int NewPillarID { get; set; }
         public int CategoryNumber { get; set; }
     }
-
 }

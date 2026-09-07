@@ -2,7 +2,7 @@
 {
     public class GetProgramProgressHistoryRequestDto
     {
-        public int StaffProgramMappingID { get; set; }
+        public int UserCountryMappingID { get; set; }
         public int AssessmentID { get; set; }
     }
 }

@@ -1,10 +1,10 @@
+using HornScope.Common.Models;
+using HornScope.Common.Models.views;
+using HornScope.Dtos.AssessmentDto;
+using HornScope.Dtos.CountryDto;
+using HornScope.Models;
 using AssessmentPlatform.Models;
 using Microsoft.EntityFrameworkCore;
-using HornScope.Common.Models;
-using HornScope.Dtos.AssessmentDto;
-using HornScope.Dtos.ProgramDto;
-using HornScope.Models;
-using HornScope.Common.Models.views;
 
 namespace HornScope.Data
 {
@@ -19,38 +19,41 @@ namespace HornScope.Data
         public DbSet<AssessmentResponse> AssessmentResponses { get; set; } = default!;
         public DbSet<Assessment> Assessments { get; set; } = default!;
         public DbSet<PillarAssessment> PillarAssessments { get; set; } = default!;
-        public DbSet<ClimateProgram> ClimatePrograms { get; set; } = default!;
-        public DbSet<StaffProgramMapping> StaffProgramMappings { get; set; } = default!;
+        public DbSet<Country> Countries { get; set; } = default!;
+        public DbSet<UserCountryMapping> UserCountryMappings { get; set; } = default!;
         public DbSet<AppLogs> AppLogs { get; set; } = default!;
         public DbSet<PaymentRecord> PaymentRecords { get; set; } = default!;
-        public DbSet<ClientProgramMapping> ClientProgramMappings { get; set; } = default!;
+        public DbSet<PublicUserCountryMapping> PublicUserCountryMappings { get; set; } = default!;
         public DbSet<AnalyticalLayer> AnalyticalLayers { get; set; } = default!;
         public DbSet<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = default!;
         public DbSet<AnalyticalLayerResult> AnalyticalLayerResults { get; set; } = default!;
-        public DbSet<ClientPillarMapping> ClientPillarMappings { get; set; } = default!;
+        public DbSet<CountryUserPillarMapping> CountryUserPillarMappings { get; set; } = default!;
         public DbSet<AIDataSourceCitation> AIDataSourceCitations { get; set; } = default!;
-        public DbSet<AIProgramScore> AIProgramScores { get; set; } = default!;
+        public DbSet<AICountryScore> AICountryScores { get; set; } = default!;
         public DbSet<AIEstimatedQuestionScore> AIEstimatedQuestionScores { get; set; } = default!;
         public DbSet<AIPillarScore> AIPillarScores { get; set; } = default!;
         public DbSet<AITrustLevel> AITrustLevels { get; set; } = default!;
+        public DbSet<GetAssessmentResponseDto> GetAssessmentResponseDto { get; set; }
         public DbSet<AnalyticalLayerPillarMapping> AnalyticalLayerPillarMappings { get; set; } = default!;
-        public DbSet<EvaluationProgramProgressResultDto> ProgramProgressResults { get; set; }
-        public DbSet<ProgramRankingResultDto> ProgramRankingResults { get; set; }
-        public DbSet<GetProgramsProgressAdminDto> GetProgramsProgressAdminDto { get; set; }
-        public DbSet<AIEvaluatorProgramMapping> AIEvaluatorProgramMappings { get; set; }
-        public DbSet<ProgramPeer> ProgramPeers { get; set; } = default!;
-        public DbSet<EvaluationProgramProgressHistoryResultDto> ProgramProgressHistoryResults { get; set; }
-        public DbSet<ProgramDocument> ProgramDocuments { get; set; }
+        public DbSet<EvaluationCountryProgressResultDto> CountryProgressResults { get; set; }
+        public DbSet<CountryRankingResultDto> CountryRankingResults { get; set; }
+        public DbSet<GetCountriesProgressAdminDto> GetCountriesProgressAdminDto { get; set; }
+        public DbSet<AIUserCountryMapping> AIUserCountryMappings { get; set; }
+        public DbSet<CountryPeer> CountryPeers { get; set; } = default!;
+        public DbSet<EvaluationCountryProgressHistoryResultDto> CountryProgressHistoryResults { get; set; }
+        public DbSet<CountryDocument> CountryDocuments { get; set; }
         public DbSet<AiPillarStatsLast4MonthsView> AiPillarStatsLast4MonthsView { get; set; }
         public DbSet<AssistantChatHistory> AssistantChatHistory { get; set; }
         public DbSet<AIAssistantFAQ> AIAssistantFAQ { get; set; }
         public DbSet<DocumentChunks> DocumentChunks { get; set; }
-        public DbSet<GetAssessmentResponseDto> GetAssessmentResponseDto { get; set; }
         public DbSet<DocumentTOC> DocumentTOC { get; set; }
         public DbSet<DashboardMode> DashboardModes { get; set; } = default!;
         public DbSet<DashboardModeKPIMapping> DashboardModeKPIMappings { get; set; } = default!;
         public DbSet<GetDashboardModeResult> GetDashboardModeResults { get; set; } = default!;
         public DbSet<DashboardInterpretation> DashboardInterpretations { get; set; } = default!;
+        public DbSet<AIEditPermission> AIEditPermissions { get; set; } = default!;
+        public DbSet<AIEditSession> AIEditSessions { get; set; } = default!;
+        public DbSet<AIEditChangeLog> AIEditChangeLogs { get; set; } = default!;
 
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -90,6 +93,7 @@ namespace HornScope.Data
             .HasForeignKey(r => r.PillarAssessmentID)
             .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Country>().HasKey(uc => uc.CountryID);
             modelBuilder.Entity<PaymentRecord>(entity =>
             {
                 entity.HasKey(p => p.PaymentRecordID);
@@ -100,8 +104,8 @@ namespace HornScope.Data
                       .HasConversion<byte>();
             });
 
-            modelBuilder.Entity<StaffProgramMapping>().HasKey(uc => uc.StaffProgramMappingID);
-            modelBuilder.Entity<ClientProgramMapping>().HasKey(uc => uc.ClientProgramMappingID);
+            modelBuilder.Entity<UserCountryMapping>().HasKey(uc => uc.UserCountryMappingID);
+            modelBuilder.Entity<PublicUserCountryMapping>().HasKey(uc => uc.PublicUserCountryMappingID);
 
             modelBuilder.Entity<AnalyticalLayer>(entity =>
             {
@@ -123,37 +127,32 @@ namespace HornScope.Data
             {
                 entity.HasKey(al => al.InterpretationID);
             });
-            modelBuilder.Entity<ClientPillarMapping>().HasKey(ur => ur.ClientPillarMappingID);
+            modelBuilder.Entity<CountryUserPillarMapping>().HasKey(ur => ur.CountryUserPillarMappingID);
 
             modelBuilder.Entity<AIDataSourceCitation>().HasKey(ur => ur.CitationID);
-            modelBuilder.Entity<AIProgramScore>(entity =>
+            modelBuilder.Entity<AICountryScore>(entity =>
             {
-                entity.HasKey(e => e.ProgramScoreID);
+                entity.HasKey(e => e.CountryScoreID);
             });
             modelBuilder.Entity<AIEstimatedQuestionScore>().HasKey(ur => ur.QuestionScoreID);
             modelBuilder.Entity<AIPillarScore>().HasKey(ur => ur.PillarScoreID);
             modelBuilder.Entity<AITrustLevel>().HasKey(ur => ur.TrustID);
             modelBuilder.Entity<AnalyticalLayerPillarMapping>().HasKey(ur => ur.AnalyticalLayerPillarMappingID);
-            modelBuilder.Entity<AIEvaluatorProgramMapping>().HasKey(ur => ur.AIEvaluatorProgramMappingID);
-            modelBuilder.Entity<EvaluationProgramProgressResultDto>().HasNoKey().ToView(null); 
-            modelBuilder.Entity<ProgramRankingResultDto>().HasNoKey().ToView(null); 
-            modelBuilder.Entity<GetProgramsProgressAdminDto>().HasNoKey().ToView(null);
-            modelBuilder.Entity<EvaluationProgramProgressHistoryResultDto>().HasNoKey().ToView(null);
-            modelBuilder.Entity<ProgramPeer>(entity =>
+            modelBuilder.Entity<AIUserCountryMapping>().HasKey(ur => ur.AIUserCountryMappingID);
+            modelBuilder.Entity<EvaluationCountryProgressResultDto>().HasNoKey().ToView(null); 
+            modelBuilder.Entity<CountryRankingResultDto>().HasNoKey().ToView(null); 
+            modelBuilder.Entity<GetCountriesProgressAdminDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<EvaluationCountryProgressHistoryResultDto>().HasNoKey().ToView(null);
+            modelBuilder.Entity<CountryPeer>(entity =>
             {
-                entity.HasKey(e => e.ProgramPeerID);
-                entity.ToTable("ProgramPeers");
-            });
-            modelBuilder.Entity<ClimateProgram>(entity =>
-            {
-                entity.HasKey(e => e.ClimateProgramID);
-                entity.ToTable("ClimatePrograms");
+                entity.HasKey(e => e.CountryPeerID);
+                entity.ToTable("CountryPeers");
             });
 
-            modelBuilder.Entity<ProgramDocument>(entity =>
+            modelBuilder.Entity<CountryDocument>(entity =>
             {
-                entity.HasKey(e => e.ProgramDocumentID);
-                entity.ToTable("ProgramDocuments");
+                entity.HasKey(e => e.CountryDocumentID);
+                entity.ToTable("CountryDocuments");
             });
 
             modelBuilder.Entity<AiPillarStatsLast4MonthsView>()
@@ -164,6 +163,12 @@ namespace HornScope.Data
             {
                 entity.HasKey(e => e.ChatID);
                 entity.ToTable("AssistantChatHistory");
+            });
+
+            modelBuilder.Entity<GetAssessmentResponseDto>(eb =>
+            {
+                eb.HasNoKey();   // it's a projection, not a table row - no PK
+                eb.ToView(null); // not mapped to any table/view, only used via FromSqlRaw
             });
 
             modelBuilder.Entity<AIAssistantFAQ>(entity =>
@@ -181,12 +186,6 @@ namespace HornScope.Data
             {
                 entity.HasKey(e => e.ChunkID);
                 entity.ToTable("DocumentChunks");
-            });
-
-            modelBuilder.Entity<GetAssessmentResponseDto>(eb =>
-            {
-                eb.HasNoKey();   // it's a projection, not a table row - no PK
-                eb.ToView(null); // not mapped to any table/view, only used via FromSqlRaw
             });
 
             modelBuilder.Entity<DashboardMode>(entity =>
@@ -211,6 +210,35 @@ namespace HornScope.Data
             modelBuilder.Entity<DashboardInterpretation>(entity =>
             {
                 entity.HasKey(al => al.DashboardInterpretationID);
+            });
+
+            modelBuilder.Entity<AIEditPermission>(entity =>
+            {
+                entity.HasKey(e => e.PermissionID);
+                entity.ToTable("AIEditPermissions");
+                entity.Property(e => e.Status).HasConversion<byte>();
+            });
+
+            modelBuilder.Entity<AIEditSession>(entity =>
+            {
+                entity.HasKey(e => e.SessionID);
+                entity.ToTable("AIEditSessions");
+                entity.Property(e => e.Status).HasConversion<byte>();
+                entity.HasOne(e => e.Permission)
+                    .WithMany()
+                    .HasForeignKey(e => e.PermissionID)
+                    .OnDelete(DeleteBehavior.Restrict);
+            });
+
+            modelBuilder.Entity<AIEditChangeLog>(entity =>
+            {
+                entity.HasKey(e => e.ChangeLogID);
+                entity.ToTable("AIEditChangeLogs");
+                entity.Property(e => e.EntityType).HasConversion<byte>();
+                entity.HasOne(e => e.Session)
+                    .WithMany(s => s.ChangeLogs)
+                    .HasForeignKey(e => e.SessionID)
+                    .OnDelete(DeleteBehavior.Restrict);
             });
 
             base.OnModelCreating(modelBuilder);

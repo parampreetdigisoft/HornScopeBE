@@ -8,8 +8,8 @@ namespace HornScope.Common.Interface
 {
     public interface IPdfGeneratorService
     {
-        Task<byte[]> GenerateProgramDetailsPdf(AiProgramSummeryDto program, List<AiProgramPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerProgramHistoryReportDto> peerPrograms, UserRole userRole);
-        Task<byte[]> GeneratePillarDetailsPdf(AiProgramPillarResponse programDetails, UserRole userRole);
-        Task<byte[]> GenerateAllProgramsDetailsPdf(List<AiProgramSummeryDto> programs, Dictionary<int, List<AiProgramPillarResponse>> pillars, List<KpiChartItem> kpis, UserRole userRole);
+        Task<byte[]> GenerateCountryDetailsPdf(AiCountrySummeryDto country, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCountryHistoryReportDto> peercountry, UserRole userRole);
+        Task<byte[]> GeneratePillarDetailsPdf(AiCountryPillarResponse countryDetails, UserRole userRole);
+        Task<byte[]> GenerateAllCountriesDetailsPdf(List<AiCountrySummeryDto> countries, Dictionary<int, List<AiCountryPillarResponse>> pillars, List<KpiChartItem> kpis, UserRole userRole);
     }
 }

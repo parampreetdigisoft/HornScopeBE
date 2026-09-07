@@ -100,8 +100,9 @@ namespace HornScope.Controllers
         [HttpPost("edit/{id}")]
         [Consumes("multipart/form-data")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdatePillar( int id, [FromForm] UpdatePillarDto pillar)
+        public async Task<IActionResult> Update( int id, [FromForm] UpdatePillarDto pillar)
         {          
+
             var result = await _pillarService.UpdateAsync(id, pillar);
             if (result == null) return NotFound();
             return Ok(result);
@@ -118,7 +119,7 @@ namespace HornScope.Controllers
 
         [HttpGet("ExportPillarsHistoryByUserId")]
         [Authorize]
-        public async Task<IActionResult> ExportPillarsHistoryByUserId([FromQuery] GetProgramPillarHistoryRequestDto requestDto)
+        public async Task<IActionResult> ExportPillarsHistoryByUserId([FromQuery] GetCountryPillarHistoryRequestDto requestDto)
         {
             var claimUserId = GetUserIdFromClaims();
             if (claimUserId == null || claimUserId != requestDto.UserID)
@@ -143,7 +144,6 @@ namespace HornScope.Controllers
 
             return File(fileBytes, contentType, fileName);
         }
-
         [HttpPost("GetResponsesByUserId")]
         public async Task<IActionResult> GetResponsesByUserId([FromBody] GetPillarResponseHistoryRequestNewDto requestDto)
         {

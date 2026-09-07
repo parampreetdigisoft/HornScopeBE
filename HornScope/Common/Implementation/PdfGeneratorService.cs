@@ -1,4 +1,8 @@
+
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using HornScope.Common.Interface;
+using HornScope.Common.Models.settings;
 using HornScope.Dtos.AiDto;
 using HornScope.IServices;
 using HornScope.Models;
@@ -16,31 +20,35 @@ namespace HornScope.Common.Implementation
         #region constructor
 
         private readonly IAppLogger _appLogger;
-        public PdfGeneratorService(IAppLogger appLogger)
+        private readonly ICommonService _commonService;
+        private int _pillarCount;
+        public PdfGeneratorService(IAppLogger appLogger, ICommonService commonService)
         {
             _appLogger = appLogger;
+            _commonService = commonService;
         }
         #endregion
 
 
-        #region pdf pillars and program report
+        #region pdf pillars and country report
 
-        public async Task<byte[]> GenerateAllProgramsDetailsPdf(List<AiProgramSummeryDto> programs, Dictionary<int, List<AiProgramPillarResponse>> pillarsDict, List<KpiChartItem> kpis, UserRole userRole)
+        public async Task<byte[]> GenerateAllCountriesDetailsPdf(List<AiCountrySummeryDto> countries, Dictionary<int, List<AiCountryPillarResponse>> pillarsDict, List<KpiChartItem> kpis, UserRole userRole)
         {
             try
             {
                 QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
                 var document = Document.Create(container =>
                 {
-                    foreach(var programDetails in programs)
+                    foreach(var countryDetails in countries)
                     {
-                        if(pillarsDict.TryGetValue(programDetails.ClimateProgramID, out var pillars) && pillars.Count > 0)
+                        if(pillarsDict.TryGetValue(countryDetails.CountryID, out var pillars) && pillars.Count > 0)
                         {
                             var kpiChartItems = kpis?
-                            .Where(x => x.ClimateProgramID == programDetails.ClimateProgramID)
+                            .Where(x => x.CountryID == countryDetails.CountryID)
                             .ToList() ?? new List<KpiChartItem>();
 
-                            AddProgramDetailsPdf(container, programDetails, pillars, kpiChartItems,new(), userRole, true);
+                            AddCountryDetailsPdf(container, countryDetails, pillars, kpiChartItems,new(), userRole, true);
                         }
                     }
                 });
@@ -49,36 +57,38 @@ namespace HornScope.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateAllProgramsDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
 
-        public async Task<byte[]> GenerateProgramDetailsPdf(AiProgramSummeryDto programDetails, List<AiProgramPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerProgramHistoryReportDto> peerPrograms, UserRole userRole)
+        public async Task<byte[]> GenerateCountryDetailsPdf(AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis, List<PeerCountryHistoryReportDto> peerCountry, UserRole userRole)
         {
             try
             {
+
                 QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
                 var document = Document.Create(container =>
                 {
-                    AddProgramDetailsPdf(container, programDetails, pillars, kpis, peerPrograms, userRole, false);
+                    AddCountryDetailsPdf(container, countryDetails, pillars, kpis, peerCountry, userRole);
                 });
 
                 return document.GeneratePdf();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateProgramDetailsPdf", ex);
+                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
 
-        public async Task<byte[]> GeneratePillarDetailsPdf(AiProgramPillarResponse pillarData, UserRole userRole)
+        public async Task<byte[]> GeneratePillarDetailsPdf(AiCountryPillarResponse pillarData, UserRole userRole)
         {
             try
             {
                 QuestPDF.Settings.EnableDebugging = true;
-
+                _pillarCount = (await _commonService.GetPillars()).Count;
                 var document = Document.Create(container =>
                 {
                     container.Page(page =>
@@ -103,46 +113,46 @@ namespace HornScope.Common.Implementation
             }
         }
 
-        public void AddProgramDetailsPdf(IDocumentContainer container, AiProgramSummeryDto programDetails, List<AiProgramPillarResponse> pillars, List<KpiChartItem> kpis,
-            List<PeerProgramHistoryReportDto> peerPrograms, UserRole userRole, bool isAllPrograms = false)
+        public void AddCountryDetailsPdf(IDocumentContainer container, AiCountrySummeryDto countryDetails, List<AiCountryPillarResponse> pillars, List<KpiChartItem> kpis,
+            List<PeerCountryHistoryReportDto> peerCountries, UserRole userRole, bool isAllCountries = false)
         {
-            var kpiChartItems = kpis.OrderByDescending(x => x.Value).ToList();
+            var kpiChartItems = kpis.OrderByDescending(x=>x.Value).ToList();
 
             // Build pillar chart items (max 14)
-            var pillarChartItems = pillars.Select(p => new PillarChartItem(SanitizeText(p.PillarName)?.Length > 20   ? SanitizeText(p.PillarName)[..20]
+            var pillarChartItems = pillars.Select(p => new PillarChartItem( SanitizeText(p.PillarName)?.Length > 20   ? SanitizeText(p.PillarName)[..20]
                   : SanitizeText(p.PillarName) ?? "-",  SanitizeText(p.PillarName) ?? "-", p.AIProgress)).ToList();
 
             // -- Section 1 : Global Dashboard ---------------------------------
-            AddGlobalDashboardPage(container, programDetails, pillarChartItems, kpis, userRole);
+             AddGlobalDashboardPage(container, countryDetails, pillarChartItems, kpis, userRole);
 
 
-            // -- Section 2 : Program Summary -------------------------------------
+            // -- Section 2 : Country Summary -------------------------------------
             container.Page(page =>
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    ProgramComposeHeader(x, programDetails, userRole, null));
+                    CountryComposeHeader(x, countryDetails, userRole, null));
                 page.Content().Element(content =>
                 {
                     content.Column(column =>
                     {
                         column.Spacing(10);
                         column.Item().Element(x =>
-                            ProgramSummeryComposeContent(x, programDetails, userRole, isAllPrograms));
+                            CountrySummeryComposeContent(x, countryDetails, userRole, isAllCountries));
                     });
                 });
                 PageFooter(page);
             });
+                
 
-
-            // -- Section 3 : Pillar Radial Overview ---------------------------
+            // -- Section 3 : Domain Radial Overview ---------------------------
             if (pillars.Any())
             {
                 container.Page(page =>
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        ProgramComposeHeader(x, programDetails, userRole, "Pillar Performance Overview"));
+                        CountryComposeHeader(x, countryDetails, userRole, "Domain Performance Overview"));
                     page.Content().Element(content =>
                         PillarLineChartPage(content, pillarChartItems));
                     PageFooter(page);
@@ -150,23 +160,23 @@ namespace HornScope.Common.Implementation
             }
 
             // -- Section 1 : Global Dashboard ---------------------------------
-            if (!isAllPrograms)
+            if (!isAllCountries)
             {
-                AddPeerProgramComparisonSection(container, peerPrograms, programDetails, userRole);
-                //AddPerformanceTrendsSection(container, peerPrograms, programDetails, userRole);
+                AddPeerCountryComparisonSection(container, peerCountries, countryDetails, userRole);
+                AddPerformanceTrendsSection(container, peerCountries, countryDetails, userRole);
             }
 
-            if (!isAllPrograms)
+            if (!isAllCountries)
             {
-                // -- Section 4+ : Per-Pillar Detail ------------------------------
-                var accessiblePillars = pillars.Where(x => x.IsAccess && UserRole.ProgramUser == userRole || UserRole.ProgramUser != userRole).ToList();
+                // -- Section 4+ : Per-Domain Detail ------------------------------
+                var accessiblePillars = pillars.Where(x => x.IsAccess && UserRole.CountryUser == userRole || UserRole.CountryUser != userRole).ToList();
                 foreach (var p in accessiblePillars)
                 {
                     container.Page(page =>
                     {
                         ApplyPageDefaults(page);
                         page.Header().Element(x =>
-                            ProgramComposeHeader(x, programDetails, userRole, SanitizeText(p.PillarName)));
+                            CountryComposeHeader(x, countryDetails, userRole, SanitizeText(p.PillarName)));
                         page.Content().Element(content =>
                         {
                             content.Column(column =>
@@ -181,6 +191,7 @@ namespace HornScope.Common.Implementation
                 }
             }
 
+
             // -- Section 5 : KPI Dashboard ------------------------------------
             if (kpiChartItems.Any())
             {
@@ -188,30 +199,9 @@ namespace HornScope.Common.Implementation
                 {
                     ApplyPageDefaults(page);
                     page.Header().Element(x =>
-                        ProgramComposeHeader(x, programDetails, userRole, "KPI Dashboard"));
+                        CountryComposeHeader(x, countryDetails, userRole, "KPI Dashboard"));
                     page.Content().Element(content =>
-                        KpiDashboardPage(content, kpiChartItems, isAllPrograms));
-                    PageFooter(page);
-                });
-            }
-
-            if (!isAllPrograms)
-            {
-                // -- Section 2 : Recommendations -------------------------------------
-                container.Page(page =>
-                {
-                    ApplyPageDefaults(page);
-                    page.Header().Element(x =>
-                        ProgramComposeHeader(x, programDetails, userRole, null));
-                    page.Content().Element(content =>
-                    {
-                        content.Column(column =>
-                        {
-                            column.Spacing(10);
-                            column.Item().Element(x =>
-                                AssessmentRecommendations(x, programDetails, userRole));
-                        });
-                    });
+                        KpiDashboardPage(content, kpiChartItems, isAllCountries));
                     PageFooter(page);
                 });
             }
@@ -226,11 +216,11 @@ namespace HornScope.Common.Implementation
         {
             page.Size(PageSizes.A4);
             page.Margin(25);
-            page.PageColor(ReportThemeColors.White);
+            page.PageColor(ReportThemeColors.PageBg);
             page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Arial"));
         }
 
-        /// <summary>Standard numeric footer for Program pages.</summary>
+        /// <summary>Standard numeric footer for country pages.</summary>
         static void PageFooter(PageDescriptor page)
         {
             page.Footer().AlignCenter().Text(x =>
@@ -240,7 +230,7 @@ namespace HornScope.Common.Implementation
         }        
         void AddGlobalDashboardPage(
             IDocumentContainer doc,
-            AiProgramSummeryDto Program,
+            AiCountrySummeryDto country,
             List<PillarChartItem> pillars,   // already filtered to max 14
             List<KpiChartItem> kpis,      // already filtered to max 107
             UserRole userRole)
@@ -251,9 +241,9 @@ namespace HornScope.Common.Implementation
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    ProgramComposeHeader(x, Program, userRole, "Program Performance Dashboard"));
+                    CountryComposeHeader(x, country, userRole, "Country Performance Dashboard"));
                 page.Content().Element(x =>
-                    RenderDashboardContent(x, vPillars, kpis, Program));
+                    RenderDashboardContent(x, vPillars, kpis, country));
                 PageFooter(page);
             });
         }
@@ -262,14 +252,14 @@ namespace HornScope.Common.Implementation
             IContainer container,
             List<PillarChartItem> pillars,
             List<KpiChartItem> kpis,
-            AiProgramSummeryDto program)
+            AiCountrySummeryDto country)
         {
             //var vKpis = kpis.Where(k => k.Value.HasValue).ToList();
 
-            float overall = (float)program.AIProgress.GetValueOrDefault();
-            int kpiGreen = kpis.Count(k => k.Value > 40);
-            int kpiAmber = kpis.Count(k => k.Value >= 4 && k.Value < 40);
-            int kpiRed = kpis.Count(k => k.Value == null || k.Value < 4);
+            float overall = (float)country.AIProgress.GetValueOrDefault();
+            int kpiGreen = kpis.Count(k => k.Value >= 70);
+            int kpiAmber = kpis.Count(k => k.Value >= 40 && k.Value < 70);
+            int kpiRed = kpis.Count(k => k.Value == null || k.Value < 40);
             var best = pillars.OrderByDescending(p => p.Value).FirstOrDefault();
             var worst = pillars.OrderBy(p => p.Value).FirstOrDefault();
 
@@ -277,11 +267,11 @@ namespace HornScope.Common.Implementation
             {
                 col.Spacing(10);
 
-                // -- Row 1 : Score Donut (left)  +  Pillar Radar (right) ----------
+                // -- Row 1 : Score Donut (left)  +  Domain Radar (right) ----------
                 col.Item().Height(280).Row(row =>
                 {
                     row.RelativeItem(5).Element(x =>
-                        RenderScoreDonutCard(x, program, pillars.Count, kpis.Count, best, worst));
+                        RenderScoreDonutCard(x, country, pillars.Count, kpis.Count, best, worst));
 
                     row.ConstantItem(10);
 
@@ -317,19 +307,25 @@ namespace HornScope.Common.Implementation
 
         void RenderScoreDonutCard(
             IContainer container,
-            AiProgramSummeryDto program,
+            AiCountrySummeryDto country,
             int pillarCount,
             int kpiCount,
             PillarChartItem? best,
             PillarChartItem? worst)
         {
 
-            float score = (float)program.AIProgress.GetValueOrDefault();
-            
+            float score = (float)country.AIProgress.GetValueOrDefault();
+
             // Overall rank label
-            var globalRankLabel = program.Rank.HasValue && program.TotalProgram.HasValue && program.TotalProgram > 1
-                ? $"Program Rank: {program.Rank} / {program.TotalProgram}"
-                : "Program Rank: N/A";
+            var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry > 1
+                ? $"Continent Rank: {country.Rank} / {country.TotalCountry}"
+                : "Continent Rank: N/A";
+
+            // Regional rank label
+            var regionRankLabel = country.RegionRank.HasValue && country.RegionTotalCountry.HasValue && country.RegionTotalCountry >= 1
+                ? $"{country.Region} Region: {country.RegionRank} / {country.RegionTotalCountry}"
+                : $"{country.Region} Region: N/A";
+
 
             container
                 .Background(ReportThemeColors.White)
@@ -345,7 +341,7 @@ namespace HornScope.Common.Implementation
                     // ---------------------------------------------
                     col.Item()
                         .AlignCenter()
-                        .Text("Overall Program Score")
+                        .Text("Overall Country Score")
                         .FontSize(10)
                         .Bold()
                         .FontColor(ReportThemeColors.PdfDarkGreen);
@@ -380,11 +376,11 @@ namespace HornScope.Common.Implementation
                                         .Text(pillarCount.ToString())
                                         .FontSize(16)
                                         .Bold()
-                                        .FontColor(ReportThemeColors.DarkBlue);
+                                        .FontColor(ReportThemeColors.PdfMediumGreen);
 
                                     c.Item()
                                         .AlignCenter()
-                                        .Text("Pillars")
+                                        .Text("Domains")
                                         .FontSize(8)
                                         .FontColor(ReportThemeColors.Gray650);
                                 });
@@ -403,7 +399,7 @@ namespace HornScope.Common.Implementation
                                         .Text(kpiCount.ToString())
                                         .FontSize(16)
                                         .Bold()
-                                        .FontColor(ReportThemeColors.DarkBlue);
+                                        .FontColor(ReportThemeColors.PdfMediumGreen);
 
                                     c.Item()
                                         .AlignCenter()
@@ -414,7 +410,7 @@ namespace HornScope.Common.Implementation
                         });
 
                     // ---------------------------------------------
-                    // Best Pillar + Program Rank
+                    // Best Domain + Continent Rank
                     // ---------------------------------------------
                     if (best != null)
                     {
@@ -433,23 +429,50 @@ namespace HornScope.Common.Implementation
                                     .FontColor(ReportThemeColors.SuccessGreenText);
 
                                 row.ConstantItem(4);
+
+                                // Global rank
+                                row.AutoItem()
+                                    .Background(ReportThemeColors.SurfaceGreen)
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(globalRankLabel)
+                                    .FontSize(7)
+                                    .Bold()
+                                    .FontColor(ReportThemeColors.PdfDarkGreen);
                             });
                     }
 
                     // ---------------------------------------------
-                    // Worst Pillar
+                    // Worst Domain + Region Rank
                     // ---------------------------------------------
                     if (worst != null)
                     {
                         col.Item()
                             .PaddingTop(3)
-                            .Background(ReportThemeColors.DangerRedBg)
-                            .PaddingVertical(3)
-                            .PaddingHorizontal(5)
-                            .Text(
-                                $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})")
-                            .FontSize(7)
-                            .FontColor(ReportThemeColors.DangerRedDark);
+                            .Row(row =>
+                            {
+                                // Worst pillar
+                                row.RelativeItem()
+                                    .Background(ReportThemeColors.DangerRedBg)
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(
+                                        $"▼ {Shorten(worst.Name, 16)} ({worst.Value:F0})")
+                                    .FontSize(7)
+                                    .FontColor(ReportThemeColors.DangerRedDark);
+
+                                row.ConstantItem(4);
+
+                                // Region rank
+                                row.AutoItem()
+                                    .Background(ReportThemeColors.WarningOrangeBg)
+                                    .PaddingVertical(3)
+                                    .PaddingHorizontal(5)
+                                    .Text(regionRankLabel)
+                                    .FontSize(7)
+                                    .Bold()
+                                    .FontColor(ReportThemeColors.WarningOrangeText);
+                            });
                     }
                 });
         }
@@ -480,7 +503,7 @@ namespace HornScope.Common.Implementation
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = thick,
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.NavyBlue),
                 IsAntialias = true,
                 StrokeCap = SKStrokeCap.Round
             };
@@ -502,7 +525,7 @@ namespace HornScope.Common.Implementation
             // Center: score value
             using var bigTxt = new SKPaint
             {
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.NavyBlue),
                 TextSize = 26,
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center,
@@ -518,11 +541,11 @@ namespace HornScope.Common.Implementation
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
-            canvas.DrawText("Program score", cx, cy + 21, subTxt);
+            canvas.DrawText("country score", cx, cy + 21, subTxt);
         }
 
         // -----------------------------------------------------------------------------
-        //  DASHBOARD WIDGET . Pillar Radar / Spider Card
+        //  DASHBOARD WIDGET . Domain Radar / Spider Card
         // -----------------------------------------------------------------------------
 
         void RenderPillarRadarCard(IContainer container, List<PillarChartItem> pillars)
@@ -534,7 +557,7 @@ namespace HornScope.Common.Implementation
                 .Column(col =>
                 {
                     col.Item().AlignCenter()
-                        .Text("Pillar Performance Radar")
+                        .Text("Domain Performance Radar")
                         .FontSize(10).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     col.Item().Height(230).Canvas((canvas, size) =>
@@ -580,7 +603,7 @@ namespace HornScope.Common.Implementation
             // -- spoke axes ------------------------------------------------------
             using var axisPaint = new SKPaint
             {
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.ChartBlueLight),
                 StrokeWidth = 0.7f,
                 IsAntialias = true
             };
@@ -604,14 +627,14 @@ namespace HornScope.Common.Implementation
             using var fillPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue).WithAlpha(55),
+                Color = SKColor.Parse(ReportThemeColors.ChartMediumBlue).WithAlpha(55),
                 IsAntialias = true
             };
             using var edgePaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 2f,
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.AccentKeyDevelopments),
                 IsAntialias = true
             };
             canvas.DrawPath(dataPath, fillPaint);
@@ -621,7 +644,7 @@ namespace HornScope.Common.Implementation
             using var dotPaint = new SKPaint
             {
                 Style = SKPaintStyle.Fill,
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.AccentKeyDevelopments),
                 IsAntialias = true
             };
             using var dotBorder = new SKPaint
@@ -705,13 +728,13 @@ namespace HornScope.Common.Implementation
                     col.Item().PaddingTop(7).Row(row =>
                     {
                         DashboardStatCard(row.RelativeItem(),
-                            green.ToString(), "Performing ≥ 40%", ReportThemeColors.AccentEquityAssessment, ReportThemeColors.SuccessGreen);
+                            green.ToString(), "Performing =70%", ReportThemeColors.AccentEquityAssessment, ReportThemeColors.SuccessGreen);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
-                            amber.ToString(), "Developing 0-39%", ReportThemeColors.WarningAmberBg, ReportThemeColors.WarningOrangeDark);
+                            amber.ToString(), "Developing 40.69%", ReportThemeColors.WarningAmberBg, ReportThemeColors.WarningOrangeDark);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
-                            red.ToString(), "Needs Improvement < 0%", ReportThemeColors.DangerRedBg, ReportThemeColors.DangerRed);
+                            red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.DangerRedBg, ReportThemeColors.DangerRed);
                         row.ConstantItem(8);
                         DashboardStatCard(row.RelativeItem(),
                             total.ToString(), "Total KPIs", ReportThemeColors.SurfaceGreenAlt, ReportThemeColors.PdfDarkGreen);
@@ -753,8 +776,8 @@ namespace HornScope.Common.Implementation
                     col.Item().Row(hdr =>
                     {
                         hdr.RelativeItem()
-                            .Text("KPI Overview - All Indicators (sorted high to low)")
-                            .FontSize(9).Bold().FontColor(ReportThemeColors.DarkBlue);
+                            .Text("KPI Overview . All Indicators (sorted high ? low)")
+                            .FontSize(9).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
                         hdr.AutoItem()
                             .Text($"Avg: {avg:F1}%")
                             .FontSize(9).Bold().FontColor(GetBarColor(avg));
@@ -776,15 +799,9 @@ namespace HornScope.Common.Implementation
             if (n < 2) return;
 
             const float lp = 28f, bp = 12f, tp = 4f;
-            const float domainMax = 100f, domainMin = -100f;
-            const float domainRange = domainMax - domainMin; // 200
-
             float w = size.Width - lp;
             float h = size.Height - bp - tp;
             float sx = w / (n - 1);
-
-            // Single source of truth for value -> y. Used by grid, line, fill, threshold.
-            float MapY(double value) => tp + h * (domainMax - (float)value) / domainRange;
 
             // Grid lines
             using var gp = new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceGreenLight), StrokeWidth = 0.7f };
@@ -795,30 +812,26 @@ namespace HornScope.Common.Implementation
                 TextAlign = SKTextAlign.Right,
                 IsAntialias = true
             };
-
-            foreach (float m in new[] { 100f, 60f, 30f, 0f, -30f, -60f, -100f })
+            foreach (float m in new[] { 25f, 50f, 75f, 100f })
             {
-                float y = MapY(m);
+                float y = tp + h - m / 100f * h;
                 canvas.DrawLine(lp, y, size.Width, y, gp);
                 canvas.DrawText($"{(int)m}", lp - 3, y + 3, gl);
             }
 
-            // Gradient fill under line (anchored at the zero line, not the bottom of the canvas,
-            // so negative values fill upward from zero instead of down to -100)
-            float yZero = MapY(0);
-
+            // Gradient fill under line
             var fPath = new SKPath();
-            fPath.MoveTo(lp, yZero);
-            fPath.LineTo(lp, MapY((float)data[0].Value));
+            fPath.MoveTo(lp, tp + h);
+            fPath.LineTo(lp, tp + h - (float)(data[0].Value ) / 100f * h);
             for (int i = 1; i < n; i++)
-                fPath.LineTo(lp + i * sx, MapY((float)data[i].Value));
-            fPath.LineTo(lp + (n - 1) * sx, yZero);
+                fPath.LineTo(lp + i * sx, tp + h - (float)(data[i].Value) / 100f * h);
+            fPath.LineTo(lp + (n - 1) * sx, tp + h);
             fPath.Close();
 
             using var shader = SKShader.CreateLinearGradient(
                 new SKPoint(0, tp), new SKPoint(0, tp + h),
-                new[] { SKColor.Parse(ReportThemeColors.DarkBlue).WithAlpha(95),
-        SKColor.Parse(ReportThemeColors.DarkBlue).WithAlpha(8) },
+                new[] { SKColor.Parse(ReportThemeColors.PdfMediumGreen).WithAlpha(95),
+                SKColor.Parse(ReportThemeColors.PdfMediumGreen).WithAlpha(8) },
                 null, SKShaderTileMode.Clamp);
             using var fp = new SKPaint { Shader = shader, Style = SKPaintStyle.Fill };
             canvas.DrawPath(fPath, fp);
@@ -828,20 +841,20 @@ namespace HornScope.Common.Implementation
             for (int i = 0; i < n; i++)
             {
                 float x = lp + i * sx;
-                float y = MapY((float)data[i].Value);
+                float y = tp + h - (float)(data[i].Value) / 100f * h;
                 if (i == 0) lPath.MoveTo(x, y); else lPath.LineTo(x, y);
             }
             using var lPaint = new SKPaint
             {
                 Style = SKPaintStyle.Stroke,
                 StrokeWidth = 1.6f,
-                Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                Color = SKColor.Parse(ReportThemeColors.PdfMediumGreen),
                 IsAntialias = true
             };
             canvas.DrawPath(lPath, lPaint);
 
-            // Dashed 70% threshold
-            float y70 = MapY(70f);
+            // Dashed 70 % threshold
+            float y70 = tp + h - 0.70f * h;
             using var thPaint = new SKPaint
             {
                 Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(140),
@@ -869,21 +882,21 @@ namespace HornScope.Common.Implementation
         //  KPI DASHBOARD PAGE  .  numbered bar chart + full-name reference tables
         // -----------------------------------------------------------------------------
 
-        void KpiDashboardPage(IContainer container, List<KpiChartItem> kpis, bool isAllPrograms = false)
+        void KpiDashboardPage(IContainer container, List<KpiChartItem> kpis, bool isAllCountries =false)
         {
             
             if (!kpis.Any()) return;
 
             int total = kpis.Count;
-            int kpiGreen = kpis.Count(k => k.Value > 40);
-            int kpiAmber = kpis.Count(k => k.Value >= 4 && k.Value < 40);
-            int kpiRed = kpis.Count(k => k.Value == null || k.Value < 4);
+            int green = kpis.Count(x => x.Value >= 70);
+            int amber = kpis.Count(x => x.Value is >= 40 and < 70);
+            int red = kpis.Count(x =>  x.Value < 40);
             float avg = (float)kpis.Average(x => x.Value);
 
             // 18 bars per chart row . compact but legible
             var groups = kpis
                 .Select((k, i) => new { k, i })
-                .GroupBy(x => x.i / 13)
+                .GroupBy(x => x.i / 18)
                 .Select(g => g.Select(x => x.k).ToList())
                 .ToList();
 
@@ -894,7 +907,7 @@ namespace HornScope.Common.Implementation
 
                 // -- top summary strip ---------------------------------------------
                 col.Item().Height(70).Element(x =>
-                    DrawKpiSummaryBand(x, total, kpiGreen, kpiAmber, kpiRed, avg));
+                    DrawKpiSummaryBand(x, total, green, amber, red, avg));
 
                 //if(topKpis.Any())
                 //    col.Item().Height(130).Element(x =>
@@ -905,7 +918,7 @@ namespace HornScope.Common.Implementation
                 foreach (var group in groups.Where(g => g.Any()))
                 {
                     int localOffset = offset;          // capture for lambda
-                    col.Item().Element(x => DrawKpiGroupSection(x, group, localOffset , isAllPrograms));
+                    col.Item().Element(x => DrawKpiGroupSection(x, group, localOffset, isAllCountries));
                     offset += group.Count;
                 }
             });
@@ -926,14 +939,14 @@ namespace HornScope.Common.Implementation
                 {
                     KpiStatPill(row.RelativeItem(), total.ToString(), "Total KPIs", ReportThemeColors.AccentGreen, ReportThemeColors.AccentGreenAlpha15);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), green.ToString(), "Performing ≥ 40 %", ReportThemeColors.AccentGreen, ReportThemeColors.AccentGreenAlpha15);
+                    KpiStatPill(row.RelativeItem(), green.ToString(), "Performing = 70 %", ReportThemeColors.AccentGreen, ReportThemeColors.AccentGreenAlpha15);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), amber.ToString(), "Developing 0-39 %", ReportThemeColors.WarningOrange, ReportThemeColors.WarningOrangeAlpha15);
+                    KpiStatPill(row.RelativeItem(), amber.ToString(), "Developing 40.69 %", ReportThemeColors.WarningOrange, ReportThemeColors.WarningOrangeAlpha15);
                     row.ConstantItem(6);
-                    KpiStatPill(row.RelativeItem(), red.ToString(), "Needs Improvement < 0 %", ReportThemeColors.DangerRedLight, ReportThemeColors.DangerRedAlpha15);
+                    KpiStatPill(row.RelativeItem(), red.ToString(), "Needs Improvement < 40 %", ReportThemeColors.DangerRedLight, ReportThemeColors.DangerRedAlpha15);
                     row.ConstantItem(6);
                     KpiStatPill(row.RelativeItem(), $"{avg:F1}%", "Average Score",
-                        avg >= 70 ? ReportThemeColors.AccentGreen : avg >= 20 ? ReportThemeColors.WarningOrange : ReportThemeColors.DangerRedLight,
+                        avg >= 70 ? ReportThemeColors.AccentGreen : avg >= 40 ? ReportThemeColors.WarningOrange : ReportThemeColors.DangerRedLight,
                         ReportThemeColors.AccentGreenAlpha15);
                 });
         }
@@ -943,16 +956,16 @@ namespace HornScope.Common.Implementation
         //  GROUP SECTION  .  bar chart on top, two-column legend table below
         // -----------------------------------------------------------------------------
 
-        void DrawKpiGroupSection(IContainer container, List<KpiChartItem> group, int offset, bool isAllPrograms = false )
+        void DrawKpiGroupSection(IContainer container, List<KpiChartItem> group, int offset, bool isAllCountries = false)
         {
             container
                 .Border(1).BorderColor(ReportThemeColors.BorderGreenMid)
                 .Column(col =>
                 {
                     // bar chart . numbers printed below each bar
-                    col.Item().Height(148).Element(x => DrawKpiBarChart(x, group, offset, isAllPrograms));
+                    col.Item().Height(148).Element(x => DrawKpiBarChart(x, group, offset, isAllCountries));
 
-                    if (!isAllPrograms)
+                    if (!isAllCountries)
                     {
                         // hairline separator between chart and table
                         col.Item().Height(1).Background(ReportThemeColors.BorderGreenMid);
@@ -967,7 +980,7 @@ namespace HornScope.Common.Implementation
         // -----------------------------------------------------------------------------
         //  BAR CHART  .  sequential index numbers below each bar (not cryptic codes)
         // -----------------------------------------------------------------------------
-        void DrawKpiBarChart(IContainer container, List<KpiChartItem> data, int offset, bool isAllPrograms = false)
+        void DrawKpiBarChart(IContainer container, List<KpiChartItem> data, int offset, bool isAllCountries = false)
         {
             container
                 .Background(ReportThemeColors.White)
@@ -975,8 +988,8 @@ namespace HornScope.Common.Implementation
                 {
                     if (!data.Any()) return;
 
-                    const float lp = 30f;   // left pad (increased for negative labels)
-                    const float rp = 12f;   // right pad
+                    const float lp = 8f;   // left pad
+                    const float rp = 8f;   // right pad
                     const float tp = 22f;  // top pad  (value labels)
                     const float bp = 26f;  // bottom pad (index labels)
 
@@ -986,9 +999,6 @@ namespace HornScope.Common.Implementation
                     float barW = chartW / n;
                     float innerW = barW * 0.62f;
                     float barGap = (barW - innerW) / 2f;
-
-                    // Calculate zero baseline (middle of chart for -100 to 100 range)
-                    float zeroY = tp + chartH / 2f;
 
                     // -- background grid lines -------------------------------------
                     using var gridPaint = new SKPaint
@@ -1002,20 +1012,18 @@ namespace HornScope.Common.Implementation
                         Color = SKColor.Parse(ReportThemeColors.BlueGrayLight),
                         TextSize = 7f,
                         IsAntialias = true,
-                        TextAlign = SKTextAlign.Right
+                        TextAlign = SKTextAlign.Left
                     };
 
-                    // Draw grid lines for range -100 to 100
-                    foreach (float pct in new[] { -100f, -80f, -60f, -40f, -20f, 0f, 20f, 40f, 60f, 80f, 100f })
+                    foreach (float pct in new[] { 25f, 50f, 75f, 100f })
                     {
-                        // Map value from -100..100 to y coordinate
-                        float gy = zeroY - (pct / 100f * (chartH / 2f));
+                        float gy = tp + chartH - pct / 100f * chartH;
                         canvas.DrawLine(lp, gy, lp + chartW, gy, gridPaint);
-                        canvas.DrawText($"{(int)pct}", lp - 4, gy + 3, gridLblPaint);
+                        canvas.DrawText($"{(int)pct}", lp + 2, gy - 2, gridLblPaint);
                     }
 
                     // -- dashed 70 % performance threshold ------------------------
-                    float y70 = zeroY - (70f / 100f * (chartH / 2f));
+                    float y70 = tp + chartH - 0.70f * chartH;
                     using var threshPaint = new SKPaint
                     {
                         Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(100),
@@ -1024,15 +1032,6 @@ namespace HornScope.Common.Implementation
                         IsAntialias = true
                     };
                     canvas.DrawLine(lp, y70, lp + chartW, y70, threshPaint);
-
-                    // -- stronger zero baseline ------------------------------------
-                    using var zeroLinePaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.BlueGrayDark),
-                        StrokeWidth = 1.2f,
-                        IsAntialias = true
-                    };
-                    canvas.DrawLine(lp, zeroY, lp + chartW, zeroY, zeroLinePaint);
 
                     // -- paint reused across bars ----------------------------------
                     using var valLblPaint = new SKPaint
@@ -1051,42 +1050,27 @@ namespace HornScope.Common.Implementation
                         float v = (float)(data[i].Value);
                         var shortName = data[i].ShortName;
                         float bx = lp + i * barW + barGap;
-
-                        // Calculate bar height for -100 to 100 range
-                        float bh = Math.Abs(v) / 100f * (chartH / 2f);
-                        float by, barBottom;
-
-                        if (v >= 0)
-                        {
-                            // Positive values: bar goes up from zero
-                            by = zeroY - bh;
-                            barBottom = zeroY;
-                        }
-                        else
-                        {
-                            // Negative values: bar goes down from zero
-                            by = zeroY;
-                            barBottom = zeroY + bh;
-                        }
-
+                        float bh = v / 100f * chartH;
+                        float by = tp + chartH - bh;
                         SKColor color = GetColor(v);
-                        SKColor textcolor = SKColor.Parse(ReportThemeColors.Black);
+                        SKColor textcolor = v > 85 ? SKColor.Parse(ReportThemeColors.White) : SKColor.Parse(ReportThemeColors.Black);
 
-                        // ghost (full-height tinted background) - only in bar direction
+
+                        // ghost (full-height tinted background)
                         using var ghostPaint = new SKPaint
                         { Color = color.WithAlpha(35), IsAntialias = true };
                         canvas.DrawRoundRect(
-                            new SKRoundRect(new SKRect(bx, by, bx + innerW, barBottom), 2, 2),
+                            new SKRoundRect(new SKRect(bx, tp, bx + innerW, tp + chartH), 2, 2),
                             ghostPaint);
 
                         // filled bar with linear gradient
                         using var shader = SKShader.CreateLinearGradient(
-                            new SKPoint(0, by), new SKPoint(0, barBottom),
+                            new SKPoint(0, by), new SKPoint(0, tp + chartH),
                             new[] { color, color.WithAlpha(180) },
                             null, SKShaderTileMode.Clamp);
                         using var barPaint = new SKPaint { Shader = shader, IsAntialias = true };
                         canvas.DrawRoundRect(
-                            new SKRoundRect(new SKRect(bx, by, bx + innerW, barBottom), 2, 2),
+                            new SKRoundRect(new SKRect(bx, by, bx + innerW, tp + chartH), 2, 2),
                             barPaint);
 
                         // top cap accent line
@@ -1097,28 +1081,11 @@ namespace HornScope.Common.Implementation
                             StrokeCap = SKStrokeCap.Round,
                             IsAntialias = true
                         };
-                        if (v >= 0)
-                        {
-                            canvas.DrawLine(bx + 1, by, bx + innerW - 1, by, capPaint);
-                        }
-                        else
-                        {
-                            canvas.DrawLine(bx + 1, barBottom, bx + innerW - 1, barBottom, capPaint);
-                        }
+                        canvas.DrawLine(bx + 1, by, bx + innerW - 1, by, capPaint);
 
-                        // value label - position based on bar direction
-                        float vly;
-                        if (v >= 0)
-                        {
-                            vly = by - 3f;
-                            if (vly < tp + 8f) vly = by + 10f;
-                        }
-                        else
-                        {
-                            vly = barBottom + 10f;
-                            if (vly > size.Height - bp - 8f) vly = barBottom - 3f;
-                        }
-
+                        // value label above bar
+                        float vly = by - 3f;
+                        if (vly < tp + 8f) vly = by + 10f;
                         valLblPaint.Color = textcolor;
                         canvas.DrawText($"{v:F1}%", bx + innerW / 2f, vly, valLblPaint);
 
@@ -1291,8 +1258,8 @@ namespace HornScope.Common.Implementation
                         string condFg = isHit ? ReportThemeColors.White : ReportThemeColors.Gray900;
 
                         string rangeStr = (interp.MinRange.HasValue && interp.MaxRange.HasValue)
-                            ? $"({Math.Round(interp.MinRange.Value, 0)}) - ({Math.Round(interp.MaxRange.Value, 0)})"
-                            : "-";
+                            ? $"{Math.Round(interp.MinRange.Value, 0)}-{Math.Round(interp.MaxRange.Value, 0)}"
+                            : ".";
 
                         inner.Item()
                              .BorderBottom(0.3f).BorderColor(ReportThemeColors.Gray350)
@@ -1378,18 +1345,18 @@ namespace HornScope.Common.Implementation
                 .Column(col =>
                 {
                     col.Item().PaddingBottom(8)
-                        .Text("Pillar Overview").FontSize(11).Bold().FontColor(ReportThemeColors.DarkBlue);
+                        .Text("Domain Overview").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                     col.Spacing(6);
                     int index = 1;
                     foreach (var item in sorted)
                     {
                         float v = (float)(item.Value ?? 0);
-                        var color = GetPillarBarColors(v);
+                        var color = GetBarColor(v);
 
                         col.Item().Row(row =>
                         {
-                            // Pillar label
+                            // Domain label
                             row.ConstantItem(102).AlignMiddle()
                                 .Text(Shorten(item.Name ?? item.ShortName ?? ".", 18))
                                 .FontSize(8).FontColor(ReportThemeColors.BlueGray);
@@ -1499,7 +1466,7 @@ namespace HornScope.Common.Implementation
 
         void DrawPillarsRadialChart(IContainer container, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(p => p.Value).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x=>x.Value).ToList();
             if (!data.Any()) return;
 
             float avg = (float)data.Average(x => x.Value ?? 0);
@@ -1522,14 +1489,13 @@ namespace HornScope.Common.Implementation
                     // Chart title
                     using var titlePaint = new SKPaint
                     {
-                        Color = SKColor.Parse(ReportThemeColors.DarkBlue),
+                        Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
                         TextSize = 10f,
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Center,
                         FakeBoldText = true
                     };
-
-                    canvas.DrawText("Pillar Performance", cx, 14f, titlePaint);
+                    canvas.DrawText("Domain Performance", cx, 14f, titlePaint);
 
                     for (int i = 0; i < n; i++)
                     {
@@ -1539,7 +1505,7 @@ namespace HornScope.Common.Implementation
 
                         var rect = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
 
-                        SKColor barCol = GetPillarColors(v);
+                        SKColor barCol = GetColor(v);
 
                         // Track ring
                         using var trackPaint = new SKPaint
@@ -1594,7 +1560,7 @@ namespace HornScope.Common.Implementation
 
                     using var circleRing = new SKPaint
                     {
-                        Color = GetPillarColors(avg).WithAlpha(180),
+                        Color = GetColor(avg).WithAlpha(180),
                         Style = SKPaintStyle.Stroke,
                         StrokeWidth = 2f,
                         IsAntialias = true
@@ -1603,7 +1569,7 @@ namespace HornScope.Common.Implementation
 
                     using var avgNumPaint = new SKPaint
                     {
-                        Color = GetPillarColors(avg),
+                        Color = GetColor(avg),
                         TextSize = cr * 0.60f,
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Center,
@@ -1613,7 +1579,7 @@ namespace HornScope.Common.Implementation
 
                     using var avgLblPaint = new SKPaint
                     {
-                        Color = SKColor.Parse(ReportThemeColors.White),
+                        Color = SKColor.Parse(ReportThemeColors.SuccessGreenMuted),
                         TextSize = cr * 0.26f,
                         IsAntialias = true,
                         TextAlign = SKTextAlign.Center
@@ -1629,67 +1595,58 @@ namespace HornScope.Common.Implementation
         // -----------------------------------------------------------------------------
         //  HEADERS / FOOTERS
         // -----------------------------------------------------------------------------
-        void ProgramComposeHeader(
+        void CountryComposeHeader(
             IContainer container,
-            AiProgramSummeryDto data,
+            AiCountrySummeryDto data,
             UserRole userRole,
             string? pillarName)
         {
-            var logoPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "wwwroot/assets/images/vcp.png");
+            var logoPath = ReportThemeColors.LogoPath;
 
             container.Column(column =>
             {
-                column.Item().Background(ReportThemeColors.DarkBlue).Padding(8).Row(row =>
+                column.Item().Background(ReportThemeColors.DarkBg).Padding(10).Row(row =>
                 {
-                    // Left content
                     row.RelativeItem().Column(col =>
                     {
                         col.Spacing(2);
 
-                        string? title = string.IsNullOrEmpty(pillarName) ? data.ProgramName : pillarName!;
+                        string? title = string.IsNullOrEmpty(pillarName) ? data.CountryName : pillarName!;
 
                         col.Item().Text(title)
                             .FontSize(21)
                             .Bold()
-                            .FontColor(ReportThemeColors.White);
+                            .FontColor(ReportThemeColors.HeaderSubtitle);
 
-                        col.Item().Text($"{data.ProgramName} | Conference Year: {data.Year}")
+                        col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}")
                             .FontSize(10)
-                            .FontColor(ReportThemeColors.HeaderTextPale);
+                            .FontColor(ReportThemeColors.Secondary);
 
                         col.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                             .FontSize(8)
                             .FontColor(ReportThemeColors.HeaderTextMuted);
                     });
 
-                    // Right logo
-                    row.ConstantItem(60)
+                    row.ConstantItem(88)
                         .AlignRight()
                         .AlignMiddle()
-                        .Background(ReportThemeColors.DarkBlue)
-                        .Padding(4)
+                        .Height(62)
                         .Image(logoPath)
                         .FitArea();
                 });
 
-                // Divider
-                column.Item().LineHorizontal(1).LineColor(ReportThemeColors.BorderDivider);
+                column.Item().Height(2).Background(ReportThemeColors.Primary);
             });
         }        
 
-        void PillarComposeHeader(IContainer container, AiProgramPillarResponse data)
+        void PillarComposeHeader(IContainer container, AiCountryPillarResponse data)
         {
-            var logoPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "wwwroot/assets/images/vcp.png");
+            var logoPath = ReportThemeColors.LogoPath;
 
             container.Column(column =>
             {
-                column.Item().Background(ReportThemeColors.DarkBlue).Padding(10).Row(row =>
+                column.Item().Background(ReportThemeColors.DarkBg).Padding(12).Row(row =>
                 {
-                    // Left content
                     row.RelativeItem().Column(col =>
                     {
                         col.Spacing(2);
@@ -1697,28 +1654,26 @@ namespace HornScope.Common.Implementation
                         col.Item().Text(data.PillarName)
                             .FontSize(21)
                             .Bold()
-                            .FontColor(ReportThemeColors.White);
+                            .FontColor(ReportThemeColors.HeaderSubtitle);
 
-                        col.Item().Text($"{data.ProgramName} | Conference Year: {data.AIDataYear}")
+                        col.Item().Text($"{data.CountryName}, {data.Continent} | Data Year: {data.AIDataYear}")
                             .FontSize(10)
-                            .FontColor(ReportThemeColors.HeaderTextPale);
+                            .FontColor(ReportThemeColors.Secondary);
 
                         col.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                             .FontSize(8)
                             .FontColor(ReportThemeColors.HeaderTextMuted);
                     });
 
-                    // Logo
-                    row.ConstantItem(60)
+                    row.ConstantItem(90)
                         .AlignRight()
                         .AlignMiddle()
-                        .Background(ReportThemeColors.DarkBlue)
-                        .Padding(1)
+                        .Height(64)
                         .Image(logoPath)
                         .FitArea();
                 });
 
-                column.Item().LineHorizontal(1).LineColor(ReportThemeColors.BorderDivider);
+                column.Item().Height(2).Background(ReportThemeColors.Primary);
             });
         }
 
@@ -1734,7 +1689,7 @@ namespace HornScope.Common.Implementation
                         text.Span(" of "); text.TotalPages();
                     });
                     col.Item().PaddingTop(5).AlignCenter()
-                        .Text("Program Assessment Platform").FontSize(8).FontColor(ReportThemeColors.Gray500);
+                        .Text("Africa Market Intelligence").FontSize(8).FontColor(ReportThemeColors.Gray500);
                 });
             });
         }
@@ -1754,7 +1709,7 @@ namespace HornScope.Common.Implementation
                 .Normalize(NormalizationForm.FormKC);
         }
 
-        void ProgramSummeryComposeContent(IContainer container, AiProgramSummeryDto data, UserRole userRole, bool isAllPrograms = false)
+        void CountrySummeryComposeContent(IContainer container, AiCountrySummeryDto data, UserRole userRole, bool isAllCountries = false)
         {
             container.PaddingTop(4).Column(column =>
             {
@@ -1763,15 +1718,41 @@ namespace HornScope.Common.Implementation
                 // =========================
 
                 column.Item().PaddingTop(10)
-                    .Element(c => ProgramProgressSection(c, data, userRole));
+                    .Element(c => CountryProgressSection(c, data, userRole));
 
                 // =========================
                 // EXECUTIVE SUMMARY
                 // =========================
                 column.Item().PaddingTop(10).Element(c =>
                     PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary), ReportThemeColors.AccentExecutiveSummary));
-                if (!isAllPrograms)
+
+                if (!isAllCountries)
                 {
+                    // =====================================================
+                    // Current situation
+                    // =====================================================
+                    if (!string.IsNullOrEmpty(data.KeyFindings))
+                        column.Item().PaddingTop(8).Element(c =>
+                        PillarContentSection(c, "Key Findings", SanitizeText(data.KeyFindings), ReportThemeColors.AccentKeyFindings));
+
+                    if (!string.IsNullOrEmpty(data.Recommendations))
+                        column.Item().PaddingTop(8).Element(c =>
+                        PillarContentSection(c, "Recommendations", SanitizeText(data.Recommendations), ReportThemeColors.AccentRecommendations));
+
+                    if (!string.IsNullOrEmpty(data.KeyDevelopments))
+                        column.Item().PaddingTop(8).Element(c =>
+                            PillarContentSection(c, "Key Developments", SanitizeText(data.KeyDevelopments), ReportThemeColors.AccentKeyDevelopments));
+                    if (!string.IsNullOrEmpty(data.CriticalRisks))
+                        column.Item().PaddingTop(8).Element(c =>
+                        PillarContentSection(c, "Critical Risks", SanitizeText(data.CriticalRisks), ReportThemeColors.AccentCriticalRisks));
+                    if (!string.IsNullOrEmpty(data.Gaps))
+                        column.Item().PaddingTop(8).Element(c =>
+                        PillarContentSection(c, "Gaps", SanitizeText(data.Gaps), ReportThemeColors.AccentGaps));
+
+
+
+
+
                     // =====================================================
                     // EVIDENCE SECTION
                     // =====================================================              
@@ -1789,10 +1770,6 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), ReportThemeColors.AccentPerceptionEvidence));
 
-                    // =====================================================
-                    // INTEGRITY CHECKS
-                    // =====================================================
-                    //column.Item().PageBreak();
 
                     //column.Item().PaddingTop(15).Text("Integrity Checks")
                     //    .FontSize(16).Bold();
@@ -1806,22 +1783,15 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), ReportThemeColors.AccentRelationalIntegrity));
 
-                    // =====================================================
-                    // STRESS TESTS
-                    // =====================================================
-                    //column.Item().PageBreak();
-
-                    //column.Item().PaddingTop(15).Text("Stress Tests")
-                    //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Geopolitical Shock", SanitizeText(data.GeopoliticalShock), ReportThemeColors.AccentGeopoliticalShock));
+                        PillarContentSection(c, "Political Shock", SanitizeText(data.PoliticalShock), ReportThemeColors.AccentPoliticalShock));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Finance Shock", SanitizeText(data.FinanceShock), ReportThemeColors.AccentFinanceShock));
+                        PillarContentSection(c, "Economic Shock", SanitizeText(data.EconomicShock), ReportThemeColors.AccentEconomicShock));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Legitimacy Shock", SanitizeText(data.LegitimacyShock), ReportThemeColors.AccentLegitimacyShock));
+                        PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), ReportThemeColors.AccentNarrativeShock));
                     //column.Item().PageBreak();
 
                     //column.Item().PaddingTop(8).Element(c =>
@@ -1830,16 +1800,9 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), ReportThemeColors.AccentStressAdjustment));
 
-                    // =====================================================
-                    // GOVERNANCE ADJUSTMENTS
-                    // =====================================================
-                    //column.Item().PageBreak();
-
-                    //column.Item().PaddingTop(15).Text("Governance Adjustments")
-                    //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Inclusion & Equity Adjustment", SanitizeText(data.InclusionEquityAdjustment), ReportThemeColors.AccentInclusionEquityAdj));
+                        PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.AccentInequalityAdj));
 
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.AccentOpacityRisk));
@@ -1847,23 +1810,18 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), ReportThemeColors.AccentNonCompensation));
 
-                    // =====================================================
-                    // SYSTEM ANALYSIS
-                    // =====================================================
-                    //column.Item().PageBreak();
-
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Cross-Pillar System Dynamics", SanitizeText(data.CrossPillarPatterns), ReportThemeColors.AccentCrossPillar));
+                        PillarContentSection(c, "Cross-Domain System Dynamics", SanitizeText(data.CrossPillarPatterns), ReportThemeColors.AccentCrossPillar));
 
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Institutional Capacity Assessment", SanitizeText(data.InstitutionalCapacity), ReportThemeColors.DeepTeal));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), ReportThemeColors.AccentEquityAssessment));
+                        PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), ReportThemeColors.AccentGaps));
 
                     //column.Item().PageBreak();
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Governance Trajectory", SanitizeText(data.GovernanceTrajectory), ReportThemeColors.AccentGovernanceTrajectory));
+                        PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), ReportThemeColors.AccentConflictRisk));
 
                     // =====================================================
                     // STRATEGIC OUTPUT
@@ -1874,32 +1832,14 @@ namespace HornScope.Common.Implementation
                         PillarContentSection(c, "Strategic Policy Priorities", SanitizeText(data.StrategicRecommendation), ReportThemeColors.AccentStrategicPolicy));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Why This Assessment Matters", SanitizeText(data.AssessmentValueNote), ReportThemeColors.AccentAssessmentValue));
-
-                    if (!string.IsNullOrWhiteSpace(data.KeyFindings))
-                    {
-                        column.Item().PaddingTop(8).Element(c =>
-                            PillarContentSection(c, "Key Findings", SanitizeText(data.KeyFindings), ReportThemeColors.AccentKeyDevelopments));
-                    }   
+                        PillarContentSection(c, "Why This Assessment Matters", SanitizeText(data.DataTransparencyNote), ReportThemeColors.AccentDataTransparency));
 
                 }
             });
         }
 
-        void AssessmentRecommendations(IContainer container, AiProgramSummeryDto data, UserRole userRole, bool isAllCountries = false)
-        {
-            container.PaddingTop(4).Column(column =>
-            {
-                if (!isAllCountries)
-                {
-                    if (!string.IsNullOrWhiteSpace(data.Recommendations))
-                        column.Item().PaddingTop(8).Element(c =>
-                            PillarContentSection(c, "Recommendations", SanitizeText(data.Recommendations), ReportThemeColors.AccentStrategicPolicy));
-                }
-            });
-        }
         void PillarComposeContent(
-     IContainer container, AiProgramPillarResponse data, UserRole userRole)
+     IContainer container, AiCountryPillarResponse data, UserRole userRole)
         {
             container.PaddingTop(8).Column(column =>
             {
@@ -1951,13 +1891,13 @@ namespace HornScope.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Geopolitical Shock", SanitizeText(data.StressGeopoliticalShock), ReportThemeColors.AccentGeopoliticalShockAlt));
+                    PillarContentSection(c, "Political Shock", SanitizeText(data.StressPoliticalShock), ReportThemeColors.AccentPoliticalShockAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Finance Shock", SanitizeText(data.StressFinanceShock), ReportThemeColors.AccentFinanceShockAlt));
+                    PillarContentSection(c, "Economic Shock", SanitizeText(data.StressEconomicShock), ReportThemeColors.AccentEconomicShockAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Legitimacy Shock", SanitizeText(data.StressLegitimacyShock), ReportThemeColors.AccentLegitimacyShockAlt));
+                    PillarContentSection(c, "Narrative Shock", SanitizeText(data.StressNarrativeShock), ReportThemeColors.AccentNarrativeShockAlt));
 
                 //column.Item().PageBreak();
 
@@ -1973,7 +1913,7 @@ namespace HornScope.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Inclusion & Equity Adjustment", SanitizeText(data.InclusionEquityAdjustment), ReportThemeColors.AccentInclusionEquityAdjAlt));
+                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.AccentInequalityAdjAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.AccentOpacityRiskAlt));
@@ -1990,7 +1930,7 @@ namespace HornScope.Common.Implementation
                     PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), ReportThemeColors.DangerRedFlag, ReportThemeColors.DangerRedFlagAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Inclusion & Access Note", SanitizeText(data.InclusionAccessNote), ReportThemeColors.DeepTeal));
+                    PillarContentSection(c, "Geographic Equity Note", SanitizeText(data.GeographicEquityNote), ReportThemeColors.DeepTeal));
 
                 // =====================================================
                 // SYSTEM / INSTITUTIONAL ANALYSIS
@@ -2016,7 +1956,7 @@ namespace HornScope.Common.Implementation
             });
         }
 
-        void ProgramProgressSection(IContainer container, AiProgramSummeryDto data, UserRole userRole)
+        void CountryProgressSection(IContainer container, AiCountrySummeryDto data, UserRole userRole)
         {
             container
                 .Background(ReportThemeColors.White)
@@ -2033,7 +1973,7 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Column(col =>
                     {
                         // Score Section
-                        PillarProgressBar(col, "Total Score", data.AIProgress, ReportThemeColors.DarkBlue);
+                        PillarProgressBar(col, "Total Score", data.AIProgress, ReportThemeColors.ProgressGreen);
 
                         col.Item().PaddingVertical(12);
 
@@ -2050,7 +1990,11 @@ namespace HornScope.Common.Implementation
 
                         col.Item().PaddingTop(8);
 
-                        RankRowModern(col, "Program Rank", data.Rank, data.TotalProgram, ReportThemeColors.DarkBlue);
+                        RankRowModern(col, "Continent Rank", data.Rank, data.TotalCountry, ReportThemeColors.RankGreen);
+
+                        col.Item().PaddingTop(2);
+
+                        RankRowModern(col, $"{data.Region} Region Rank", data.RegionRank, data.RegionTotalCountry, ReportThemeColors.RankBlue);
                     });
                 });
         }
@@ -2092,7 +2036,7 @@ namespace HornScope.Common.Implementation
         }
 
         void PillarProgressSection(
-            IContainer container, AiProgramPillarResponse data, UserRole userRole, bool isProgram = false)
+            IContainer container, AiCountryPillarResponse data, UserRole userRole, bool isCity = false)
         {
             container
                 .Background(ReportThemeColors.White)
@@ -2100,14 +2044,14 @@ namespace HornScope.Common.Implementation
                 .Padding(18)
                 .Column(column =>
                 {
-                    column.Item().Text(isProgram ? "Total Overview" : "Pillar Score")
+                    column.Item().Text(isCity ? "Total Overview" : "Domain Score")
                         .FontSize(16)
                         .SemiBold()
                         .FontColor(ReportThemeColors.GrayTailwind800);
 
                     column.Item().PaddingTop(15);
 
-                    PillarProgressBar(column, "Score", data.AIProgress, ReportThemeColors.DarkBlue);
+                    PillarProgressBar(column, "Score", data.AIProgress, ReportThemeColors.ProgressGreen);
                 });
         }
         void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
@@ -2166,6 +2110,7 @@ namespace HornScope.Common.Implementation
             });
         }
 
+        /// <summary>Turn legacy "||" / mid-line "2)" markers into newlines for readable PDF lines.</summary>
         static string NormalizeListLineBreaks(string content)
         {
             if (string.IsNullOrEmpty(content)) return content;
@@ -2175,6 +2120,7 @@ namespace HornScope.Common.Implementation
             text = System.Text.RegularExpressions.Regex.Replace(text, @"\n{2,}", "\n");
             return text.Trim();
         }
+
         void DataSourcesSection(IContainer container, List<AIDataSourceCitation> sources)
         {
             // ?? Sanitize entire list first (best practice)
@@ -2285,60 +2231,20 @@ namespace HornScope.Common.Implementation
 
         static SKColor GetColor(float value)
         {
-            if (value > 40)
-                return SKColor.Parse(ReportThemeColors.DarkGreen);
-
-            else if (value > 20)
-                return SKColor.Parse(ReportThemeColors.SuccessGreen);
-
-            else if (value > 5)
-                return SKColor.Parse(ReportThemeColors.WarningAmber);
-
-            else if (value > -20)
-                return SKColor.Parse(ReportThemeColors.Yellow);
-
-            else if (value > -39)
-                return SKColor.Parse(ReportThemeColors.DangerRed);
-
-            return SKColor.Parse(ReportThemeColors.DarkRed);
+            if (value >= 80) return SKColor.Parse(ReportThemeColors.SuccessGreen);
+            else if (value >= 60) return SKColor.Parse(ReportThemeColors.BarGreenLow);
+            else if (value >= 40) return SKColor.Parse(ReportThemeColors.WarningAmber);
+            else if (value >= 20) return SKColor.Parse(ReportThemeColors.BarOrangeMid);
+            return SKColor.Parse(ReportThemeColors.DangerRed);
         }
 
         static string GetBarColor(float value)
-        {
-            if (value > 40)
-                return ReportThemeColors.DarkGreen;
-
-            else if (value > 20)
-                return ReportThemeColors.SuccessGreen;
-
-            else if (value > 5)
-                return ReportThemeColors.WarningAmber;
-
-            else if (value > -20)
-                return ReportThemeColors.Yellow;
-
-            else if (value > -39)
-                return ReportThemeColors.DangerRed;
-
-            return ReportThemeColors.DarkRed;
-        }
-
-        static string GetPillarBarColors(float value)
         {
             if (value >= 80) return ReportThemeColors.SuccessGreen;
             else if (value >= 60) return ReportThemeColors.BarGreenLow;
             else if (value >= 40) return ReportThemeColors.WarningAmber;
             else if (value >= 20) return ReportThemeColors.BarOrangeMid;
             return ReportThemeColors.DangerRed;
-        }
-
-        static SKColor GetPillarColors(float value)
-        {
-            if (value >= 80) return SKColor.Parse(ReportThemeColors.SuccessGreen);
-            else if (value >= 60) return SKColor.Parse(ReportThemeColors.BarGreenLow);
-            else if (value >= 40) return SKColor.Parse(ReportThemeColors.WarningAmber);
-            else if (value >= 20) return SKColor.Parse(ReportThemeColors.BarOrangeMid);
-            return SKColor.Parse(ReportThemeColors.DangerRed);
         }
 
         static string GetSourceTypeBadgeColor(string sourceType) => sourceType?.ToLower() switch
@@ -2362,66 +2268,440 @@ namespace HornScope.Common.Implementation
             return text[..maxLength] + "...";
         }
 
-        #endregion pdf pillars and Program report
+
+
+        #endregion pdf pillars and country report
 
     }
 
     public partial class PdfGeneratorService
     {   
 
-        // Palette: index 0 = selected Program (gold), 1-5 = peer programs
-        private static readonly string[] ProgramPalette = ReportThemeColors.ProgramChartPalette;
+        // Palette: index 0 = selected country (gold), 1-5 = peer countries
+        private static readonly string[] CountryPalette = ReportThemeColors.CountryChartPalette;
 
-        // Pillar palette (up to 14 distinct colours)
+        // Domain palette (up to 14 distinct colours)
         private static readonly string[] PillarPalette = ReportThemeColors.PillarChartPalette;
 
         // --------------------------------------------------------------------------
-        //  ENTRY POINTS  . called from AddProgramDetailsPdf
+        //  ENTRY POINTS  . called from AddCountryDetailsPdf
         // --------------------------------------------------------------------------
 
-        void AddPeerProgramComparisonSection(
+        void AddPeerCountryComparisonSection(
             IDocumentContainer container,
-            List<PeerProgramHistoryReportDto> peerPrograms,
-            AiProgramSummeryDto ProgramDetails,
+            List<PeerCountryHistoryReportDto> peerCountries,
+            AiCountrySummeryDto countryDetails,
             UserRole userRole)
         {
-            if (peerPrograms == null || !peerPrograms.Any()) return;
+            if (peerCountries == null || !peerCountries.Any()) return;
 
-            // Separate: main Program entry + actual peer entries (cap at MaxpeerPrograms)
-            var main = FindMainProgram(peerPrograms, ProgramDetails);
-            var peers = peerPrograms
-                .Where(p => !IsSameProgram(p.ProgramName, ProgramDetails.ProgramName))
+            // Separate: main country entry + actual peer entries (cap at MaxpeerCountries)
+            var main = FindMainCountry(peerCountries, countryDetails);
+            var peers = peerCountries
+                .Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName))
                 .ToList();
 
+            // -- 5.1  Population-Based --------------------------------------------
+            container.Page(page =>
+            {
+                ApplyPageDefaults(page);
+                page.Header().Element(x =>
+                    CountryComposeHeader(x, countryDetails, userRole, "Population-Based Peer Comparison"));
+                page.Content().Element(c =>
+                    PopulationPeerPage(c, peers, main, countryDetails));
+                PageFooter(page);
+            });
+
+            // -- 5.2  Regional ----------------------------------------------------
+            container.Page(page =>
+            {
+                ApplyPageDefaults(page);
+                page.Header().Element(x =>
+                    CountryComposeHeader(x, countryDetails, userRole, "Regional Peer Group Comparison"));
+                page.Content().Element(c =>
+                    RegionalPeerPage(c, peers, main, countryDetails));
+                PageFooter(page);
+            });
+
+            // -- 5.3  Income-Level ------------------------------------------------
+            container.Page(page =>
+            {
+                ApplyPageDefaults(page);
+                page.Header().Element(x =>
+                    CountryComposeHeader(x, countryDetails, userRole, "Income-Level Peer Comparison"));
+                page.Content().Element(c =>
+                    IncomePeerPage(c, peers, main, countryDetails));
+                PageFooter(page);
+            });
+
+           
             // -- 5.5  Relative Ranking --------------------------------------------
             container.Page(page =>
             {
                 ApplyPageDefaults(page);
                 page.Header().Element(x =>
-                    ProgramComposeHeader(x, ProgramDetails, userRole, "Relative Ranking Among Peer programs"));
+                    CountryComposeHeader(x, countryDetails, userRole, "Relative Ranking Among Peer countries"));
                 page.Content().Element(c =>
-                    RelativeRankingPage(c, peers, main, ProgramDetails));
+                    RelativeRankingPage(c, peers, main, countryDetails));
                 PageFooter(page);
             });
         }
 
-        //  5.5  RELATIVE RANKING AMONG PEER programs
+        void AddPerformanceTrendsSection(
+            IDocumentContainer container,
+            List<PeerCountryHistoryReportDto> peerCountries,
+            AiCountrySummeryDto countryDetails,
+            UserRole userRole)
+        {
+            if (peerCountries == null || !peerCountries.Any()) return;
+
+            var main = FindMainCountry(peerCountries, countryDetails);
+            var peers = peerCountries
+                .Where(p => !IsSameCountry(p.CountryName, countryDetails.CountryName))      
+                .ToList();
+
+            // -- 6.1 + 6.2  Historical & Five-Year Evolution ----------------------
+            container.Page(page =>
+            {
+                ApplyPageDefaults(page);
+                page.Header().Element(x =>
+                    CountryComposeHeader(x, countryDetails, userRole, "Performance Trends Over Time"));
+                page.Content().Element(c =>
+                    HistoricalTrendsPage(c, peers, main, countryDetails));
+                PageFooter(page);
+            });
+
+            // -- 6.3  Pillar-Level Trend ------------------------------------------
+            container.Page(page =>
+            {
+                ApplyPageDefaults(page);
+                page.Header().Element(x =>
+                    CountryComposeHeader(x, countryDetails, userRole, "Domain-Level Trend Analysis"));
+                page.Content().Element(c =>
+                    PillarTrendPage(c, main, countryDetails));
+                PageFooter(page);
+            });
+        }
+
+        // --------------------------------------------------------------------------
+        //  5.1  POPULATION-BASED PEER GROUP COMPARISON
+        // --------------------------------------------------------------------------
+
+        void PopulationPeerPage(
+            IContainer container,
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
+        {
+            // All countries (main + peers) sorted by population desc
+            var all = BuildAllCountries(main, peers)
+                .Where(c => c.Population.HasValue)
+                .OrderByDescending(c => c.Population)
+                .ToList();
+
+            if (!all.Any()) { DrawNoDataPage(container); return; }
+
+            long maxPop = (long)(all.Max(p => p.Population) ?? 1);
+
+            container.Padding(16).Column(col =>
+            {
+                col.Spacing(12);
+
+                col.Item().Element(x => DrawInsightBand(x,
+                    $"{all.Count} countries compared  |  " +
+                    $"Largest: {all.First().CountryName} ({FormatPop(all.First().Population)})  |  " +
+                    $"Smallest: {all.Last().CountryName} ({FormatPop(all.Last().Population)})"));
+
+                // -- Population bar chart --------------------------------------
+                col.Item().Text("Population Size by Country")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
+                    DrawPopulationBars(canvas, size, all, countryDetails, maxPop));
+
+                col.Item().Element(x => DrawCountryLegend(x, all, countryDetails));
+
+                // -- Score vs Population scatter -------------------------------
+                col.Item().PaddingTop(8)
+                    .Text("Score vs Population  (each dot = one country)")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(all.Count * 40).Canvas((canvas, size) =>
+                    DrawScatterPlot(canvas, size, all, countryDetails,
+                        c => (float)(c.Population ?? 0),
+                        c => GetLatestScoreOrZero(c),
+                        "Population", "Score"));
+            });
+        }
+
+        void DrawPopulationBars(
+            SKCanvas canvas, Size size,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
+            long maxPop)
+        {
+            float rowH = 30f;
+            float labelW = 130f;
+            float barArea = size.Width - labelW - 72f;
+
+            for (int i = 0; i < countries.Count; i++)
+            {
+                var country = countries[i];
+                float y = i * rowH + 4f;
+                float barW = (float)((country.Population ?? 0) / (double)maxPop * barArea);
+                bool isMain = IsSameCountry(country.CountryName, countryDetails.CountryName);
+
+                // Row background
+                if (i % 2 == 0)
+                    canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
+                        new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceGreenRow) });
+
+                // Highlight selected country row
+                if (isMain)
+                    canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + rowH - 4),
+                        new SKPaint { Color = SKColor.Parse(ReportThemeColors.WarningAmberBg) });
+
+                DrawCanvasText(canvas, country.CountryName, 4, y + 5, 9,
+                    isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.Gray850, bold: isMain);
+
+                string barColor = isMain ? CountryPalette[0] : CountryPalette[1 + (i % (CountryPalette.Length - 1))];
+                canvas.DrawRoundRect(
+                    new SKRoundRect(new SKRect(labelW, y + 4, labelW + barW, y + rowH - 6), 3),
+                    new SKPaint { Color = SKColor.Parse(barColor), IsAntialias = true });
+
+                DrawCanvasText(canvas, FormatPop(country.Population),
+                    labelW + barW + 5, y + 5, 9, ReportThemeColors.Gray800);
+            }
+        }
+
+        // --------------------------------------------------------------------------
+        //  5.2  REGIONAL PEER GROUP COMPARISON
+        // --------------------------------------------------------------------------
+
+        void RegionalPeerPage(
+            IContainer container,
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
+        {
+            var all = BuildAllCountries(main, peers);
+
+            var byRegion = all
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? p.Country ?? "Unknown" : p.Region)
+                .OrderByDescending(g => g.Count())
+                .ToList();
+
+            container.Padding(16).Column(col =>
+            {
+                col.Spacing(12);
+
+                col.Item().Element(x => DrawInsightBand(x,
+                    $"{byRegion.Count} region(s)  |  {all.Count} total countries analysed"));
+
+                col.Item().Text("Country Distribution by Region")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(180).Canvas((canvas, size) =>
+                    DrawDonutChart(canvas, size,
+                        byRegion.Select(g => (g.Key, (float)g.Count())).ToList()));
+
+                col.Item().PaddingTop(4)
+                    .Text("Average Score per Region")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Canvas((canvas, size) =>
+                {
+                    var regionScores = byRegion
+                        .Select(g => (
+                            Region: g.Key,
+                            Avg: g.Average(c => GetLatestScoreOrZero(c)),  // includes 0
+                            Count: g.Count()
+                        ))
+                        .OrderByDescending(r => r.Avg)
+                        .ToList();
+
+                    float barH = 28f;
+                    float labelW = 120f;
+                    float barArea = size.Width - labelW - 65f;
+
+                    for (int i = 0; i < regionScores.Count; i++)
+                    {
+                        var r = regionScores[i];
+                        float y = i * barH + 4f;
+                        float barW = r.Avg / 100f * barArea;
+
+                        if (i % 2 == 0)
+                            canvas.DrawRect(new SKRect(0, y - 2, size.Width, y + barH - 4),
+                                new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceGreenRow) });
+
+                        DrawCanvasText(canvas, r.Region, 4, y + 5, 9, ReportThemeColors.Gray900);
+                        canvas.DrawRoundRect(
+                            new SKRoundRect(new SKRect(labelW, y + 3, labelW + barW, y + barH - 6), 3),
+                            new SKPaint { Color = SKColor.Parse(ScoreColor(r.Avg)), IsAntialias = true });
+                        DrawCanvasText(canvas, $"{r.Avg:F1}  (n={r.Count})",
+                            labelW + barW + 5, y + 5, 9, ReportThemeColors.Gray800);
+                    }
+                });
+            });
+        }
+
+        // --------------------------------------------------------------------------
+        //  5.3  INCOME-LEVEL PEER COMPARISON
+        // --------------------------------------------------------------------------
+        public static string GetIncomeCategory(decimal income)
+        {
+            if (income < 5000) return "Low Income";
+            if (income <= 15000) return "Lower-Middle Income";
+            if (income <= 40000) return "Upper-Middle Income";
+            return "High Income";
+        }
+        private static string GetSegmentColor(string category)
+        {
+            return category switch
+            {
+                "Low Income" => ReportThemeColors.IncomeLow,          // softer red
+                "Lower-Middle Income" => ReportThemeColors.IncomeLowerMiddle, // amber
+                "Upper-Middle Income" => ReportThemeColors.BootstrapInfo, // blue-green
+                "High Income" => ReportThemeColors.SuccessGreen,         // strong green
+                _ => ReportThemeColors.GrayLight
+            };
+        }
+
+        void IncomePeerPage(
+              IContainer container,
+              List<PeerCountryHistoryReportDto> peers,
+              PeerCountryHistoryReportDto? main,
+              AiCountrySummeryDto countryDetails)
+        {
+            var categoryOrder = new[]
+            {
+                "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income"
+            };
+
+            var all = BuildAllCountries(main, peers);
+            var withIncome = all.Where(p => p.Income.HasValue).OrderBy(p => p.Income).ToList();
+
+            if (!withIncome.Any()) { DrawNoDataPage(container); return; }
+
+            var segments = all
+                .GroupBy(x => GetIncomeCategory(x.Income ?? 0))
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            container.Padding(16).Column(col =>
+            {
+                col.Spacing(12);
+
+                // -- Insight band ---------------------------------------------
+                col.Item().Element(x => DrawInsightBand(x,
+                    $"Income quartile analysis  |  {withIncome.Count} countries  |  " +
+                    $"Range: {withIncome.Min(p => p.Income):C0} . {withIncome.Max(p => p.Income):C0}"));
+
+                // -- Avg score per quartile bars (UNCHANGED) ------------------
+                col.Item().Text("Average Score by Income Quartile")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(130).Canvas((canvas, size) =>
+                {
+                    float barAreaW = (size.Width - 40f) / 4f - 8f;
+                    for (int i = 0; i < categoryOrder.Length; i++)
+                    {
+                        var label = categoryOrder[i];
+                        if (!segments.TryGetValue(label, out var countries) || !countries.Any()) continue;
+
+                        float avg = countries.Average(c => GetLatestScoreOrZero(c));
+                        float barH = avg / 100f * 90f;
+                        float x = 20 + i * ((size.Width - 40f) / 4f);
+
+                        canvas.DrawRoundRect(
+                            new SKRoundRect(new SKRect(x, 100 - barH, x + barAreaW, 100), 6),
+                            new SKPaint { Color = SKColor.Parse(GetSegmentColor(label)), IsAntialias = true });
+
+                        DrawCanvasText(canvas, $"{avg:F1}", x + barAreaW / 2 - 10, 100 - barH - 14, 9, ReportThemeColors.PdfDarkGreen, true);
+                        DrawCanvasText(canvas, label, x, 108, 8, ReportThemeColors.Gray800);
+                        DrawCanvasText(canvas, $"n={countries.Count}", x, 118, 8, ReportThemeColors.Gray600);
+                    }
+                });
+
+                // -- Scatter: Income vs Score (UNCHANGED) ---------------------
+                col.Item().PaddingTop(4)
+                    .Text("Income vs Composite Score  (each dot = one country)")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(160).Canvas((canvas, size) =>
+                    DrawScatterPlot(canvas, size, withIncome, countryDetails,
+                        c => (float)(c.Income ?? 0),
+                        c => GetLatestScoreOrZero(c),
+                        "Income (USD)", "Score"));
+
+
+                // -- Top performers table (UPDATED . PPP column added) --------
+                col.Item().PaddingTop(8)
+                    .Text("Top Performers by Income Group")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Table(table =>
+                {
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(100);  // Country
+                        cols.ConstantColumn(55);   // Country
+                        cols.ConstantColumn(40);   // Score
+                        cols.RelativeColumn();     // Income Group
+                        cols.ConstantColumn(55);   // Income
+                        //cols.ConstantColumn(60);   // PPP  ? NEW
+                    });
+
+                    DrawTableHeader(table, new[]
+                    {
+                        "Country", "Continent", "Score", "Income Group", "Income"
+                    });
+
+                    foreach (var (label, countries) in segments)
+                    {
+                        foreach (var country in countries.OrderByDescending(c => GetLatestScoreOrZero(c)))
+                        {
+                            bool isMain = IsSameCountry(country.CountryName, countryDetails.Continent);
+                            string rowBg = isMain ? ReportThemeColors.SurfaceSelected : ReportThemeColors.White;
+                            float score = GetLatestScoreOrZero(country);
+
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(5).Text(country.CountryName).FontSize(8)
+                                .FontColor(isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.Gray900);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(5).Text(country.Country ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(5).Text($"{score:F1}").FontSize(8).Bold().FontColor(ScoreColor(score));
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(5).Text(label).FontSize(8).FontColor(ReportThemeColors.Gray800);
+                            table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(5).Text(FormatPop(country.Income).ToString()).FontSize(8).FontColor(ReportThemeColors.Gray800);
+
+
+                        }
+                    }
+                });
+            });
+        }
+
+
+        // --------------------------------------------------------------------------
+        //  5.5  RELATIVE RANKING AMONG PEER countries
         // --------------------------------------------------------------------------
 
         void RelativeRankingPage(
             IContainer container,
-            List<PeerProgramHistoryReportDto> peers,
-            PeerProgramHistoryReportDto? main,
-            AiProgramSummeryDto programDetails)
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
         {
-            // Build ranked list including main Program; include 0-score programs
-            var all = BuildAllPrograms(main, peers)
-                .Select(c => (Program: c, Score: GetLatestScoreOrZero(c)))
+            // Build ranked list including main country; include 0-score countries
+            var all = BuildAllCountries(main, peers)
+                .Select(c => (Country: c, Score: GetLatestScoreOrZero(c)))
                 .OrderByDescending(x => x.Score)
                 .ToList();
 
             int total = all.Count;
-            int mainRank = all.FindIndex(r => IsSameProgram(r.Program.ProgramName, programDetails.ProgramName)) + 1;
+            int mainRank = all.FindIndex(r => IsSameCountry(r.Country.CountryName, countryDetails.CountryName)) + 1;
             float mainScore = mainRank > 0 ? all[mainRank - 1].Score : 0f;
             float pctile = mainRank > 0 ? (1f - (float)mainRank / total) * 100f : 0f;
 
@@ -2436,7 +2716,7 @@ namespace HornScope.Common.Implementation
                     {
                         c.Item().Text($"#{mainRank} of {total}")
                             .FontSize(32).Bold().FontColor(ReportThemeColors.WarningGold);
-                        c.Item().Text($"{programDetails.ProgramName}  \u00b7  {programDetails.Location}")
+                        c.Item().Text($"{countryDetails.CountryName}  \u00b7  {countryDetails.Continent}")
                             .FontSize(12).FontColor(ReportThemeColors.SuccessGreenSoft);
                     });
                     row.ConstantItem(130).Column(c =>
@@ -2450,34 +2730,34 @@ namespace HornScope.Common.Implementation
                 });
 
                 // -- Score distribution histogram ------------------------------
-                //col.Item().Text("Score Distribution Among All programs")
-                //    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+                col.Item().Text("Score Distribution Among All countries")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
-                //col.Item().Height(150).Canvas((canvas, size) =>
-                //    DrawHistogram(canvas, size,
-                //        all.Select(r => r.Score).ToList(), mainScore, 10));
+                col.Item().Height(150).Canvas((canvas, size) =>
+                    DrawHistogram(canvas, size,
+                        all.Select(r => r.Score).ToList(), mainScore, 10));
 
                 // -- Full ranking table ----------------------------------------
-                col.Item().Text("Full Program Ranking").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+                col.Item().Text("Full Country Ranking").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
 
                 col.Item().Table(table =>
                 {
                     table.ColumnsDefinition(cols =>
                     {
                         cols.ConstantColumn(24);   // rank
-                        cols.ConstantColumn(65);   // Program name
-                        cols.ConstantColumn(70);   // conference year
-                        cols.RelativeColumn();     //Description
-                        cols.ConstantColumn(65);   // Location
-                        cols.ConstantColumn(65);   // Score
+                        cols.RelativeColumn();     // country name
+                        cols.ConstantColumn(65);   // country
+                        cols.ConstantColumn(55);   // region
+                        cols.ConstantColumn(52);   // population
+                        cols.ConstantColumn(70);   // score bar
                     });
 
-                    DrawTableHeader(table, new[] { "#", "Program", "Conference Year", "Description" ,"Location", "Score" });
+                    DrawTableHeader(table, new[] { "#", "Country", "Continent", "Region", "Pop.", "Score" });
 
 
                     foreach (var (entry, idx) in all.Select((e, i) => (e, i)))
                     {
-                        bool isMain = IsSameProgram(entry.Program.ProgramName, programDetails.ProgramName);
+                        bool isMain = IsSameCountry(entry.Country.CountryName, countryDetails.CountryName);
                         string bg = isMain ? ReportThemeColors.SurfaceSelected : (idx % 2 == 0 ? ReportThemeColors.White : ReportThemeColors.PageBg);
                         string rankColor = idx == 0 ? ReportThemeColors.WarningGold
                                          : idx == 1 ? ReportThemeColors.GraySilver
@@ -2486,17 +2766,15 @@ namespace HornScope.Common.Implementation
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
                             .Padding(4).Text($"{idx + 1}").FontSize(8).FontColor(rankColor);
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
-                            .Padding(4).Text(entry.Program.ProgramName).FontSize(8)
+                            .Padding(4).Text(entry.Country.CountryName).FontSize(8)
                             .FontColor(isMain ? ReportThemeColors.PdfDarkGreen : ReportThemeColors.Gray900);
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
-                            .Padding(4).Text(entry.Program.Year?.ToString() ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
+                            .Padding(4).Text(entry.Country.Continent ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
-                            .Padding(4).Text(entry.Program.Description ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
+                            .Padding(4).Text(entry.Country.Region ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
                         table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
-                            .Padding(4).Text(entry.Program.Location ?? ".").FontSize(8).FontColor(ReportThemeColors.Gray800);
-                        //table.Cell().Background(bg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray250)
-                        //    .Padding(4).AlignRight()
-                        //    .Text(FormatPop(entry.Program.Population)).FontSize(8).FontColor(ReportThemeColors.Gray800);
+                            .Padding(4).AlignRight()
+                            .Text(FormatPop(entry.Country.Population)).FontSize(8).FontColor(ReportThemeColors.Gray800);
 
                         table.Cell()
                         .Background(bg)
@@ -2506,6 +2784,15 @@ namespace HornScope.Common.Implementation
                         .Row(r =>
                         {
                             var percent = entry.Score / 100f;
+
+                            r.RelativeItem().Height(10).Background(ReportThemeColors.BorderLight).Layers(layer =>
+                            {
+                                layer.PrimaryLayer().Background(ReportThemeColors.BorderLight);
+
+                                layer.Layer().Width((float)percent * 100)
+                                    .Background(ScoreColor(entry.Score));
+                            });
+
                             r.ConstantItem(24).AlignRight().Text($"{entry.Score:F1}")
                                 .FontSize(8)
                                 .FontColor(ReportThemeColors.Gray900);
@@ -2515,11 +2802,814 @@ namespace HornScope.Common.Implementation
             });
         }
 
+        // --------------------------------------------------------------------------
+        //  6.1 + 6.2  HISTORICAL PERFORMANCE TRENDS
+        // --------------------------------------------------------------------------
+
+        void HistoricalTrendsPage(
+            IContainer container,
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? main,
+            AiCountrySummeryDto countryDetails)
+        {
+            var all = BuildAllCountries(main, peers);
+            var mainCountry = main ?? peers.FirstOrDefault();
+
+            if (mainCountry == null) { DrawNoDataPage(container); return; }
+
+            // All distinct years across all countries
+            var allYears = all
+                .SelectMany(c => c.CountryHistory ?? Enumerable.Empty<PeerCountryYearHistoryDto>())
+                .Select(h => h.Year)
+                .Distinct()
+                .OrderBy(y => y)
+                .ToList();
+
+            if (!allYears.Any()) { DrawNoDataPage(container); return; }
+
+            var mainHistory = (mainCountry.CountryHistory ?? new())
+                .OrderBy(h => h.Year).ToList();
+
+            // Peer average per year (include 0-score years)
+            var peerAvg = allYears.Select(yr =>
+            {
+                var scores = peers
+                    .Select(p => p.CountryHistory?.FirstOrDefault(h => h.Year == yr))
+                    .Select(h => h != null ? (float?)h.ScoreProgress : null)
+                    .Where(s => s.HasValue)
+                    .Select(s => s!.Value)
+                    .ToList();
+                return (Year: yr, Avg: scores.Any() ? scores.Average() : 0f, HasData: scores.Any());
+            }).ToList();
+
+            container.Padding(16).Column(col =>
+            {
+                col.Spacing(14);
+
+                // Insight
+                if (mainHistory.Count >= 2)
+                {
+                    float first = (float)mainHistory.First().ScoreProgress;
+                    float last = (float)mainHistory.Last().ScoreProgress;
+                    float delta = last - first;
+                    col.Item().Element(x => DrawInsightBand(x,
+                        $"Period: {allYears.First()} . {allYears.Last()}  |  " +
+                        $"{mainCountry.CountryName}: {(delta >= 0 ? "+" : "")}{delta:F1} pts  |  " +
+                        $"Latest score: {last:F1}  |  " +
+                        $"{peers.Count} peer country(ies)"));
+                }
+
+                // -- 6.1  Multi-line trend ------------------------------------
+                col.Item().Text("6.1  Historical Score Trend")
+                    .FontSize(12).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(190).Canvas((canvas, size) =>
+                    DrawMultiLineTrendChart(canvas, size, allYears, peers, mainCountry, countryDetails, peerAvg));
+
+                // Legend: one entry per country
+                col.Item().Element(x => DrawCountryLineLegend(x, mainCountry, peers, countryDetails));
+
+                col.Item().PaddingVertical(4).LineHorizontal(0.5f).LineColor(ReportThemeColors.Gray350);
+
+                // -- 6.2  Five-year area chart --------------------------------
+                col.Item().Text("6.2  Five-Year Composite Score Evolution")
+                    .FontSize(12).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                var last5 = allYears.TakeLast(5).ToList();
+                var mainLast5 = mainHistory.Where(h => last5.Contains(h.Year))
+                                            .OrderBy(h => h.Year).ToList();
+                var peerLast5 = peerAvg.Where(p => last5.Contains(p.Year))
+                                        .OrderBy(p => p.Year).ToList();
+
+                col.Item().Height(120).Canvas((canvas, size) =>
+                    DrawAreaComparisonChart(canvas, size, last5, mainLast5,
+                        peerLast5.Select(p => (p.Year, p.Avg)).ToList()));
+
+                // YoY table
+                if (mainLast5.Count > 1)
+                    col.Item().Element(x =>
+                        DrawYoYTable(x, last5, mainLast5,
+                            peerLast5.Select(p => (p.Year, p.Avg)).ToList()));
+            });
+        }
+
+        void DrawYoYTable(
+            IContainer container,
+            List<int> years,
+            List<PeerCountryYearHistoryDto> mainHistory,
+            List<(int Year, float Avg)> peerAvg)
+        {
+            container.Table(table =>
+            {
+                table.ColumnsDefinition(cols =>
+                {
+                    cols.ConstantColumn(65);
+                    for (int i = 0; i < years.Count; i++) cols.RelativeColumn();
+                });
+
+                // Header
+                table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
+                    .Text("Metric").FontSize(8).Bold().FontColor(ReportThemeColors.White);
+                foreach (var yr in years)
+                    table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5).AlignRight()
+                        .Text(yr.ToString()).FontSize(8).Bold().FontColor(ReportThemeColors.White);
+
+                // Score row
+                table.Cell().Background(ReportThemeColors.SurfaceGreenRow).Padding(5)
+                    .Text("Score").FontSize(8).FontColor(ReportThemeColors.Gray900);
+                foreach (var yr in years)
+                {
+                    float s = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
+                    table.Cell().Background(ReportThemeColors.SurfaceGreenRow).Padding(5).AlignRight()
+                        .Text($"{s:F1}").FontSize(8).Bold().FontColor(ScoreColor(s));
+                }
+
+                // YoY delta
+                table.Cell().Background(ReportThemeColors.White).Padding(5)
+                    .Text("YoY \u0394").FontSize(8).FontColor(ReportThemeColors.Gray900);
+                for (int i = 0; i < years.Count; i++)
+                {
+                    if (i == 0)
+                    {
+                        table.Cell().Background(ReportThemeColors.White).Padding(5)
+                            .Text(".").FontSize(8).FontColor(ReportThemeColors.GrayMuted);
+                        continue;
+                    }
+                    float prev = (float)(mainHistory.FirstOrDefault(h => h.Year == years[i - 1])?.ScoreProgress ?? 0);
+                    float curr = (float)(mainHistory.FirstOrDefault(h => h.Year == years[i])?.ScoreProgress ?? 0);
+                    float d = curr - prev;
+                    table.Cell().Background(ReportThemeColors.White).Padding(5).AlignRight()
+                        .Text($"{(d >= 0 ? "+" : "")}{d:F1}").FontSize(8)
+                        .FontColor(d >= 0 ? ReportThemeColors.PdfMediumGreen : ReportThemeColors.DangerRedAccent);
+                }
+
+                // vs Peers
+                table.Cell().Background(ReportThemeColors.SurfaceGreenRow).Padding(5)
+                    .Text("vs Peers").FontSize(8).FontColor(ReportThemeColors.Gray900);
+                foreach (var yr in years)
+                {
+                    float myS = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
+                    float pAvg = peerAvg.FirstOrDefault(p => p.Year == yr).Avg;
+                    float d = myS - pAvg;
+                    table.Cell().Background(ReportThemeColors.SurfaceGreenRow).Padding(5).AlignRight()
+                        .Text($"{(d >= 0 ? "+" : "")}{d:F1}").FontSize(8)
+                        .FontColor(d >= 0 ? ReportThemeColors.PdfMediumGreen : ReportThemeColors.DangerRedAccent);
+                }
+            });
+        }
+
+        // --------------------------------------------------------------------------
+        //  6.3  PILLAR-LEVEL TREND  (main country only; up to 14 pillars)
+        // --------------------------------------------------------------------------
+
+        void PillarTrendPage(
+            IContainer container,
+            PeerCountryHistoryReportDto? mainCountry,
+            AiCountrySummeryDto countryDetails)
+        {
+            if (mainCountry == null) { DrawNoDataPage(container); return; }
+
+            var history = mainCountry.CountryHistory ?? new();            
+            var allYears = history.Select(h => h.Year).OrderBy(y => y).ToList();
+
+            if (!allYears.Any()) { DrawNoDataPage(container); return; }
+
+            // Collect all unique pillars (cap at MaxPillars = 23)
+            var pillars = history
+                .SelectMany(h => h.Pillars ?? Enumerable.Empty<PeerCountryPillarHistoryReportDto>())
+                .GroupBy(p => p.PillarID)
+                .Select(g => g.OrderBy(p => p.DisplayOrder).First())
+                .OrderBy(p => p.DisplayOrder)
+                .Take(_pillarCount)
+                .ToList();
+
+            container.Padding(16).Column(col =>
+            {
+                col.Spacing(12);
+
+                col.Item().Element(x => DrawInsightBand(x,
+                    $"{pillars.Count} Domain(s)  |  {allYears.Count} year(s)  |  Country: {mainCountry.CountryName}"));
+
+                col.Item().Text("Domain Score Trajectory Over Time")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Height(200).Canvas((canvas, size) =>
+                    DrawPillarLineChart(canvas, size, allYears, history, pillars));
+
+                //// Domain colour legend
+                col.Item().Element(x => DrawLegend(x,
+                    pillars.Select((p, i) =>
+                        (PillarPalette[i % PillarPalette.Length], p.PillarName)).ToArray(), 10));
+
+                // -- Domain heatmap table --------------------------------------
+                col.Item().PaddingTop(4)
+                    .Text("Domain Score Heatmap  (darker = higher score)")
+                    .FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                col.Item().Table(table =>
+                {
+                    table.ColumnsDefinition(cols =>
+                    {
+                        cols.ConstantColumn(110);
+                        foreach (var _ in allYears) cols.RelativeColumn();
+                    });
+
+                    table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
+                        .Text("Domain").FontSize(8).Bold().FontColor(ReportThemeColors.White);
+                    foreach (var yr in allYears)
+                        table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5).AlignCenter()
+                            .Text(yr.ToString()).FontSize(8).Bold().FontColor(ReportThemeColors.White);
+
+                    foreach (var (pillar, pi) in pillars.Select((p, i) => (p, i)))
+                    {
+                        string rowBg = pi % 2 == 0 ? ReportThemeColors.SurfaceGreenRow : ReportThemeColors.White;
+
+                        table.Cell().Background(rowBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                            .Padding(5).Text(pillar.PillarName).FontSize(8)
+                            .Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                        foreach (var yr in allYears)
+                        {
+                            var h = history.FirstOrDefault(h2 => h2.Year == yr);
+                            var ps = h?.Pillars?.FirstOrDefault(p2 => p2.PillarID == pillar.PillarID);
+                            // treat null as "no data"; 0 is a valid score
+                            bool hasData = ps != null;
+                            float score = hasData ? (float)ps!.ScoreProgress : -1f;
+
+                            string cellBg = !hasData ? ReportThemeColors.Gray150
+                                : InterpolateColor(ReportThemeColors.White, ReportThemeColors.PdfDarkGreen, score / 100f);
+
+                            table.Cell().Background(cellBg).BorderBottom(0.5f).BorderColor(ReportThemeColors.Gray350)
+                                .Padding(4).AlignCenter()
+                                .Text(!hasData ? "." : $"{score:F1}").FontSize(8)
+                                .FontColor(score >= 50 ? ReportThemeColors.White : ReportThemeColors.Gray900);
+                        }
+                    }
+                });
+
+                // -- Trend highlights ------------------------------------------
+                if (allYears.Count >= 2 && pillars.Any())
+                {
+                    col.Item().PaddingTop(6)
+                        .Text("Domain Trend Highlights").FontSize(11).Bold().FontColor(ReportThemeColors.PdfDarkGreen);
+
+                    var pillarDeltas = pillars.Select(p =>
+                    {
+                        var firstH = history.FirstOrDefault()?.Pillars?
+                            .FirstOrDefault(pp => pp.PillarID == p.PillarID);
+                        var lastH = history.LastOrDefault()?.Pillars?
+                            .FirstOrDefault(pp => pp.PillarID == p.PillarID);
+                        float d = (float)((lastH?.ScoreProgress ?? 0) - (firstH?.ScoreProgress ?? 0));
+                        return (Name: p.PillarName, Delta: d);
+                    }).OrderByDescending(x => x.Delta).ToList();
+
+                    col.Item().Row(row =>
+                    {
+                        // Most improved  (replaced emoji with ASCII arrow)
+                        row.RelativeItem().Background(ReportThemeColors.AccentEquityAssessment).Padding(10).Column(c =>
+                        {
+                            c.Item().Text("(+) Most Improved").FontSize(9).Bold().FontColor(ReportThemeColors.PdfMediumGreen);
+                            foreach (var pd in pillarDeltas.Take(3))
+                                c.Item().Row(r =>
+                                {
+                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor(ReportThemeColors.Gray900);
+                                    r.ConstantItem(44).AlignRight()
+                                        .Text($"+{pd.Delta:F1}").FontSize(8).Bold().FontColor(ReportThemeColors.PdfMediumGreen);
+                                });
+                        });
+
+                        row.ConstantItem(10);
+
+                        // Needs attention  (replaced emoji with ASCII)
+                        row.RelativeItem().Background(ReportThemeColors.DangerRedBg).Padding(10).Column(c =>
+                        {
+                            c.Item().Text("(!) Needs Attention").FontSize(9).Bold().FontColor(ReportThemeColors.DangerRedAccent);
+                            foreach (var pd in pillarDeltas.TakeLast(3).Reverse())
+                                c.Item().Row(r =>
+                                {
+                                    r.RelativeItem().Text(Shorten(pd.Name, 28)).FontSize(8).FontColor(ReportThemeColors.Gray900);
+                                    r.ConstantItem(44).AlignRight()
+                                        .Text($"{pd.Delta:F1}").FontSize(8).Bold().FontColor(ReportThemeColors.DangerRedAccent);
+                                });
+                        });
+                    });
+                }
+            });
+        }
+
+        // --------------------------------------------------------------------------
+        //  CANVAS CHART RENDERERS
+        // --------------------------------------------------------------------------
+
+        /// <summary>
+        /// Multi-line trend chart: one coloured line per country (gold = main, palette = peers).
+        /// Thin grey peer lines are no longer used; each peer gets its own distinct colour.
+        /// </summary>
+        void DrawMultiLineTrendChart(
+            SKCanvas canvas, Size size,
+            List<int> years,
+            List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto mainCountry,
+            AiCountrySummeryDto countryDetails,
+            List<(int Year, float Avg, bool HasData)> peerAvg)
+        {
+            if (years.Count < 2) return;
+
+            const float padL = 36f, padR = 12f, padT = 10f, padB = 24f;
+            float w = size.Width - padL - padR;
+            float h = size.Height - padT - padB;
+
+            float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
+            float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
+
+            // Grid
+            foreach (int s in new[] { 0, 25, 50, 75, 100 })
+            {
+                float y = Yp(s);
+                canvas.DrawLine(padL, y, padL + w, y,
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray250), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayMuted);
+            }
+            foreach (int yr in years)
+            {
+                float x = Xp(yr);
+                canvas.DrawLine(x, padT, x, padT + h,
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray150), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, yr.ToString(), x - 14, padT + h + 7, 7, ReportThemeColors.Gray600);
+            }
+
+            // Peer average (dashed green)
+            var avgPts = peerAvg.Where(p => p.HasData)
+                .Select(p => new SKPoint(Xp(p.Year), Yp(p.Avg))).ToList();
+            DrawDashedPolyline(canvas, avgPts,
+                new SKPaint
+                {
+                    Color = SKColor.Parse(ReportThemeColors.PdfTealGreen),
+                    StrokeWidth = 1.5f,
+                    IsAntialias = true,
+                    IsStroke = true
+                });
+
+            // Individual peer lines
+            for (int pi = 0; pi < peers.Count; pi++)
+            {
+                var peer = peers[pi];
+                string clr = CountryPalette[1 + (pi % (CountryPalette.Length - 1))];
+
+                var pts = (peer.CountryHistory ?? new())
+                    .Where(h => years.Contains(h.Year))
+                    .OrderBy(h => h.Year)
+                    .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress)))
+                    .ToList();
+
+                DrawPolyline(canvas, pts,
+                    new SKPaint
+                    {
+                        Color = SKColor.Parse(clr).WithAlpha(180),
+                        StrokeWidth = 1.2f,
+                        IsAntialias = true,
+                        IsStroke = true
+                    });
+            }
+
+            // Main country line (gold, bold)
+            var mainPts = (mainCountry.CountryHistory ?? new())
+                .Where(h => years.Contains(h.Year))
+                .OrderBy(h => h.Year)
+                .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress)))
+                .ToList();
+
+            DrawPolyline(canvas, mainPts,
+                new SKPaint
+                {
+                    Color = SKColor.Parse(CountryPalette[0]),
+                    StrokeWidth = 2.5f,
+                    IsAntialias = true,
+                    IsStroke = true
+                });
+
+            foreach (var pt in mainPts)
+                canvas.DrawCircle(pt.X, pt.Y, 4f,
+                    new SKPaint { Color = SKColor.Parse(CountryPalette[0]), IsAntialias = true });
+        }
+
+        void DrawAreaComparisonChart(
+            SKCanvas canvas, Size size,
+            List<int> years,
+            List<PeerCountryYearHistoryDto> mainHistory,
+            List<(int Year, float Avg)> peerAvg)
+        {
+            if (years.Count < 2) return;
+
+            const float padL = 36f, padR = 10f, padT = 6f, padB = 20f;
+            float w = size.Width - padL - padR;
+            float h = size.Height - padT - padB;
+
+            float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
+            float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
+
+            foreach (int s in new[] { 0, 25, 50, 75, 100 })
+            {
+                float y = Yp(s);
+                canvas.DrawLine(padL, y, padL + w, y,
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray250), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayMuted);
+            }
+            foreach (int yr in years)
+                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, ReportThemeColors.Gray600);
+
+            // Peer area
+            var peerPath = new SKPath();
+            peerPath.MoveTo(Xp(years.First()), Yp(0));
+            foreach (int yr in years)
+            {
+                float v = peerAvg.FirstOrDefault(p => p.Year == yr).Avg;
+                peerPath.LineTo(Xp(yr), Yp(v));
+            }
+            peerPath.LineTo(Xp(years.Last()), Yp(0));
+            peerPath.Close();
+            canvas.DrawPath(peerPath,
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.PdfTealGreen).WithAlpha(40), IsAntialias = true });
+
+            // Main area
+            var mainPath = new SKPath();
+            mainPath.MoveTo(Xp(years.First()), Yp(0));
+            foreach (int yr in years)
+            {
+                float v = (float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0);
+                mainPath.LineTo(Xp(yr), Yp(v));
+            }
+            mainPath.LineTo(Xp(years.Last()), Yp(0));
+            mainPath.Close();
+            canvas.DrawPath(mainPath,
+                new SKPaint { Color = SKColor.Parse(CountryPalette[0]).WithAlpha(50), IsAntialias = true });
+
+            // Outlines
+            DrawPolyline(canvas,
+                years.Select(yr => new SKPoint(Xp(yr),
+                    Yp(peerAvg.FirstOrDefault(p => p.Year == yr).Avg))).ToList(),
+                new SKPaint
+                {
+                    Color = SKColor.Parse(ReportThemeColors.PdfTealGreen),
+                    StrokeWidth = 1.5f,
+                    IsAntialias = true,
+                    IsStroke = true
+                });
+
+            DrawPolyline(canvas,
+                years.Select(yr => new SKPoint(Xp(yr),
+                    Yp((float)(mainHistory.FirstOrDefault(h => h.Year == yr)?.ScoreProgress ?? 0)))).ToList(),
+                new SKPaint
+                {
+                    Color = SKColor.Parse(CountryPalette[0]),
+                    StrokeWidth = 2f,
+                    IsAntialias = true,
+                    IsStroke = true
+                });
+        }
+
+        /// <summary>Multi-pillar line chart . one coloured line per pillar (up to 14).</summary>
+        void DrawPillarLineChart(
+            SKCanvas canvas, Size size,
+            List<int> years,
+            List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars)
+        {
+            if (years.Count < 2) return;
+
+            const float padL = 36f, padR = 10f, padT = 8f, padB = 20f;
+            float w = size.Width - padL - padR;
+            float h = size.Height - padT - padB;
+
+            float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
+            float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
+
+            foreach (int s in new[] { 0, 25, 50, 75, 100 })
+            {
+                float y = Yp(s);
+                canvas.DrawLine(padL, y, padL + w, y,
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray250), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayMuted);
+            }
+            foreach (int yr in years)
+                DrawCanvasText(canvas, yr.ToString(), Xp(yr) - 12, padT + h + 5, 7, ReportThemeColors.Gray600);
+
+            for (int pi = 0; pi < pillars.Count; pi++)
+            {
+                var pillar = pillars[pi];
+                string color = PillarPalette[pi % PillarPalette.Length];
+
+                var pts = years
+                    .Select(yr =>
+                    {
+                        var hEntry = history.FirstOrDefault(h => h.Year == yr);
+                        var ps = hEntry?.Pillars?.FirstOrDefault(p => p.PillarID == pillar.PillarID);
+                        return ps != null ? (float?)ps.ScoreProgress : null;
+                    })
+                    .Select((s, i) => (Year: years[i], Score: s))
+                    .Where(p => p.Score.HasValue)
+                    .Select(p => new SKPoint(Xp(p.Year), Yp(p.Score!.Value)))
+                    .ToList();
+
+                DrawPolyline(canvas, pts,
+                    new SKPaint
+                    {
+                        Color = SKColor.Parse(color),
+                        StrokeWidth = 1.5f,
+                        IsAntialias = true,
+                        IsStroke = true
+                    });
+
+                foreach (var pt in pts)
+                    canvas.DrawCircle(pt.X, pt.Y, 2.5f,
+                        new SKPaint { Color = SKColor.Parse(color), IsAntialias = true });
+            }
+        }
+
+        void DrawScatterPlot(
+            SKCanvas canvas, Size size,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
+            Func<PeerCountryHistoryReportDto, float> xVal,
+            Func<PeerCountryHistoryReportDto, float> yVal,
+            string xLabel, string yLabel)
+        {
+            const float padL = 42f, padR = 14f, padT = 8f, padB = 24f;
+            float w = size.Width - padL - padR;
+            float h = size.Height - padT - padB;
+
+            float xMin = countries.Any() ? countries.Min(xVal) : 0f;
+            float xMax = countries.Any() ? countries.Max(xVal) : 1f;
+            if (xMax <= xMin) xMax = xMin + 1;
+
+            float Xp(float v) => padL + (v - xMin) / (xMax - xMin) * w;
+            float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
+
+            // Axes
+            canvas.DrawLine(padL, padT, padL, padT + h,
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayMuted), StrokeWidth = 0.8f });
+            canvas.DrawLine(padL, padT + h, padL + w, padT + h,
+                new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayMuted), StrokeWidth = 0.8f });
+
+            foreach (int s in new[] { 0, 25, 50, 75, 100 })
+            {
+                float y = Yp(s);
+                canvas.DrawLine(padL, y, padL + w, y,
+                    new SKPaint { Color = SKColor.Parse(ReportThemeColors.BorderLight), StrokeWidth = 0.5f });
+                DrawCanvasText(canvas, s.ToString(), 2, y - 5, 7, ReportThemeColors.GrayLight);
+            }
+
+            for (int i = 0; i < countries.Count; i++)
+            {
+                var country = countries[i];
+                bool isMain = IsSameCountry(country.CountryName, countryDetails.CountryName);
+                float x = Xp(xVal(country));
+                float y = Yp(yVal(country));
+                string clr = isMain ? CountryPalette[0] : CountryPalette[1 + (i % (CountryPalette.Length - 1))];
+
+                canvas.DrawCircle(x, y, isMain ? 6f : 4.5f,
+                    new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
+
+                if (isMain)
+                    canvas.DrawCircle(x, y, 6f,
+                        new SKPaint
+                        {
+                            Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                            IsStroke = true,
+                            StrokeWidth = 1.5f,
+                            IsAntialias = true
+                        });
+            }
+
+            DrawCanvasText(canvas, xLabel, padL + w / 2 - 22, padT + h + 14, 8, ReportThemeColors.Gray700);
+            DrawCanvasText(canvas, yLabel, 2, padT + h / 2, 8, ReportThemeColors.Gray700);
+        }
+
+        void DrawDonutChart(SKCanvas canvas, Size size, List<(string Label, float Value)> segments)
+        {
+            float total = segments.Sum(s => s.Value);
+            if (total <= 0) return;
+
+            float cx = size.Height / 2f;
+            float cy = size.Height / 2f;
+            float outerR = size.Height / 2f - 6f;
+            float innerR = outerR * 0.52f;
+
+            float startAngle = -90f;
+            for (int i = 0; i < segments.Count; i++)
+            {
+                float sweep = segments[i].Value / total * 360f;
+                using var path = new SKPath();
+                var outer = new SKRect(cx - outerR, cy - outerR, cx + outerR, cy + outerR);
+                path.AddArc(outer, startAngle, sweep);
+                path.ArcTo(new SKRect(cx - innerR, cy - innerR, cx + innerR, cy + innerR),
+                    startAngle + sweep, -sweep, false);
+                path.Close();
+
+                canvas.DrawPath(path, new SKPaint
+                { Color = SKColor.Parse(PillarPalette[i % PillarPalette.Length]), IsAntialias = true });
+
+                startAngle += sweep;
+            }
+
+            // Centre count
+            DrawCanvasText(canvas, $"{segments.Count}", cx - 8, cy - 8, 14, ReportThemeColors.PdfDarkGreen, bold: true);
+            DrawCanvasText(canvas, "groups", cx - 16, cy + 6, 7, ReportThemeColors.Gray800);
+
+            // Legend right of donut
+            float lx = cx + outerR + 14f;
+            for (int i = 0; i < segments.Count; i++)
+            {
+                float ly = 12 + i * 17f;
+                canvas.DrawRoundRect(
+                    new SKRoundRect(new SKRect(lx, ly, lx + 10, ly + 10), 2),
+                    new SKPaint
+                    {
+                        Color = SKColor.Parse(PillarPalette[i % PillarPalette.Length]),
+                        IsAntialias = true
+                    });
+                DrawCanvasText(canvas,
+                    $"{Shorten(segments[i].Label, 18)}  ({segments[i].Value:F0})",
+                    lx + 14, ly, 8, ReportThemeColors.Gray900);
+            }
+        }
+
+        void DrawHistogram(
+            SKCanvas canvas, Size size,
+            List<float> scores, float markerValue, int bins)
+        {
+            if (!scores.Any()) return;
+
+            const float padL = 30f, padR = 10f, padT = 6f, padB = 20f;
+            float w = size.Width - padL - padR;
+            float h = size.Height - padT - padB;
+            float binW = w / bins;
+            float bucketSz = 100f / bins;
+
+            int[] counts = new int[bins];
+            foreach (float s in scores)
+            {
+                int b = Math.Clamp((int)(s / bucketSz), 0, bins - 1);
+                counts[b]++;
+            }
+            int maxCount = counts.Max() == 0 ? 1 : counts.Max();
+
+            for (int b = 0; b < bins; b++)
+            {
+                float bH = (float)counts[b] / maxCount * h;
+                float x = padL + b * binW;
+                float midScr = b * bucketSz + bucketSz / 2f;
+
+                canvas.DrawRoundRect(
+                    new SKRoundRect(new SKRect(x + 2, padT + h - bH, x + binW - 2, padT + h), 2),
+                    new SKPaint { Color = SKColor.Parse(ScoreColor(midScr)), IsAntialias = true });
+
+                if (counts[b] > 0)
+                    DrawCanvasText(canvas, counts[b].ToString(), x + 3, padT + h - bH - 12, 7, ReportThemeColors.Gray800);
+            }
+
+            for (int b = 0; b <= bins; b += 2)
+                DrawCanvasText(canvas, (b * bucketSz).ToString("F0"),
+                    padL + b * binW - 6, padT + h + 5, 7, ReportThemeColors.Gray600);
+
+            // Marker for selected country
+            float mx = padL + Math.Clamp(markerValue, 0, 100) / 100f * w;
+            canvas.DrawLine(mx, padT, mx, padT + h,
+                new SKPaint
+                {
+                    Color = SKColor.Parse(CountryPalette[0]),
+                    StrokeWidth = 2f,
+                    PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0)
+                });
+            DrawCanvasText(canvas, $"^{markerValue:F1}", mx - 12, padT - 1, 7, CountryPalette[0], bold: true);
+        }
+
+        // --------------------------------------------------------------------------
+        //  SHARED LAYOUT HELPERS
+        // --------------------------------------------------------------------------
+
+        void DrawInsightBand(IContainer container, string text)
+        {
+            container.Background(ReportThemeColors.AccentEquityAssessment).Padding(8)
+                .Text(text).FontSize(8.5f).FontColor(ReportThemeColors.PdfDarkGreen);
+        }
+
+        void DrawNoDataPage(IContainer container)
+        {
+            container.AlignCenter().AlignMiddle()
+                .Text("No data available for this section.")
+                .FontSize(12).FontColor(ReportThemeColors.GrayMuted);
+        }
+        void DrawLegend(IContainer container, (string Color, string Label)[] items, int textsize = 20)
+        {
+            var groups = items
+                .Select((x, i) => new { x, i })
+                .GroupBy(x => x.i / 7)
+                .Select(g => g.Select(v => v.x).ToList());
+
+            container.Column(col =>
+            {
+                col.Item().Row(row =>
+                {
+                    row.AutoItem().AlignMiddle()
+                        .Text("Legend:  ")
+                        .FontSize(8)
+                        .FontColor(ReportThemeColors.Gray600);
+                });
+
+                foreach (var group in groups)
+                {
+                    col.Item().Row(row =>
+                    {
+                        foreach (var (color, label) in group)
+                        {
+                            row.ConstantItem(10).Height(10).Canvas((c, s) =>
+                                c.DrawRoundRect(
+                                    new SKRoundRect(new SKRect(0, 1, 10, 9), 2),
+                                    new SKPaint { Color = SKColor.Parse(color) }));
+
+                            row.AutoItem()
+                                .PaddingLeft(3)
+                                .PaddingRight(10)
+                                .Text(Shorten(label, textsize))
+                                .FontSize(8)
+                                .FontColor(ReportThemeColors.Gray800);
+                        }
+                    });
+                }
+            });
+        }
+
+        /// <summary>Country-specific legend: gold dot for selected country, palette dots for peers.</summary>
+        void DrawCountryLineLegend(
+            IContainer container,
+            PeerCountryHistoryReportDto mainCountry,
+            List<PeerCountryHistoryReportDto> peers,
+            AiCountrySummeryDto countryDetails)
+        {
+            var items = new List<(string Color, string Label)>
+            {
+                (CountryPalette[0],  $"{countryDetails.CountryName} (selected)"),
+                (ReportThemeColors.PdfTealGreen,       "Peer Average")
+            };
+            for (int i = 0; i < peers.Count; i++)
+                items.Add((CountryPalette[1 + (i % (CountryPalette.Length - 1))], peers[i].CountryName));
+
+            DrawLegend(container, items.ToArray());
+        }
+
+        /// <summary>Legend row showing a coloured dot for every country in the chart.</summary>
+        void DrawCountryLegend(
+            IContainer container,
+            List<PeerCountryHistoryReportDto> allcountries,
+            AiCountrySummeryDto countryDetails)
+        {
+            var items = allcountries
+                .Select((c, i) => (
+                    Color: IsSameCountry(c.CountryName, countryDetails.CountryName)
+                        ? CountryPalette[0]
+                        : CountryPalette[1 + (i % (CountryPalette.Length - 1))],
+                    Label: c.CountryName
+                ))
+                .ToArray();
+
+            DrawLegend(container, items);
+        }
+
         static void DrawTableHeader(TableDescriptor table, string[] headers)
         {
             foreach (string h in headers)
                 table.Cell().Background(ReportThemeColors.PdfDarkGreen).Padding(5)
                     .Text(h).FontSize(8).Bold().FontColor(ReportThemeColors.White);
+        }
+
+        static void DrawPolyline(SKCanvas canvas, List<SKPoint> pts, SKPaint paint)
+        {
+            for (int i = 0; i < pts.Count - 1; i++)
+                canvas.DrawLine(pts[i], pts[i + 1], paint);
+        }
+
+        static void DrawDashedPolyline(SKCanvas canvas, List<SKPoint> pts, SKPaint paint)
+        {
+            var dashed = paint.Clone();
+            dashed.PathEffect = SKPathEffect.CreateDash(new[] { 5f, 3f }, 0);
+            DrawPolyline(canvas, pts, dashed);
+        }
+
+        static void DrawCanvasText(
+            SKCanvas canvas, string text, float x, float y, float textSize,
+            string hexColor, bool bold = false)
+        {
+            using var paint = new SKPaint
+            {
+                Color = SKColor.Parse(hexColor),
+                TextSize = textSize,
+                IsAntialias = true,
+                Typeface = bold
+                    ? SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                    : SKTypeface.FromFamilyName("Arial")
+            };
+            canvas.DrawText(text, x, y + textSize, paint);
         }
 
         // --------------------------------------------------------------------------
@@ -2530,34 +3620,69 @@ namespace HornScope.Common.Implementation
         /// Returns the latest year's score including 0.
         /// Returns -1 only when there is genuinely NO history entry at all.
         /// </summary>
-        static float GetLatestScoreOrZero(PeerProgramHistoryReportDto program)
+        static float GetLatestScoreOrZero(PeerCountryHistoryReportDto country)
         {
-            var last = program.ProgramHistory?
+            var last = country.CountryHistory?
                 .OrderByDescending(h => h.Year)
                 .FirstOrDefault();
-            return last != null ? (float)last.ScoreProgress : 0f;
+            return last != null ? (float)last.ScoreProgress : -1f;
         }
 
-        /// <summary>Returns main-Program entry from the combined list; null if not found.</summary>
-        static PeerProgramHistoryReportDto? FindMainProgram(
-            List<PeerProgramHistoryReportDto> all, AiProgramSummeryDto ProgramDetails) =>
-            all.FirstOrDefault(p => IsSameProgram(p.ProgramName, ProgramDetails.ProgramName));
+        /// <summary>Returns main-country entry from the combined list; null if not found.</summary>
+        static PeerCountryHistoryReportDto? FindMainCountry(
+            List<PeerCountryHistoryReportDto> all, AiCountrySummeryDto countryDetails) =>
+            all.FirstOrDefault(p => IsSameCountry(p.CountryName, countryDetails.CountryName));
 
-        /// <summary>Case-insensitive Program name equality check.</summary>
-        static bool IsSameProgram(string? a, string? b) =>
+        /// <summary>Case-insensitive country name equality check.</summary>
+        static bool IsSameCountry(string? a, string? b) =>
             string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        /// <summary>Builds a deduplicated list: main Program first, then peers.</summary>
-        static List<PeerProgramHistoryReportDto> BuildAllPrograms(
-            PeerProgramHistoryReportDto? main,
-            List<PeerProgramHistoryReportDto> peers)
+        /// <summary>Builds a deduplicated list: main country first, then peers.</summary>
+        static List<PeerCountryHistoryReportDto> BuildAllCountries(
+            PeerCountryHistoryReportDto? main,
+            List<PeerCountryHistoryReportDto> peers)
         {
-            var list = new List<PeerProgramHistoryReportDto>();
+            var list = new List<PeerCountryHistoryReportDto>();
             if (main != null) list.Add(main);
             list.AddRange(peers);
             return list;
         }
-       
+
+        static string ScoreColor(float score) =>
+            score >= 70 ? ReportThemeColors.PdfMediumGreen : score >= 40 ? ReportThemeColors.WarningGoldAlt : ReportThemeColors.DangerRedAccent;
+
+        static string DeriveRole(PeerCountryHistoryReportDto country)
+        {
+            if (country.Population >= 5_000_000) return "Metropolis";
+            if (country.Population >= 1_000_000) return "Major Country";
+            if (country.Population >= 300_000) return "Mid-Sized Country";
+            if (country.Population >= 100_000) return "Large Town";
+            return "Small Country";
+        }
+
+        static string FormatPop(decimal? value)
+        {
+            if (!value.HasValue || value <= 0) return "N/A";
+
+            if (value >= 1_000_000_000) return $"{value / 1_000_000_000M:F1}B";
+            if (value >= 1_000_000) return $"{value / 1_000_000M:F1}M";
+            if (value >= 1_000) return $"{value / 1_000M:F0}K";
+
+            return value.Value.ToString("N0");
+        }
+
+      
+
+        static string InterpolateColor(string from, string to, float t)
+        {
+            t = Math.Clamp(t, 0f, 1f);
+            var c1 = SKColor.Parse(from);
+            var c2 = SKColor.Parse(to);
+            byte r = (byte)(c1.Red + (c2.Red - c1.Red) * t);
+            byte g = (byte)(c1.Green + (c2.Green - c1.Green) * t);
+            byte b = (byte)(c1.Blue + (c2.Blue - c1.Blue) * t);
+            return $"#{r:X2}{g:X2}{b:X2}";
+        }
     }
 
 }

@@ -1,9 +1,7 @@
-using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
 using HornScope.Data;
 using HornScope.Dtos.chatDto;
-using HornScope.Dtos.CommonDto;
 using HornScope.Dtos.PublicDto;
 using HornScope.IServices;
 using Microsoft.AspNetCore.Authorization;
@@ -40,70 +38,28 @@ namespace HornScope.Services
             _aIAnalyzeService = aIAnalyzeService;
             _configuration = configuration;
         }
-        public async Task<ResultResponseDto<List<PartnerProgramResponseDto>>> GetAllPrograms()
+        public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
         {
             try
             {
-                var result = await _context.ClimatePrograms.Where(c => c.IsActive && !c.IsDeleted).
-                 Select(c => new PartnerProgramResponseDto
+                var result = await _context.Countries.Where(c => c.IsActive && !c.IsDeleted).
+                 Select(c => new PartnerCountryResponseDto
                  {
-                     ClimateProgramID = c.ClimateProgramID,                     
-                     ProgramName = c.ProgramName,
-                     Location = c.Location
-                 }).OrderBy(x => x.ProgramName).ToListAsync();
+                     CountryID = c.CountryID,                     
+                     CountryName = c.CountryName,
+                     CountryCode = c.CountryCode,
+                     Continent = c.Continent,
+                     
+                 }).OrderBy(x => x.CountryName).ToListAsync();
 
-                return ResultResponseDto<List<PartnerProgramResponseDto>>.Success(result, new string[] { "Get All Programs successfully" });
+                return ResultResponseDto<List<PartnerCountryResponseDto>>.Success(result, new string[] { "get All Countries successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAllPrograms", ex);
-                return ResultResponseDto<List<PartnerProgramResponseDto>>.Failure(new string[] { "There is an error please try later" });
+                await _appLogger.LogAsync("Error Occure in getAllCountries", ex);
+                return ResultResponseDto<List<PartnerCountryResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        public async Task<ResultResponseDto<PartnerProgramFilterResponse>> GetPartnerProgramsFilterRecord()
-        {
-            try
-            {
-                // Fetch all active Climate Programs once
-                var activePrograms = await _context.ClimatePrograms
-                    .Where(x => !x.IsDeleted)
-                    .ToListAsync();
-
-                var res = new PartnerProgramFilterResponse
-                {
-                    Programs = activePrograms.Select(x=>x.ProgramName)
-                        .Distinct()
-                        .ToList(),
-
-                    //Programs = activePrograms
-                    //    .Select(x => new PartnerProgramDto
-                    //    {
-                    //        ClimateProgramID = x.ClimateProgramID,
-                    //        ProgramName = x.ProgramName
-                    //    })
-                    //    .ToList(),
-
-                    //Regions = activePrograms        
-                    //    .Select(x => x.Region)
-                    //    .Where(r => !string.IsNullOrEmpty(r))
-                    //    .Distinct()
-                    //    .ToList()
-                };
-
-                return ResultResponseDto<PartnerProgramFilterResponse>.Success(
-                    res,
-                    new List<string> { "Get program filter data successfully" }
-                );
-            }
-            catch (Exception ex)
-            {
-                await _appLogger.LogAsync("Error Occured in GetPartnerProgramsFilterRecord", ex);
-                return ResultResponseDto<PartnerProgramFilterResponse>.Failure(
-                    new string[] { "Failed to get Partner program filter data" }
-                );
-            }
-        }
-
         public async Task<ResultResponseDto<List<PillarResponseDto>>> GetAllPillarAsync()
         {
             try
@@ -117,98 +73,41 @@ namespace HornScope.Services
                     PillarName = x.PillarName,
                     ImagePath = x.ImagePath
                 }).ToList();
-                return ResultResponseDto<List<PillarResponseDto>>.Success(res, new List<string> { "Get Pillars history successfully" });
+                return ResultResponseDto<List<PillarResponseDto>>.Success(res, new List<string> { "Get Countries history successfully" });
 
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occure in GetAllPillarAsync", ex);
-                return ResultResponseDto<List<PillarResponseDto>>.Failure(new string[] { "Failed to get Pillar detail" });
+                return ResultResponseDto<List<PillarResponseDto>>.Failure(new string[] { "Failed to get Piilar detail" });
             }
         }
-        public async Task<PaginationResponse<PartnerProgramResponseDto>> GetPartnerPrograms(PartnerProgramRequestDto request)
+        public async Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport()
         {
             try
             {
-                var programQuery =
-                   from c in _context.ClimatePrograms.Where(x => !request.ClimateProgramID.HasValue || x.ClimateProgramID == request.ClimateProgramID)
-                   join uc in _context.StaffProgramMappings on c.ClimateProgramID equals uc.ClimateProgramID into ucg
-                   from uc in ucg.DefaultIfEmpty()
-                   join a in _context.Assessments on uc.StaffProgramMappingID equals a.StaffProgramMappingID into ag
-                   from a in ag.DefaultIfEmpty()
-                   join pa in _context.PillarAssessments.Where(x=> !request.PillarID.HasValue || x.PillarID == request.PillarID) 
-                   on a.AssessmentID equals pa.AssessmentID into pag
-                   from pa in pag.DefaultIfEmpty()
-                   join r in _context.AssessmentResponses on pa.PillarAssessmentID equals r.PillarAssessmentID into rg
-                   from r in rg.DefaultIfEmpty()
-                   where !c.IsDeleted && 
-                    (uc == null || !uc.IsDeleted) &&
-                    (a == null) 
-                   group r by new
-                   {
-                       c.ClimateProgramID,                       
-                       c.ProgramName,
-                       c.Image,
-                       c.Location,
-                       EvaluatorCount = _context.StaffProgramMappings
-                                           .Count(x => x.ClimateProgramID == c.ClimateProgramID && !x.IsDeleted)
-                   }
-                   into g
-                   select new PartnerProgramResponseDto
-                   {
-                       ClimateProgramID = g.Key.ClimateProgramID,
-                       ProgramName = g.Key.ProgramName,
-                       Image = g.Key.Image,
-                       Location = g.Key.Location,
-                       Score = (decimal)g.Sum(x => (int?)x.Score ?? 0) / (g.Key.EvaluatorCount == 0 ? 1 : g.Key.EvaluatorCount),
-                       HighScore = g.Max(x=>(int?)x.Score ?? 0),
-                       LowerScore = g.Min(x => (int?)x.Score ?? 0),
-                       Progress = ((decimal)g.Sum(x => (int?)x.Score ?? 0)) / ((g.Key.EvaluatorCount == 0 ? 1 : g.Key.EvaluatorCount) * g.Count()),
-                   };
-
-                if (!string.IsNullOrWhiteSpace(request.Program))
-                {
-                    programQuery = programQuery.Where(c => c.ProgramName.Contains(request.Program));
-                }
-
-                var response = await programQuery.ApplyPaginationAsync(request);
-
-                return response;
-
-            }
-            catch (Exception ex)
-            {
-                await _appLogger.LogAsync("Error Occure in GetPartnerPrograms", ex);
-                return new();
-            }
-        }
-
-        public async Task<ProgramResponse> GetProgramsAndPrograms_WithStaleSupport()
-        {
-            try
-            {
-                string jsonFilePath = Path.Combine(_env.WebRootPath, "data\\programs_cache.json");
+                string jsonFilePath = Path.Combine(_env.WebRootPath, "data\\countries_cache.json");
                 if (!File.Exists(jsonFilePath))
-                    return new ProgramResponse(); // ? NEVER return null
+                    return new CountryCityResponse(); // ? NEVER return null
 
                 var json = await File.ReadAllTextAsync(jsonFilePath);
 
-                var data = JsonSerializer.Deserialize<ProgramResponse>(json);
+                var data = JsonSerializer.Deserialize<CountryCityResponse>(json);
 
-                return data ?? new ProgramResponse();
+                return data ?? new CountryCityResponse();
             }
             catch (Exception ex)
             {
                 // ? Optional: log error
-                // _logger.LogError(ex, "Failed to load programs file");
+                // _logger.LogError(ex, "Failed to load country-city file");
 
-                return new ProgramResponse(); // ? Safe fallback
+                return new CountryCityResponse(); // ? Safe fallback
             }
         }
 
-        public async Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedPrograms()
+        public async Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries()
         {
-            const string cacheKey = "GetPromotedPrograms";
+            const string cacheKey = "GetPromotedCountries";
 
             try
             {
@@ -216,8 +115,10 @@ namespace HornScope.Services
                 {
                     return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                         cachedData,
-                        new List<string> { "Promoted Programs fetched successfully" });
+                        new List<string> { "Promoted Countries fetched successfully" });
                 }
+
+                int currentYear = DateTime.UtcNow.Year;
 
                 var admin = await _context.Users
                     .AsNoTracking()
@@ -232,12 +133,12 @@ namespace HornScope.Services
                 int userId = admin?.UserID ?? 0;
                 int role = (int)(admin?.Role ?? Models.UserRole.Admin);
 
-                var pillarScores = await _commonService.GetProgramProgressAsync(userId, role);
+                var pillarScores = await _commonService.GetCountriesProgressAsync(userId, role, currentYear);
 
-                int[] selectedPillars = { 4, 5, 8, 11, 16, 17, 20, 21 };
+                int[] selectedPillars = { 1, 4, 7, 15, 22 };
                 pillarScores = pillarScores.Where(x => selectedPillars.Contains(x.PillarID)).ToList();
 
-                var topProgramsByPillar = pillarScores
+                var topCountriesByPillar = pillarScores
                     .GroupBy(x => x.PillarID)
                     .ToDictionary(
                         g => g.Key,
@@ -246,25 +147,27 @@ namespace HornScope.Services
                               .ToList()
                     );
 
-                var climateProgramIDs = topProgramsByPillar
+                var countryIds = topCountriesByPillar
                     .SelectMany(x => x.Value)
-                    .Select(x => x.ClimateProgramID)
+                    .Select(x => x.CountryID)
                     .Distinct()
                     .ToList();
 
                 var scoreLookup = pillarScores
-                    .GroupBy(x => new { x.ClimateProgramID, x.PillarID })
+                    .GroupBy(x => new { x.CountryID, x.PillarID })
                     .ToDictionary(
-                        g => (g.Key.ClimateProgramID, g.Key.PillarID),
+                        g => (g.Key.CountryID, g.Key.PillarID),
                         g => g.First().ScoreProgress
                     );
 
                 var result = await _context.AIPillarScores
                     .AsNoTracking()
-                    .Where(x => climateProgramIDs.Contains(x.ClimateProgramID) && 
-                                selectedPillars.Contains(x.PillarID) &&
-                                x.Program.IsActive &&
-                                !x.Program.IsDeleted)
+                    .Where(x =>
+                        x.Year == currentYear &&
+                        countryIds.Contains(x.CountryID) &&
+                        selectedPillars.Contains(x.PillarID) &&
+                        x.Country.IsActive &&
+                        !x.Country.IsDeleted)
                     .GroupBy(x => new
                     {
                         x.PillarID,
@@ -279,14 +182,16 @@ namespace HornScope.Services
                         DisplayOrder = g.Key.DisplayOrder,
                         ImagePath = g.Key.ImagePath,
 
-                        Programs = g
+                        Countries = g
                             .OrderByDescending(x => x.AIProgress)
-                            .Select(c => new PromotedProgramResponseDto
+                            .Select(c => new PromotedCountryResponseDto
                             {
-                                ClimateProgramID = c.ClimateProgramID,
-                                ProgramName = c.Program.ProgramName,
-                                Location = c.Program.Location,
-                                Image = c.Program.Image,
+                                CountryID = c.CountryID,
+                                CountryName = c.Country.CountryName,
+                                CountryCode = c.Country.CountryCode,
+                                Continent = c.Country.Continent,
+                                Region = c.Country.Region,
+                                Image = c.Country.Image,
                                 Description = c.EvidenceSummary,
                                 ScoreProgress = 0 
                             })
@@ -297,17 +202,17 @@ namespace HornScope.Services
 
                 foreach (var pillar in result)
                 {
-                    foreach (var program in pillar.Programs)
+                    foreach (var country in pillar.Countries)
                     {
                         if (scoreLookup.TryGetValue(
-                            (program.ClimateProgramID, pillar.PillarID),
+                            (country.CountryID, pillar.PillarID),
                             out var score))
                         {
-                            program.ScoreProgress = Math.Round(score, 2);
+                            country.ScoreProgress = Math.Round(score,2);
                         }
                     }
 
-                    pillar.Programs = pillar.Programs
+                    pillar.Countries = pillar.Countries
                         .OrderByDescending(x => x.ScoreProgress)
                         .Take(3)
                         .ToList();
@@ -322,14 +227,14 @@ namespace HornScope.Services
 
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Success(
                     result,
-                    new List<string> { "Promoted Programs fetched successfully" });
+                    new List<string> { "Promoted Countries fetched successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occurred in GetPromotedPrograms", ex);
+                await _appLogger.LogAsync("Error Occurred in GetPromotedCountries", ex);
 
                 return ResultResponseDto<List<PromotedPillarsResponseDto>>.Failure(
-                    new[] { "Failed to get promoted Programs" });
+                    new[] { "Failed to get promoted Countries" });
             }
         }
 
@@ -340,11 +245,11 @@ namespace HornScope.Services
             PropertyNameCaseInsensitive = true
         };
 
-        private static string EmergingTrendsCacheKey(int programCount) =>
-            $"EmergingTrendsAndIssues_{programCount}";
+        private static string EmergingTrendsCacheKey(int countryCount) =>
+            $"EmergingTrendsAndIssues_{countryCount}";
 
-        private static string EmergingTrendsStaleCacheKey(int programCount) =>
-            $"EmergingTrendsAndIssues_Stale_{programCount}";
+        private static string EmergingTrendsStaleCacheKey(int countryCount) =>
+            $"EmergingTrendsAndIssues_Stale_{countryCount}";
 
         private TimeSpan EmergingTrendsCacheDuration =>
             TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:CacheExpirationHours", 12));
@@ -353,8 +258,8 @@ namespace HornScope.Services
             TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:StaleCacheExpirationHours", 168));
 
         private static bool IsEmergingTrendsCacheValid(EmergingTrendsResult? data) =>
-            data?.Programs?.Any(c =>
-                !string.IsNullOrWhiteSpace(c.ProgramName) &&
+            data?.Countries?.Any(c =>
+                !string.IsNullOrWhiteSpace(c.Country) &&
                 !string.IsNullOrWhiteSpace(c.SourceUrl)) == true;
 
         private static EmergingTrendsResult CloneEmergingTrendsResult(EmergingTrendsResult data) =>
@@ -364,13 +269,13 @@ namespace HornScope.Services
             ) ?? new EmergingTrendsResult();
 
         private bool TryGetEmergingTrendsFromCache(
-            int programCount,
+            int countryCount,
             out EmergingTrendsResult? result,
             bool allowStale = false)
         {
             result = null;
 
-            if (_cache.TryGetValue(EmergingTrendsCacheKey(programCount), out EmergingTrendsResult? cached))
+            if (_cache.TryGetValue(EmergingTrendsCacheKey(countryCount), out EmergingTrendsResult? cached))
             {
                 if (IsEmergingTrendsCacheValid(cached))
                 {
@@ -378,11 +283,11 @@ namespace HornScope.Services
                     return true;
                 }
 
-                _cache.Remove(EmergingTrendsCacheKey(programCount));
+                _cache.Remove(EmergingTrendsCacheKey(countryCount));
             }
 
             if (allowStale
-                && _cache.TryGetValue(EmergingTrendsStaleCacheKey(programCount), out EmergingTrendsResult? stale)
+                && _cache.TryGetValue(EmergingTrendsStaleCacheKey(countryCount), out EmergingTrendsResult? stale)
                 && IsEmergingTrendsCacheValid(stale))
             {
                 result = CloneEmergingTrendsResult(stale!);
@@ -393,7 +298,7 @@ namespace HornScope.Services
         }
 
         private void SetEmergingTrendsCache(
-            int programCount,
+            int countryCount,
             EmergingTrendsResult data,
             bool updateStale = true)
         {
@@ -403,12 +308,12 @@ namespace HornScope.Services
                 AbsoluteExpirationRelativeToNow = EmergingTrendsCacheDuration,
                 Priority = CacheItemPriority.NeverRemove
             };
-            _cache.Set(EmergingTrendsCacheKey(programCount), primarySnapshot, cacheOptions);
+            _cache.Set(EmergingTrendsCacheKey(countryCount), primarySnapshot, cacheOptions);
 
             if (updateStale)
             {
                 _cache.Set(
-                    EmergingTrendsStaleCacheKey(programCount),
+                    EmergingTrendsStaleCacheKey(countryCount),
                     CloneEmergingTrendsResult(primarySnapshot),
                     new MemoryCacheEntryOptions
                     {
@@ -419,16 +324,16 @@ namespace HornScope.Services
             }
         }
 
-        private bool PreserveEmergingTrendsCacheOnRefreshFailure(int programCount)
+        private bool PreserveEmergingTrendsCacheOnRefreshFailure(int countryCount)
         {
-            if (!TryGetEmergingTrendsFromCache(programCount, out var lastGood, allowStale: true)
+            if (!TryGetEmergingTrendsFromCache(countryCount, out var lastGood, allowStale: true)
                 || lastGood == null)
             {
                 return false;
             }
 
             // Re-write both cache entries so TTLs are extended and snapshots stay isolated.
-            SetEmergingTrendsCache(programCount, lastGood, updateStale: true);
+            SetEmergingTrendsCache(countryCount, lastGood, updateStale: true);
             return true;
         }
 
@@ -436,13 +341,13 @@ namespace HornScope.Services
         {
             try
             {
-                var programCount = _configuration.GetValue("EmergingTrendsCache:ProgramCount", 8);
+                var countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", 8);
 
-                if (TryGetEmergingTrendsFromCache(programCount, out var cachedResult, allowStale: true)
+                if (TryGetEmergingTrendsFromCache(countryCount, out var cachedResult, allowStale: true)
                     && cachedResult != null)
                 {
                     var fromPrimary = _cache.TryGetValue(
-                        EmergingTrendsCacheKey(programCount),
+                        EmergingTrendsCacheKey(countryCount),
                         out EmergingTrendsResult _);
 
                     return ResultResponseDto<EmergingTrendsResult>.Success(
@@ -480,22 +385,22 @@ namespace HornScope.Services
         }
 
         public async Task<bool> RefreshEmergingTrendsCacheAsync(
-            int programCount,
+            int countryCount,
             CancellationToken cancellationToken = default)
         {
             try
             {
-                programCount = _configuration.GetValue("EmergingTrendsCache:programCount", programCount);
+                countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", countryCount);
 
-                var enriched = await FetchAndEnrichEmergingTrendsAsync(programCount, cancellationToken);
+                var enriched = await FetchAndEnrichEmergingTrendsAsync(countryCount, cancellationToken);
 
                 if (IsEmergingTrendsCacheValid(enriched))
                 {
-                    SetEmergingTrendsCache(programCount, enriched!);
+                    SetEmergingTrendsCache(countryCount, enriched!);
                     return true;
                 }
 
-                return PreserveEmergingTrendsCacheOnRefreshFailure(programCount);
+                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
             }
             catch (Exception ex)
             {
@@ -504,15 +409,15 @@ namespace HornScope.Services
                     ex
                 );
 
-                return PreserveEmergingTrendsCacheOnRefreshFailure(programCount);
+                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
             }
         }
 
         private async Task<EmergingTrendsResult?> FetchAndEnrichEmergingTrendsAsync(
-            int programCount,
+            int countryCount,
             CancellationToken cancellationToken = default)
         {
-            var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(programCount);
+            var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(countryCount);
 
             if (result == null || result.Success != true || result.Result == null)
             {
@@ -524,44 +429,46 @@ namespace HornScope.Services
                 return null;
             }
 
-            var programNames = result.Result.Programs
-                .Select(c => c.ProgramName?.Trim().ToLower())
+            var countryCodes = result.Result.Countries
+                .Select(c => c.CountryCode?.Trim().ToLower())
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
 
-            var locations = result.Result.Programs
-                .Select(c => c.Location?.Trim().ToLower())
+            var countries = result.Result.Countries
+                .Select(c => c.Country?.Trim().ToLower())
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .ToList();
 
-            var programLookup = await _context.ClimatePrograms
+            var countryLookup = await _context.Countries
                 .AsNoTracking()
                 .Where(c =>
                     c.IsActive &&
                     !c.IsDeleted &&
                     (
-                        programNames.Contains(c.ProgramName.ToLower()) ||
-                        locations.Contains(c.Location.ToLower())
+                        countryCodes.Contains(c.CountryCode.ToLower()) ||
+                        countries.Contains(c.CountryName.ToLower())
                     ))
                 .Select(c => new
                 {
-                    ProgramName = c.ProgramName.ToLower(),
-                    Location = c.Location.ToLower(),
+                    CountryCode = c.CountryCode.ToLower(),
+                    CountryName = c.CountryName.ToLower(),
                     c.Image,
-                    c.ClimateProgramID
+                    c.Region,
+                    c.Continent,
+                    c.CountryID
                 })
                 .ToListAsync(cancellationToken);
 
-            foreach (var trendProgram in result.Result.Programs)
+            foreach (var trendCountry in result.Result.Countries)
             {
-                var programName = trendProgram.ProgramName?.Trim().ToLower();
-                var location = trendProgram.Location?.Trim().ToLower();
+                var countryCode = trendCountry.CountryCode?.Trim().ToLower();
+                var countryName = trendCountry.Country?.Trim().ToLower();
 
-                var matchedProgram = programLookup.FirstOrDefault(x =>
-                    x.ProgramName == programName ||
-                    x.Location == location);
+                var matchedCountry = countryLookup.FirstOrDefault(x =>
+                    x.CountryCode == countryCode ||
+                    x.CountryName == countryName);
 
-                trendProgram.ImagePath = matchedProgram?.Image ?? "";
+                trendCountry.ImagePath = matchedCountry?.Image ?? "";
             }
 
             return result.Result;
@@ -580,7 +487,7 @@ namespace HornScope.Services
                         cachedResult,
                         new List<string>
                         {
-                            "Pillar live signals fetched successfully from cache."
+                            "Domain live signals fetched successfully from cache."
                         }
                     );
                 }
@@ -603,7 +510,7 @@ namespace HornScope.Services
                 foreach (var pillarCard in result.Result.Pillars)
                 {
                     var matched = pillarLookup.FirstOrDefault(p => p.PillarID == pillarCard.PillarId);
-                    pillarCard.PillarName = matched?.PillarName ?? $"Pillar {pillarCard.PillarId}";
+                    pillarCard.PillarName = matched?.PillarName ?? $"Domain {pillarCard.PillarId}";
                     pillarCard.ImagePath = matched?.ImagePath ?? "";
                 }
 
@@ -630,7 +537,7 @@ namespace HornScope.Services
                     result.Result,
                     new List<string>
                     {
-                        "Pillar live signals fetched successfully."
+                        "Domain live signals fetched successfully."
                     }
                 );
             }
@@ -650,113 +557,81 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<ROSEWPublicDashboardDto>> GetResilienceScorecard()
+        public async Task<ResultResponseDto<OverallAfricaMarketResponse>> GetOverAllAfricaMarketScore()
         {
-            int dashboardModeId = 3;
-        
+            const string cacheKey = "OverAllAfricaMarketScore";
+
             try
             {
-                var dashboardMode = await _context.DashboardModes
+                if (_cache.TryGetValue(cacheKey, out OverallAfricaMarketResponse cachedResult))
+                {
+                    return ResultResponseDto<OverallAfricaMarketResponse>.Success(
+                        cachedResult,
+                        new List<string>
+                        {
+                            "Overall Africa market score fetched successfully from cache."
+                        }
+                    );
+                }
+
+                var year = DateTime.UtcNow.Year;
+
+                var result = await _context.AIPillarScores
                     .AsNoTracking()
-                    .FirstOrDefaultAsync(x => x.DashboardModeID == dashboardModeId);
-
-                if (dashboardMode == null)
-                {
-                    return ResultResponseDto<ROSEWPublicDashboardDto>.Failure(new[] { "Dashboard configuration not found." });
-                }
-
-                var mappings = await _context.DashboardModeKPIMappings
-                .AsNoTracking()
-                .Where(x => x.DashboardModeID == dashboardModeId && x.IsActive && !x.IsDeleted)
-                .ToListAsync(); 
-
-                if (!mappings.Any())
-                {
-                    return ResultResponseDto<ROSEWPublicDashboardDto>.Failure(new[] { "Dashboard KPI mappings not found." });
-                }
-
-                var interpretations = await _context.DashboardInterpretations
-                    .AsNoTracking()
-                    .Where(x => x.DashboardModeID == dashboardModeId)
-                    .ToListAsync();
-
-                var spResults = await _commonService.GetDashboardModeResults(1, 1, dashboardModeId);
-                var spResultsByQuestion = spResults
-                    .Where(x => x.QuestionID.HasValue)
-                    .GroupBy(x => x.QuestionID!.Value)
-                    .ToDictionary(g => g.Key, g => g.Average(x => x.AiQuestionScore));
-
-
-                var questions = new List<ROSEWPublicQuestionDto>();
-
-                foreach (var mapping in mappings)
-                {
-                    spResultsByQuestion.TryGetValue(mapping.LayerID, out var totalScore);
-                     var Score = (decimal)totalScore.GetValueOrDefault();
-                    var questionScore = new ROSEWPublicQuestionDto
+                    .Where(x => x.Country.IsActive && !x.Country.IsDeleted && x.Year == year)
+                    .GroupBy(x => 1)
+                    .Select(g => new OverallAfricaMarketResponse
                     {
-                        QuestionDescription = mapping.Description ?? "",
-                        Condition = interpretations.FirstOrDefault(i => i.MaxRange >= Score && i.MinRange <= Score)?.Condition ?? "Moderate Stress (Watch)"
-                    };
-                    questions.Add(questionScore);
-                }
+                        OverallScore = Math.Round(g.Average(x => x.AIProgress) ?? 0,2)
+                    })
+                    .FirstOrDefaultAsync() ?? new OverallAfricaMarketResponse();
 
-                var spResultsByProgram = spResults
-                    .Where(x => x.ClimateProgramID.HasValue)
-                    .GroupBy(x => x.ClimateProgramID!.Value)
-                        .ToDictionary(g => g.Key, g => g.Average(x => x.AiQuestionScore)).OrderByDescending(x=>x.Value).Take(3);
-
-
-                var dbPrograms = _context.ClimatePrograms.Where(x=> spResultsByProgram.Select(k=>k.Key).Contains(x.ClimateProgramID)).ToList();
-                var programs = new List<ROSEWPublicProgramDto>();
-
-                foreach (var program in spResultsByProgram)
-                {
-                    var Score = (decimal)program    .Value.GetValueOrDefault();
-                    var programScore = new ROSEWPublicProgramDto
+                _cache.Set(
+                    cacheKey,
+                    result,
+                    new MemoryCacheEntryOptions
                     {
-                        ProgramName = dbPrograms.FirstOrDefault(x=>x.ClimateProgramID == program.Key)?.ProgramName ?? "",
-                        Location = dbPrograms.FirstOrDefault(x=>x.ClimateProgramID == program.Key)?.Location ?? "",
-                        UpdatedAt = DateTime.UtcNow,
-                        Condition = interpretations.FirstOrDefault(i => i.MaxRange >= Score && i.MinRange <= Score)?.Condition ?? "Moderate Stress (Watch)"
-                    };
-                    programs.Add(programScore);
-                }
+                        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                        Priority = CacheItemPriority.High
+                    }
+                );
 
-
-                var overAllScore = spResultsByQuestion.Any() ? (decimal?)spResultsByQuestion?.Select(x => x.Value)?.Average() : 0m;
-
-                var response = new ROSEWPublicDashboardDto
-                {
-                    Score = Math.Round(overAllScore ?? 0m, 2),
-                    UpdatedAt = spResults.Max(x => x.AiUpdatedAt),
-                    OverallCondition = interpretations.FirstOrDefault(i => i.MaxRange >= (overAllScore ?? 0m) && i.MinRange <= (overAllScore ?? 0m))?.Condition ?? "Moderate Stress (Watch)",
-                    Programs = programs,
-                    Questions = questions
-
-                };
-
-                return ResultResponseDto<ROSEWPublicDashboardDto>.Success(response, new[] { "Response get successfully" });
+                return ResultResponseDto<OverallAfricaMarketResponse>.Success(
+                    result,
+                    new List<string>
+                    {
+                        "Overall Africa market score fetched successfully."
+                    }
+                );
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync($"Error in GetDashboardMode for mode {dashboardModeId}", ex);
-                return ResultResponseDto<ROSEWPublicDashboardDto>.Failure(new[] { "There is an error, please try later" });
+                await _appLogger.LogAsync(
+                    "An error occurred while processing the GetOverAllAfricaMarketScore request.",
+                    ex
+                );
+
+                return ResultResponseDto<OverallAfricaMarketResponse>.Failure(
+                    new[]
+                    {
+                        "An error occurred while processing your request. Please try again later."
+                    }
+                );
             }
         }
     }
 }
 
-public class ProgramResponse
+public class CountryCityResponse
 {
     public bool error { get; set; }
     public string msg { get; set; }
-    public List<ProgramData> data { get; set; }
+    public List<CountryData> data { get; set; }
 }
 
-public class ProgramData
+public class CountryData
 {
-    public string Program { get; set; }
-    public List<string> Programs { get; set; }
+    public string Country { get; set; }
+    public List<string> Countries { get; set; }
 }
 

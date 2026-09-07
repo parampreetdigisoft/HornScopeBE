@@ -12,11 +12,11 @@ namespace HornScope.Common.DI
         public static IServiceCollection AddDependencyInjection(this IServiceCollection services)
         {
             services.AddHostedService<ChannelWorker>();
-            //services.AddHostedService<AiJobService>();
-            //services.AddHostedService<EmergingTrendsCacheWorker>();
+            services.AddHostedService<AiJobService>();
+            services.AddHostedService<EmergingTrendsCacheWorker>();
             services.AddScoped<Download>();
             services.AddHostedService<LogWorker>();
-           
+            // Channels
             services.AddSingleton<ChannelService>();
             services.AddSingleton<LogChannelService>();
             services.AddScoped<IAppLogger, AppLogger>();
@@ -28,15 +28,16 @@ namespace HornScope.Common.DI
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPillarService, PillarService>();
             services.AddScoped<IAssessmentResponseService, AssessmentResponseService>();
-            services.AddScoped<IProgramService, ProgramService>();
+            services.AddScoped<ICountryService, CountryService>();
             services.AddScoped<IEmailService, EmailService>();
             services.AddScoped<IAuthService, AuthService>();
-            services.AddScoped<IClientService, ClientService>();
+            services.AddScoped<ICountryUserService, CountryUserService>();
             services.AddScoped<ISignalDashboardService, SignalDashboardService>();
             services.AddScoped<IPaymentService, PaymentService>();
             services.AddScoped<IPublicService, PublicService>();
             services.AddScoped<IKpiService, KpiService>();
             services.AddScoped<IAIComputationService, AIComputationService>();
+            services.AddScoped<IAIEditService, AIEditService>();
             services.AddScoped<ICommonService, CommonService>();
             services.AddScoped<Interface.IPdfGeneratorService, Implementation.PdfGeneratorService>();
             services.AddScoped<IDocxGeneratorService, DocxGeneratorService>();

@@ -1,20 +1,20 @@
-using Microsoft.EntityFrameworkCore;
 using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
 using HornScope.Data;
-using HornScope.Dtos.ClientDto;
+using HornScope.Dtos.CountryUserDto;
 using HornScope.Dtos.dashboard;
 using HornScope.IServices;
 using HornScope.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace HornScope.Services
 {
     public class SignalDashboardService : ISignalDashboardService
     {
-        private const int AmbitionDeliveryIndexModeId = 1;
-        private const int DiplomaticRiskModeId = 2;
-        private const int InstitutionalReadinessModeId = 3;
+        private const int MarketStressTestModeId = 1;
+        private const int EarlyWarningModeId = 2;
+        private const int ResilienceModeId = 3;
 
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
@@ -27,27 +27,28 @@ namespace HornScope.Services
             _commonService = commonService;
         }
 
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetAmbitionDeliveryIndexDashboard(int climateProgramID, int userId, UserRole userRole)
-            => GetDashboardMode(AmbitionDeliveryIndexModeId, climateProgramID, userId, userRole, "Ambition–Delivery Index dashboard generated successfully.");
+        public Task<ResultResponseDto<DashboardModeResponseDto>> GetPeaceStressTestDashboard(int countryID, int userId, UserRole userRole, int year)
+            => GetDashboardMode(MarketStressTestModeId, countryID, userId, userRole, "Market stress test dashboard generated successfully.", year);
 
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetDiplomaticRiskDashboard(int climateProgramID, int userId, UserRole userRole)
-            => GetDashboardMode(DiplomaticRiskModeId, climateProgramID, userId, userRole, "Diplomatic Risk & Trust Index dashboard generated successfully.");
+        public Task<ResultResponseDto<DashboardModeResponseDto>> GetEarlyWarningDashboard(int countryID, int userId, UserRole userRole, int year)
+            => GetDashboardMode(EarlyWarningModeId, countryID, userId, userRole, "Early warning dashboard generated successfully.", year);
 
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetReadinessScorecardDashboard(int climateProgramID, int userId, UserRole userRole)
-            => GetDashboardMode(InstitutionalReadinessModeId, climateProgramID, userId, userRole, "Institutional Readiness Scorecard generated successfully.");
+        public Task<ResultResponseDto<DashboardModeResponseDto>> GetResilienceScorecard(int countryID, int userId, UserRole userRole, int year)
+            => GetDashboardMode(ResilienceModeId, countryID, userId, userRole, "Resilience scorecard generated successfully.", year);
 
         private async Task<ResultResponseDto<DashboardModeResponseDto>> GetDashboardMode(
             int dashboardModeId,
-            int climateProgramID,
+            int countryID,
             int userId,
             UserRole userRole,
-            string successMessage)
+            string successMessage,
+            int year)
         {
             try
             {
-                if (userRole == UserRole.ProgramUser && !await ValidateProgramAccess(climateProgramID, userId))
+                if (userRole == UserRole.CountryUser && !await ValidateCountryAccess(countryID, userId))
                 {
-                    return ResultResponseDto<DashboardModeResponseDto>.Failure(new[] { "You don't have access to this program data." });
+                    return ResultResponseDto<DashboardModeResponseDto>.Failure(new[] { "You don't have access to this country data." });
                 }
 
                 var dashboardMode = await _context.DashboardModes
@@ -66,80 +67,73 @@ namespace HornScope.Services
                 }
 
                 var layerIds = mappings.Select(x => x.LayerID).Distinct().ToList();
-
                 var layers = await LoadLayers(layerIds);
-
-                var accessibleLayerIds = await GetAccessibleLayerIds(userId);
-                var kpiResults = await LoadLayerResults(climateProgramID, layerIds);
-                var vcpAIScores = await LoadProgramAIVcpScore(climateProgramID, userRole);
-                var vcpManualScores = await LoadProgramVcpManualScores(userId, climateProgramID, userRole);
+                var kpiResults = await LoadLayerResultsByYear(countryID, year, layerIds);
+                var amiScores = await LoadCountryAIAMIScore(countryID, userRole, year);
+                var amiManualScores = await LoadCountryAMIManualScores(userId, countryID, userRole, year);
                 var primaryMappings = OrderMappings(mappings.Where(x => x.PriorityLevel == 1));
                 var secondaryMappings = OrderMappings(mappings.Where(x => x.PriorityLevel != 1));
-                var primarySignals = BuildSignalCards(primaryMappings, kpiResults,layers, accessibleLayerIds, vcpAIScores.Score);
+                var primarySignals = BuildSignalCards(primaryMappings, kpiResults, layers, amiScores.Score);
+                var amiLayer = layers.Values.FirstOrDefault(x => x.LayerCode.Equals("AMI", StringComparison.OrdinalIgnoreCase));
+
+                var amiAIInterpretation = amiLayer != null
+                    ? MatchInterpretationByValue(amiLayer, amiScores.Score ?? 0m)
+                    : null;
+                var amiManualInterpretation = amiLayer != null
+                    ? MatchInterpretationByValue(amiLayer, amiManualScores.Score ?? 0m)
+                    : null;
+                var amiAICondition = CommonStaticMethods.GetConditionByScore(amiScores.Score ?? 0m);
+                var amiManualCondition = CommonStaticMethods.GetConditionByScore(amiManualScores.Score ?? 0m);
 
                 primarySignals.Insert(0, new SignalCardDto
                 {
                     LayerID = 0,
-                    LayerCode = "VCP",
-                    LayerName = "Program Score",
-                    Description = "Represents the program's overall progress score based on the latest assessment.",
-                    Descriptor = "Overall assessment of the program's current progress and performance.",
-                    Code = "VCP Score",
-                    Name = "Program Score",
-                    AIValue = vcpAIScores.Score ?? 0m,
-                    ManualValue = vcpManualScores.Score ?? -1,
-                    AICondition = CommonStaticMethods.GetConditionByScore(vcpAIScores.Score ?? 0m),
-                    ManualCondition = CommonStaticMethods.GetConditionByScore(vcpManualScores.Score ?? 0m),
+                    LayerCode = "AMI",
+                    LayerName = "Country Score",
+                    Description = "Represents the country's overall resilience score based on the latest assessment.",
+                    AiDescriptor = "Overall assessment of the country's current resilience and performance.",
+                    ManualDescriptor = "Overall assessment of the country's current resilience and performance.",
+                    StrategicAction = "Review the score category and prioritize actions to strengthen resilience and improve overall performance.",
+                    Code = "AMI Score",
+                    Name = "Country Score",
+                    AIValue = amiScores.Score ?? 0m,
+                    AiUpdatedAt = amiScores.AiUpdateAt,
+                    ManualValue = amiManualScores.Score ?? -1,
+                    ManualUpdatedAt = amiManualScores.ManualUpdateAt,
+                    AIInterpretationValue =  amiAIInterpretation?.Condition,
+                    ManualInterpretationValue =  amiManualInterpretation?.Condition,
+                    AICondition = amiAICondition,
+                    ManualCondition = amiManualCondition,
                 });
 
-                var secondarySignals = BuildSignalCards(secondaryMappings, kpiResults, layers, accessibleLayerIds, vcpAIScores.Score);
-                var vcpLayer = layers.Values.FirstOrDefault(x => x.LayerCode.Equals("VCP", StringComparison.OrdinalIgnoreCase));
+                var secondarySignals = BuildSignalCards(secondaryMappings, kpiResults, layers, amiScores.Score);
 
-                var vcpAIInterpretation = vcpLayer != null 
-                    ? MatchInterpretationByValue(vcpLayer, vcpAIScores.Score ?? 0m)
-                    : null;
-                var vcpManualInterpretation = vcpLayer != null
-                    ? MatchInterpretationByValue(vcpLayer, vcpManualScores.Score ?? 0m)
-                    : null;
-                var vcpAICondition = CommonStaticMethods.GetConditionByScore(vcpAIScores.Score ?? 0m);
-                var vcpManualCondition = CommonStaticMethods.GetConditionByScore(vcpManualScores.Score ?? 0m);
-
-                var narratives = primarySignals
-                    .Where(x => !x.LayerCode.Equals("VCP", StringComparison.OrdinalIgnoreCase))
-                    .OrderByDescending(x => x.IsAlert)
-                    .ThenByDescending(x => x.AIValue)
-                    .Take(4)
-                    .Select(x => new NarrativeDto
-                    {
-                        Headline = $"{x.LayerName} ({x.AICondition})",
-                        Detail = string.IsNullOrWhiteSpace(x.Descriptor) ? x.Narrative : x.Descriptor
-                    })
-                    .ToList();
 
                 var allSignals = primarySignals.Concat(secondarySignals).ToList();
 
                 return ResultResponseDto<DashboardModeResponseDto>.Success(
                     new DashboardModeResponseDto
                     {
-                        ClimateProgramID = climateProgramID,
+                        CountryID = countryID,
                         DashboardModeID = dashboardModeId,
                         ModeName = dashboardMode.ModeName ?? string.Empty,
                         Description = dashboardMode.Description,
-                        Year = DateTime.Now.Year,
-                        Vcp = vcpAIScores.Score ?? 0m,
-                        AIProgramScore = vcpAIScores.Score ?? 0m,
-                        ManualProgramScore = vcpManualScores.Score ?? 0m,
-                        ManualValue = vcpManualScores.Score ?? 0m,
-                        VcpDirectionalMovement = 0m,
-                        VcpCondition = vcpAICondition,
-                        ManualCondition = vcpManualCondition,
-                        VcpDescriptor = vcpAIInterpretation?.Descriptor ?? string.Empty,
-                        ManualDescriptor = vcpManualInterpretation?.Descriptor ?? string.Empty,
+                        Year = year,
+                        Ami = amiScores.Score ?? 0m,
+                        AICountryScore = amiScores.Score ?? 0m,
+                        ManualCountryScore = amiManualScores.Score ?? 0m,
+                        ManualValue = amiManualScores.Score ?? 0m,
+                        AmiDirectionalMovement = amiScores.Delta,
+                        AmiCondition = amiAICondition,
+                        ManualCondition = amiManualCondition,
+                        AmiDescriptor = amiAIInterpretation?.Descriptor ?? string.Empty,
+                        ManualDescriptor = amiManualInterpretation?.Descriptor ?? string.Empty,
+                        AmiStrategicAction = amiAIInterpretation?.Descriptor ?? string.Empty,
                         PrimarySignals = primarySignals,
                         SecondarySignals = secondarySignals,
                         Signals = allSignals,
-                        Narratives = narratives
-                    }, 
+                        //Narratives = narratives
+                    },
                     new[] { successMessage });
             }
             catch (Exception ex)
@@ -149,70 +143,11 @@ namespace HornScope.Services
             }
         }
 
-        private async Task<Dictionary<int, LayerScoreResult>> LoadLayerResults(int climateProgramID, IEnumerable<int> layerIds)
+        private async Task<bool> ValidateCountryAccess(int countryID, int userId)
         {
-            var ids = layerIds.Distinct().ToList();
-            if (!ids.Any())
-            {
-                return new Dictionary<int, LayerScoreResult>();
-            }
-
-            var rows = await _context.AnalyticalLayerResults
+            return await _context.PublicUserCountryMappings
                 .AsNoTracking()
-                .Where(x =>
-                    x.ClimateProgramID == climateProgramID &&
-                    ids.Contains(x.LayerID) &&
-                    x.AiLastUpdated.HasValue)
-                .Select(x => new
-                {
-                    x.LayerID,
-                    x.AiCalValue5,
-                    x.AiInterpretationID,
-                    x.AiLastUpdated,
-                    x.CalValue5,
-                    x.InterpretationID,
-                    x.LastUpdated
-                })
-                .ToListAsync();
-            
-            return rows
-            .GroupBy(x => x.LayerID)
-            .ToDictionary(
-                g => g.Key,
-                g =>
-                {
-                    var score = g
-                        .OrderByDescending(x => x.AiLastUpdated)
-                        .First();
-                    return new LayerScoreResult
-                    {
-                        AIValue = Math.Round(score.AiCalValue5 ?? 0m, 2),
-                        AIInterpretationId = score.AiInterpretationID,
-                        ManualValue = score.CalValue5 ?? 0m,
-                        ManualInterpretationId = score.InterpretationID
-                    };
-                });
-        }
-
-        private static FiveLevelInterpretationDto? ResolveInterpretation(AnalyticalLayer? layer, int? interpretationId)
-        {
-            if (layer == null || !interpretationId.HasValue)
-            {
-                return null;
-            }
-
-            var match = layer.FiveLevelInterpretations
-                .FirstOrDefault(x => x.InterpretationID == interpretationId.Value);
-
-            return match == null ? null : ToInterpretationDto(match);
-        }
-  
-
-        private async Task<bool> ValidateProgramAccess(int climateProgramID, int userId)
-        {
-            return await _context.ClientProgramMappings
-                .AsNoTracking()
-                .AnyAsync(x => x.UserID == userId && x.ClimateProgramID == climateProgramID && x.IsActive);
+                .AnyAsync(x => x.UserID == userId && x.CountryID == countryID && x.IsActive);
         }
 
         private async Task<List<DashboardModeKPIMapping>> LoadActiveMappings(int dashboardModeId)
@@ -222,6 +157,7 @@ namespace HornScope.Services
                 .Where(x => x.DashboardModeID == dashboardModeId && x.IsActive && !x.IsDeleted)
                 .ToListAsync();
         }
+
         private async Task<Dictionary<int, AnalyticalLayer>> LoadLayers(IEnumerable<int> layerIds)
         {
             var ids = layerIds.Distinct().ToList();
@@ -233,21 +169,6 @@ namespace HornScope.Services
 
             return layers.ToDictionary(x => x.LayerID);
         }
-        private async Task<HashSet<int>> GetAccessibleLayerIds(int userId)
-        {
-            var layerIds = await _context.ClientPillarMappings
-                .AsNoTracking()
-                .Where(x => x.UserID == userId && x.IsActive)
-                .Join(
-                    _context.AnalyticalLayerPillarMappings.AsNoTracking(),
-                    up => up.PillarID,
-                    lp => lp.PillarID,
-                    (up, lp) => lp.LayerID)
-                .Distinct()
-                .ToListAsync();
-
-            return layerIds.ToHashSet();
-        }
 
         private static List<DashboardModeKPIMapping> OrderMappings(IEnumerable<DashboardModeKPIMapping> mappings)
         {
@@ -256,44 +177,124 @@ namespace HornScope.Services
                 .ToList();
         }
 
-        private async Task<ProgramVcpScores> LoadProgramAIVcpScore(int climateProgramID, UserRole userRole)
+        private async Task<Dictionary<int, LayerScoreResult>> LoadLayerResultsByYear(int countryID, int year, IEnumerable<int> layerIds)
         {
-            var query = _context.AIProgramScores
-                .AsNoTracking()
-                .Where(x => x.ClimateProgramID == climateProgramID);
+            var ids = layerIds.Distinct().ToList();
+            if (!ids.Any())
+            {
+                return new Dictionary<int, LayerScoreResult>();
+            }
 
-            if (userRole == UserRole.ProgramUser)
+            var (startDate, endDate) = GetYearDateRange(year);
+            var rows = await _context.AnalyticalLayerResults
+                .AsNoTracking()
+                .Where(x =>
+                    x.CountryID == countryID &&
+                    ids.Contains(x.LayerID) &&
+                    (
+                        (x.AiLastUpdated.HasValue && x.AiLastUpdated.Value >= startDate && x.AiLastUpdated.Value < endDate) ||
+                        (x.LastUpdated >= startDate && x.LastUpdated < endDate)
+                    ))
+                .Select(x => new
+                {
+                    x.LayerID,
+                    x.AiCalValue5,
+                    x.AiInterpretationID,
+                    x.AiLastUpdated,
+                    x.CalValue5,
+                    x.InterpretationID,
+                    x.LastUpdated
+                })
+                .ToListAsync();
+
+            return rows
+                .GroupBy(x => x.LayerID)
+                .ToDictionary(
+                    g => g.Key,
+                    g =>
+                    {
+                        var aiScore = g
+                            .Where(x => x.AiLastUpdated.HasValue && x.AiLastUpdated.Value >= startDate && x.AiLastUpdated.Value < endDate)
+                            .OrderByDescending(x => x.AiLastUpdated)
+                            .FirstOrDefault();
+
+                        var manualScore = g
+                            .Where(x => x.LastUpdated >= startDate && x.LastUpdated < endDate)
+                            .OrderByDescending(x => x.LastUpdated)
+                            .FirstOrDefault();
+
+                        return new LayerScoreResult
+                        {
+                            AIValue = Math.Round(aiScore?.AiCalValue5 ?? 0m, 2),
+                            AIInterpretationId = aiScore?.AiInterpretationID,
+                            ManualValue = Math.Round(manualScore?.CalValue5 ?? 0m, 2),
+                            ManualInterpretationId = manualScore?.InterpretationID,
+                            AiUpdatedAt = aiScore?.AiLastUpdated,
+                            ManualUpdatedAt = manualScore?.LastUpdated
+                        };
+                    });
+        }
+
+        private async Task<CountryAMIScores> LoadCountryAIAMIScore(int countryID, UserRole userRole, int year)
+        {
+            var query = _context.AICountryScores
+                .AsNoTracking()
+                .Where(x =>
+                    x.CountryID == countryID &&
+                    (x.Year == year || x.Year == year - 1));
+
+            if (userRole == UserRole.CountryUser)
             {
                 query = query.Where(x => x.IsVerified);
             }
 
             var scores = await query
-                .Select(x => new { x.AIProgress })
-                .FirstOrDefaultAsync();
+                .Select(x => new { x.Year, x.AIProgress, x.UpdatedAt })
+                .ToListAsync();
 
-            return new ProgramVcpScores
+            var current = scores.FirstOrDefault(x => x.Year == year)?.AIProgress;
+            var previous = scores.FirstOrDefault(x => x.Year == year - 1)?.AIProgress;
+            var currentYearScore = scores.FirstOrDefault(x => x.Year == year);
+
+            return new CountryAMIScores
             {
-                Score = scores != null ? scores.AIProgress : 0m
+                Score = current ?? 0m,
+                Previous = previous,
+                Delta = previous.HasValue ? Math.Round((current ?? 0m) - previous.Value, 2) : 0m,
+                AiUpdateAt = currentYearScore?.UpdatedAt
             };
         }
 
-        private async Task<ProgramVcpScores> LoadProgramVcpManualScores(
+        private async Task<CountryAMIScores> LoadCountryAMIManualScores(
             int userID,
-            int climateProgramID,
-            UserRole userRole)
+            int countryID,
+            UserRole userRole,
+            int year)
         {
-            var progress = await _commonService.GetProgramProgressAsync(
+            var progress = await _commonService.GetCountriesProgressAsync(
                 userID,
                 (int)userRole,
-                climateProgramID);
+                year,
+                countryID);
 
             var averageScoreProgress = progress != null && progress.Any()
                 ? progress.Average(x => x.ScoreProgress)
                 : 0m;
 
-            return new ProgramVcpScores
+            // Get the latest manual update timestamp from assessment responses
+            var latestManualUpdate = await _context.AssessmentResponses
+                .AsNoTracking()
+                .Where(ar => ar.PillarAssessment.Assessment.UserCountryMapping.CountryID == countryID &&
+                             ar.PillarAssessment.Assessment.UpdatedAt.Year == year &&
+                             ar.PillarAssessment.Assessment.IsActive)
+                .OrderByDescending(ar => ar.UpdatedAt)
+                .Select(ar => (DateTime?)ar.UpdatedAt)
+                .FirstOrDefaultAsync();
+
+            return new CountryAMIScores
             {
-                Score = averageScoreProgress
+                Score = averageScoreProgress,
+                ManualUpdateAt = latestManualUpdate
             };
         }
 
@@ -301,8 +302,7 @@ namespace HornScope.Services
            IEnumerable<DashboardModeKPIMapping> mappings,
            IReadOnlyDictionary<int, LayerScoreResult> kpiResults,
            IReadOnlyDictionary<int, AnalyticalLayer> layers,
-           IReadOnlySet<int> accessibleLayerIds,
-           decimal? vcpOverride = null)
+           decimal? AMIOverride = null)
         {
             var cards = new List<SignalCardDto>();
             foreach (var mapping in mappings)
@@ -317,10 +317,10 @@ namespace HornScope.Services
                 var value = kpiResult?.AIValue ?? 0m;
                 var manualValue = kpiResult?.ManualValue ?? 0m;
 
-                if (vcpOverride.HasValue &&
-                    layer.LayerCode.Equals("VCP", StringComparison.OrdinalIgnoreCase))
+                if (AMIOverride.HasValue &&
+                    layer.LayerCode.Equals("AMI", StringComparison.OrdinalIgnoreCase))
                 {
-                    value = vcpOverride.Value;
+                    value = AMIOverride.Value;
                 }
 
                 var aiInterpretation = ResolveInterpretation(layer, kpiResult?.AIInterpretationId);
@@ -340,42 +340,36 @@ namespace HornScope.Services
                     Code = layer.LayerCode,
                     Name = layer.LayerName,
                     AIValue = value,
+                    AiUpdatedAt = kpiResult?.AiUpdatedAt,
+                    ManualUpdatedAt = kpiResult?.ManualUpdatedAt,
                     AICondition = condition,
                     ManualValue = manualValue,
                     ManualCondition = manualCondition ?? string.Empty,
-                    Descriptor = manualInterpretation?.Descriptor ?? string.Empty,
-                    Narrative = manualInterpretation?.Descriptor ?? string.Empty,
-                    AIInterpretationID = aiInterpretation?.InterpretationID ?? 0,
-                    ManualInterpretationID = manualInterpretation?.InterpretationID ?? 0,
+                    AiDescriptor = aiInterpretation?.Descriptor ?? string.Empty,
+                    ManualDescriptor = manualInterpretation?.Descriptor ?? string.Empty,
+                    AIInterpretationValue = aiInterpretation?.Condition,
+                    ManualInterpretationValue = manualInterpretation?.Condition,
                     IsAlert = isAlert,
-                    IsAccessible = accessibleLayerIds.Contains(layer.LayerID),
-                    Interpretations = MapInterpretations(layer),
                     DisplayOrder = mapping.DisplayOrder
-
                 });
             }
 
             return cards;
-         
         }
 
-
-        private static List<FiveLevelInterpretationDto> MapInterpretations(AnalyticalLayer layer)
+        private static FiveLevelInterpretationDto? ResolveInterpretation(AnalyticalLayer? layer, int? interpretationId)
         {
-            return layer.FiveLevelInterpretations
-                .OrderByDescending(x => x.MaxRange)
-                .Select(x => new FiveLevelInterpretationDto
-                {
-                    InterpretationID = x.InterpretationID,
-                    LayerID = x.LayerID,
-                    MinRange = x.MinRange,
-                    MaxRange = x.MaxRange,
-                    Condition = x.Condition ?? string.Empty,
-                    Descriptor = x.Descriptor ?? string.Empty
-                })
-                .ToList();
+            if (layer == null || !interpretationId.HasValue)
+            {
+                return null;
+            }
+
+            var match = layer.FiveLevelInterpretations
+                .FirstOrDefault(x => x.InterpretationID == interpretationId.Value);
+
+            return match == null ? null : ToInterpretationDto(match);
         }
-      
+
         private static FiveLevelInterpretationDto? MatchInterpretationByValue(AnalyticalLayer layer, decimal value)
         {
             var match = layer.FiveLevelInterpretations.FirstOrDefault(x =>
@@ -396,6 +390,7 @@ namespace HornScope.Services
                 Descriptor = interpretation.Descriptor ?? string.Empty
             };
         }
+
         private static string ResolveConditionByValue(AnalyticalLayer? layer, decimal value)
         {
             return MatchInterpretationByValue(layer ?? new AnalyticalLayer(), value)?.Condition ?? "";
@@ -410,17 +405,30 @@ namespace HornScope.Services
                    normalized.Contains("watch");
         }
 
-        private sealed class ProgramVcpScores
+        private static (DateTime StartDate, DateTime EndDate) GetYearDateRange(int year)
+        {
+            return (new DateTime(year, 1, 1), new DateTime(year + 1, 1, 1));
+        }
+
+        private sealed class CountryAMIScores
         {
             public decimal? Score { get; init; }
+            public decimal? Previous { get; init; }
+            public decimal Delta { get; init; }
+            public DateTime? AiUpdateAt { get; init; }
+            public DateTime? ManualUpdateAt { get; init; }
+            public string? AIInterpretationCondition { get; init; }
+            public string? ManualInterpretationCondition { get; init; }
         }
+
         private sealed class LayerScoreResult
         {
             public decimal AIValue { get; init; }
             public int? AIInterpretationId { get; init; }
             public decimal ManualValue { get; init; }
             public int? ManualInterpretationId { get; init; }
+            public DateTime? AiUpdatedAt { get; init; }
+            public DateTime? ManualUpdatedAt { get; init; }
         }
-
     }
 }

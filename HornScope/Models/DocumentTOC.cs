@@ -4,9 +4,9 @@ namespace HornScope.Models
     {
         public int TOCID { get; set; }
 
-        public int ProgramDocumentID { get; set; }
+        public int CountryDocumentID { get; set; }
 
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
 
         public int PillarID { get; set; }
 

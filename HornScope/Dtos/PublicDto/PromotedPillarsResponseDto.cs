@@ -6,14 +6,16 @@ namespace HornScope.Dtos.PublicDto
         public string PillarName { get; set; }
         public string ImagePath { get; set; }
         public int DisplayOrder { get; set; }
-        public List<PromotedProgramResponseDto> Programs { get; set; }
+        public List<PromotedCountryResponseDto> Countries { get; set; }
     }
 
-    public class PromotedProgramResponseDto
+    public class PromotedCountryResponseDto
     {
-        public int ClimateProgramID { get; set; }        
-        public string ProgramName { get; set; }
-        public string Location { get; set; }
+        public int CountryID { get; set; }        
+        public string Continent { get; set; }
+        public string CountryName { get; set; }
+        public string? CountryCode { get; set; }
+        public string? Region { get; set; }
         public string? Image { get; set; }
         public decimal? ScoreProgress { get; set; }
         public string Description { get; set; }

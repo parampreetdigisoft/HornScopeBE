@@ -1,9 +1,9 @@
-using HornScope.Dtos.ProgramDto;
+using HornScope.Dtos.CountryDto;
 
 namespace HornScope.Dtos.UserDtos
 {
     public class GetUserByRoleResponse : PublicUserResponse
     {
-        public List<AddUpdateProgramDto> ClimatePrograms { get; set; } = new();
+        public List<AddUpdateCountryDto> Countries { get; set; } = new();
     }
 }

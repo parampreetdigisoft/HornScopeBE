@@ -100,9 +100,9 @@ namespace HornScope.Controllers
             return Ok(result);
         }
         [HttpGet]
-        [Route("getAssessmentQuestions")]
+        [Route("getAssessmentQuestoins")]
         [Authorize]
-        public async Task<IActionResult> GetAssessmentQuestions([FromQuery] GetAssessmentQuestionRequestDto response)
+        public async Task<IActionResult> GetAssessmentQuestoins([FromQuery] GetAssessmentQuestoinRequestDto response)
         {
             var result = await _responseService.GetAssessmentQuestion(response);
             return Ok(result);
@@ -130,14 +130,14 @@ namespace HornScope.Controllers
             return Ok(content);
         }
         /// <summary>
-        /// This API is used to get the program question history  global history for admin
+        /// This API is used to get the country question history  gloabal history for admin
         /// </summary>
-        /// <param name="ClimateProgramID"></param>
+        /// <param name="countryID"></param>
         /// <returns></returns>
         [HttpGet]
-        [Route("getProgramQuestionHistory")]
+        [Route("getCountryQuestionHistory")]
         [Authorize]
-        public async Task<IActionResult> GetProgramQuestionHistory([FromQuery] UserProgramRequestDto userProgramRequestDto)
+        public async Task<IActionResult> GetCountryQuestionHistory([FromQuery] UserCountryRequestDto userCountryRequestDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -151,13 +151,14 @@ namespace HornScope.Controllers
             {
                 return Unauthorized("You Don't have access.");
             }
-            var result = await _responseService.GetProgramQuestionHistory(userProgramRequestDto);
+            var result = await _responseService.GetCountryQuestionHistory(userCountryRequestDto);
             return Ok(result);
         }
+
         [HttpGet]
         [Route("getAssessmentProgressHistory")]
         [Authorize]
-        public async Task<IActionResult> getAssessmentProgressHistory([FromQuery]GetProgramProgressHistoryRequestDto progressHistoryRequest)
+        public async Task<IActionResult> getAssessmentProgressHistory([FromQuery] GetProgramProgressHistoryRequestDto progressHistoryRequest)
         {
             var result = await _responseService.GetAssessmentProgressHistory(progressHistoryRequest);
             return Ok(result);
@@ -195,14 +196,14 @@ namespace HornScope.Controllers
         }
 
         /// <summary>
-        /// This API is used to get the program pillar history global history for admin
+        /// This API is used to get the country pillar history  gloabal history for admin
         /// </summary>
-        /// <param name="ClimateProgramID"></param>
+        /// <param name="countryID"></param>
         /// <returns></returns>
         [HttpGet]
-        [Route("getProgramPillarHistory")]
+        [Route("getCountryPillarHistory")]
         [Authorize]
-        public async Task<IActionResult> GetProgramPillarHistory([FromQuery] UserProgramDashBoardRequestDto userProgramDashBoardRequestDto)
+        public async Task<IActionResult> GetCountryPillarHistory([FromQuery] UserCountryDashBoardRequestDto userCountryDashBoardRequestDto)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -216,7 +217,7 @@ namespace HornScope.Controllers
             {
                 return Unauthorized("You Don't have access.");
             }
-            var result = await _responseService.GetProgramPillarHistory(userProgramDashBoardRequestDto, userId.GetValueOrDefault(), userRole);
+            var result = await _responseService.GetCountryPillarHistory(userCountryDashBoardRequestDto, userId.GetValueOrDefault(), userRole);
             return Ok(result);
         }
 

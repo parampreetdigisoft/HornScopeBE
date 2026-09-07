@@ -4,7 +4,7 @@ namespace HornScope.Dtos.AiDto
 {
     public class AIEstimatedQuestionScoreDto
     {
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int PillarID { get; set; }
         public int QuestionID { get; set; }
         public string? QuestionText { get; set; }
@@ -33,12 +33,12 @@ namespace HornScope.Dtos.AiDto
         public string? RelationalDependencies { get; set; }
 
         // Stress Tests
-        public string? StressGeopoliticalShock { get; set; }
-        public string? StressFinanceShock { get; set; }
-        public string? StressLegitimacyShock { get; set; }
+        public string? StressPoliticalShock { get; set; }
+        public string? StressEconomicShock { get; set; }
+        public string? StressNarrativeShock { get; set; }
         public string? StressOverallResilienceShock { get; set; }
 
-        public string? InclusionEquityAdjustment { get; set; }   // ? renamed
+        public string? InequalityAdjustment { get; set; }   // ? renamed
         public string? OpacityRisk { get; set; }
 
         public string? RedFlag { get; set; }   // ? renamed

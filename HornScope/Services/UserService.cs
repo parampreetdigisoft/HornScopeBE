@@ -1,15 +1,15 @@
-using Microsoft.EntityFrameworkCore;
 using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
 using HornScope.Data;
 using HornScope.Dtos.AssessmentDto;
 using HornScope.Dtos.CommonDto;
-using HornScope.Dtos.ProgramDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Dtos.UserDtos;
 using HornScope.Enums;
 using HornScope.IServices;
 using HornScope.Models;
+using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
 
 namespace HornScope.Services
@@ -31,12 +31,12 @@ namespace HornScope.Services
         {
             return _context.Users.FirstOrDefault(u => u.Email == email);
         }
-        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedProgram(GetUserByRoleRequestDto request, int userid, UserRole userRole)
+        public async Task<PaginationResponse<GetUserByRoleResponse>> GetUserByRoleWithAssignedCountry(GetUserByRoleRequestDto request, int userid, UserRole userRole)
         {
             try
             {
                 var filteredMappings =
-                    _context.StaffProgramMappings
+                    _context.UserCountryMappings
                         .Where(x => !x.IsDeleted &&
                                (x.AssignedByUserId == request.UserID || userRole == UserRole.Admin));
 
@@ -45,7 +45,7 @@ namespace HornScope.Services
                     UserRole.Admin => x => !x.IsDeleted && (request.GetUserRole.HasValue
                                         ? x.Role == request.GetUserRole
                                         : (x.Role == UserRole.Evaluator)),
-                    _ => x => !x.IsDeleted && x.Role == UserRole.Evaluator && x.CreatedBy == userid
+                    _ => x => !x.IsDeleted && x.Role == UserRole.Evaluator
                 };
 
                 var query =
@@ -69,7 +69,7 @@ namespace HornScope.Services
                         CreatedAt = u.CreatedAt,
                         CreatedByName = ab != null ? ab.FullName : null,
                         Tier = u.Tier,
-                        ClimatePrograms = new List<AddUpdateProgramDto>(),
+                        Countries = new List<AddUpdateCountryDto>(),
                         Pillars = new List<int>()  // initialize empty list
                     };
 
@@ -81,58 +81,58 @@ namespace HornScope.Services
 
                 var userIds = response.Data.Select(x => x.UserID).Distinct().ToList();
 
-                if (request.GetUserRole == UserRole.ProgramUser)
+                if (request.GetUserRole == UserRole.CountryUser)
                 {
-                    // Fetch programs from PublicStaffProgramMappings
-                    var programMap = await _context.ClientProgramMappings
+                    // Fetch countries from PublicUserCountryMappings
+                    var countryMap = await _context.PublicUserCountryMappings
                         .Where(x => x.IsActive && userIds.Contains(x.UserID))
-                        .Join(_context.ClimatePrograms,
-                            cm => cm.ClimateProgramID,
-                            p => p.ClimateProgramID,
-                            (cm, p) => new { cm.UserID, Program = new AddUpdateProgramDto { ClimateProgramID = p.ClimateProgramID, ProgramName = p.ProgramName } })
+                        .Join(_context.Countries,
+                            cm => cm.CountryID,
+                            c => c.CountryID,
+                            (cm, c) => new { cm.UserID, Country = new AddUpdateCountryDto { CountryID = c.CountryID, CountryName = c.CountryName, Region = c.Region, Continent = c.Continent } })
                         .ToListAsync();
 
-                    // Fetch pillar IDs from ClientPillarMappings
-                    var pillarMap = await _context.ClientPillarMappings
+                    // Fetch pillar IDs from CountryUserPillarMappings
+                    var pillarMap = await _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && userIds.Contains(x.UserID))
                         .Select(x => new { x.UserID, x.PillarID })
                         .ToListAsync();
 
-                    var programsGrouped = programMap.GroupBy(x => x.UserID)
-                        .ToDictionary(g => g.Key, g => g.Select(x => x.Program).ToList());
+                    var countriesGrouped = countryMap.GroupBy(x => x.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
 
                     var pillarsGrouped = pillarMap.GroupBy(x => x.UserID)
                         .ToDictionary(g => g.Key, g => g.Select(x => x.PillarID).ToList());
 
                     foreach (var item in response.Data)
                     {
-                        programsGrouped.TryGetValue(item.UserID, out var programs);
+                        countriesGrouped.TryGetValue(item.UserID, out var countries);
                         pillarsGrouped.TryGetValue(item.UserID, out var pillars);
 
-                        item.ClimatePrograms = programs ?? new List<AddUpdateProgramDto>();
+                        item.Countries = countries ?? new List<AddUpdateCountryDto>();
                         item.Pillars = pillars ?? new List<int>();
                     }
                 }
                 else
                 {
-                    // For Evaluator / Analyst, keep your existing logic for programs
-                    var programMap = await _context.StaffProgramMappings
+                    // For Evaluator / Analyst, keep your existing logic for countries
+                    var countryMap = await _context.UserCountryMappings
                         .Where(x => !x.IsDeleted &&
                                userIds.Contains(x.UserID) &&
                                (x.AssignedByUserId == request.UserID || userRole == UserRole.Admin))
-                        .Join(_context.ClimatePrograms,
-                            cm => cm.ClimateProgramID,
-                            p => p.ClimateProgramID,
-                            (cm, p) => new { cm.UserID, Program = new AddUpdateProgramDto { ClimateProgramID = p.ClimateProgramID, ProgramName = p.ProgramName } })
+                        .Join(_context.Countries,
+                            cm => cm.CountryID,
+                            c => c.CountryID,
+                            (cm, c) => new { cm.UserID, Country = new AddUpdateCountryDto { CountryID = c.CountryID, CountryName = c.CountryName, Region = c.Region, Continent = c.Continent } })
                         .ToListAsync();
 
-                    var programsGrouped = programMap.GroupBy(x => x.UserID)
-                        .ToDictionary(g => g.Key, g => g.Select(x => x.Program).ToList());
+                    var countriesGrouped = countryMap.GroupBy(x => x.UserID)
+                        .ToDictionary(g => g.Key, g => g.Select(x => x.Country).ToList());
 
                     foreach (var item in response.Data)
                     {
-                        programsGrouped.TryGetValue(item.UserID, out var programs);
-                        item.ClimatePrograms = programs ?? new List<AddUpdateProgramDto>();
+                        countriesGrouped.TryGetValue(item.UserID, out var countries);
+                        item.Countries = countries ?? new List<AddUpdateCountryDto>();
                         item.Pillars = new List<int>(); // no pillars for other roles
                     }
                 }
@@ -141,21 +141,20 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetUserByRoleWithAssignedProgram", ex);
+                await _appLogger.LogAsync("Error Occure in GetUserByRoleWithAssignedCity", ex);
                 return new PaginationResponse<GetUserByRoleResponse>();
             }
         }
-
         public async Task<ResultResponseDto<List<PublicUserResponse>>> GetEvaluatorByAnalyst(GetAssignUserDto request)
         {
             try
             {
                 var query =
-                    from uc in _context.StaffProgramMappings
+                    from uc in _context.UserCountryMappings
                     where !uc.IsDeleted
                           && uc.AssignedByUserId == request.UserID
                           && (!request.SearchedUserID.HasValue || uc.UserID == request.SearchedUserID.Value)
-                          && (!request.ClimateProgramID.HasValue || uc.ClimateProgramID == request.ClimateProgramID.Value)
+                          && (!request.CountryID.HasValue || uc.CountryID == request.CountryID.Value)
                     join u in _context.Users
                         .Where(x => !x.IsDeleted)
                         on uc.UserID equals u.UserID
@@ -188,20 +187,20 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToProgram(int climateProgramID)
+        public async Task<ResultResponseDto<List<GetAssessmentResponseDto>>> GetUsersAssignedToCountry(int countryId)
         {
             try
             {
-                var users = await _commonService.GetUserDetailsAssignedToProgram(climateProgramID);
+                var year = DateTime.Now.Year;
+                var users = await _commonService.GetUserDetailsAssignedToCountry(year, countryId);
                 return ResultResponseDto<List<GetAssessmentResponseDto>>.Success(users, new[] { "User fetched successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetUsersAssignedToProgram", ex);
+                await _appLogger.LogAsync("Error Occure in GetUsersAssignedToCity", ex);
                 return ResultResponseDto<List<GetAssessmentResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
         public async Task<ResultResponseDto<UpdateUserResponseDto>> GetUserInfo(int userId)
         {
             try

@@ -1,17 +1,16 @@
 using ClosedXML.Excel;
-using Microsoft.EntityFrameworkCore;
-using System.Linq.Expressions;
-using HornScope.Common.Implementation;
-using HornScope.Common.Interface;
-using HornScope.Common.Models;
 using HornScope.Data;
-using HornScope.Dtos.AssessmentDto;
+using HornScope.Models;
+using HornScope.IServices;
+using Microsoft.EntityFrameworkCore;
+using HornScope.Common.Models;
 using HornScope.Dtos.CommonDto;
 using HornScope.Dtos.PillarDto;
+using HornScope.Common.Interface;
 using HornScope.Dtos.QuestionDto;
-using HornScope.Enums;
-using HornScope.IServices;
-using HornScope.Models;
+using HornScope.Dtos.AssessmentDto;
+using HornScope.Common.Implementation;
+using System.Linq.Expressions;
 
 namespace HornScope.Services
 {
@@ -20,7 +19,7 @@ namespace HornScope.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly ICommonService _commonService;
-
+        int ROSEWPillarID = 22;
         public QuestionService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
             _context = context;
@@ -28,7 +27,7 @@ namespace HornScope.Services
             _commonService = commonService;
         }
 
-        public async Task<List<GetPillarDTO>> GetPillarsAsync()
+        public async Task<List<GetPillarDto>> GetPillarsAsync()
         {
             try
             {
@@ -37,7 +36,7 @@ namespace HornScope.Services
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occure in GetPillarsAsync", ex);
-                return new List<GetPillarDTO>();
+                return new List<GetPillarDto>();
             }
         }
 
@@ -51,38 +50,17 @@ namespace HornScope.Services
                     .Include(o => o.QuestionOptions)
                 where !q.IsDeleted
                    && (!request.PillarID.HasValue || q.PillarID == request.PillarID.Value)
-                select new
+                select new GetQuestionResponse
                 {
-                    q.QuestionID,
-                    q.QuestionText,
-                    q.PillarID,
-                    q.Weight,
+                    QuestionID = q.QuestionID,
+                    QuestionText = q.QuestionText,
+                    PillarID = q.PillarID,
                     PillarName = q.Pillar.PillarName,
-                    q.DisplayOrder,
+                    DisplayOrder = q.DisplayOrder,
                     QuestionOptions = q.QuestionOptions.ToList()
                 };
 
-                // Get paginated data
-                var pagedData = await query.ApplyPaginationAsync(request);
-
-                // Map to response DTO and calculate WeightID from Weight
-                var response = new PaginationResponse<GetQuestionResponse>
-                {
-                    Data = pagedData.Data.Select(q => new GetQuestionResponse
-                    {
-                        QuestionID = q.QuestionID,
-                        QuestionText = q.QuestionText,
-                        PillarID = q.PillarID,
-                        Weight = q.Weight,
-                        WeightID = QuestionWeightTierExtensions.GetWeightIdFromWeight(q.Weight),
-                        PillarName = q.PillarName,
-                        DisplayOrder = q.DisplayOrder,
-                        QuestionOptions = q.QuestionOptions
-                    }).ToList(),
-                    TotalRecords = pagedData.TotalRecords,
-                    PageNumber = pagedData.PageNumber,
-                    PageSize = pagedData.PageSize
-                };
+                var response = await query.ApplyPaginationAsync(request);
 
                 return response;
             }
@@ -114,7 +92,7 @@ namespace HornScope.Services
             {
                 var existing = await _context.Questions.FindAsync(id);
                 if (existing == null) return null;
-                existing.QuestionText = q.QuestionText;     
+                existing.QuestionText = q.QuestionText;
                 existing.PillarID = q.PillarID;
                 existing.DisplayOrder = q.DisplayOrder;
                 await _context.SaveChangesAsync();
@@ -155,8 +133,8 @@ namespace HornScope.Services
                 .ToListAsync();
 
                 var totalQuestions = pillarQuestions.Count;
-                var question = _context.Questions
-                    .Include(x => x.QuestionOptions)
+                var question =  _context.Questions
+                    .Include(x=>x.QuestionOptions)
                     .FirstOrDefault(x => x.QuestionID == q.QuestionID) ?? new Question();
                 if (question.QuestionID > 0 && !pillarQuestions.Select(x => x.QuestionID).Contains(q.QuestionID))
                 {
@@ -167,10 +145,6 @@ namespace HornScope.Services
                 question.IsDeleted = false;
                 question.QuestionText = q.QuestionText;
                 question.PillarID = q.PillarID;
-
-                // Get Weight value 
-                var tier = (QuestionWeightTier)q.WeightID;
-                question.Weight = tier.GetWeight();
 
                 // Sync options (Add / Update / Delete)
                 var incomingOptions = q.QuestionOptions ?? new List<QuestionOption>();
@@ -185,7 +159,7 @@ namespace HornScope.Services
                         option = new QuestionOption
                         {
                             OptionText = o.OptionText,
-                            DisplayOrder = GetDisplayOrder(o),
+                            DisplayOrder = (o.ScoreValue ?? -1) + 1,
                             ScoreValue = o.ScoreValue,
                             Question = question
                         };
@@ -194,9 +168,27 @@ namespace HornScope.Services
                     else // update existing
                     {
                         option.OptionText = o.OptionText;
-                        option.DisplayOrder = GetDisplayOrder(o);
+                        option.DisplayOrder = (o.ScoreValue ?? -1) + 1;
                         option.ScoreValue = o.ScoreValue;
                     }
+                }
+                // Add default N/A and Unknown only for new question
+                if (question.QuestionID == 0)
+                {
+                    question.DisplayOrder = totalQuestions + 1;
+
+                    question.QuestionOptions.Add(new QuestionOption
+                    {
+                        DisplayOrder = 6,
+                        OptionText = "N/A",
+                        ScoreValue = null
+                    });
+                    question.QuestionOptions.Add(new QuestionOption
+                    {
+                        DisplayOrder = 7,
+                        OptionText = "Unknown",
+                        ScoreValue = null
+                    });
                 }
 
                 var optionIdsFromDto = incomingOptions.Select(x => x.OptionID).ToHashSet();
@@ -225,71 +217,64 @@ namespace HornScope.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
-
-        private int GetDisplayOrder(QuestionOption option)
-        {
-            // Handle special options by OptionText
-            if (option.ScoreValue == "N/A")
-                return (int)ScoreValue.NA;
-
-            if (option.ScoreValue == "Indeterminate")
-                return (int)ScoreValue.Indeterminate;
-
-            // Try to find the ScoreValue using enum extension method
-            if (!string.IsNullOrEmpty(option.ScoreValue))
-            {
-                var displayOrder = ScoreValueExtensions.GetDisplayOrderByScore(option.ScoreValue);
-                if (displayOrder.HasValue)
-                    return displayOrder.Value;
-            }
-
-            // If not found, return max value + 1
-            return ScoreValueExtensions.GetMaxDisplayOrder() + 1;
-        }
-
         public async Task<ResultResponseDto<string>> AddBulkQuestion(AddBulkQuestionsDto payload)
         {
             try
             {
                 var newQuestions = new List<Question>();
-                var pillarIds = payload.Questions.Select(x => x.PillarID).Distinct().ToList();
-                var pillarQuestions = await _context.Questions
-                    .Where(x => pillarIds.Contains(x.PillarID) && !x.IsDeleted)
-                    .ToListAsync();
 
-                // Create a dictionary to track the max display order per pillar
-                var pillarQuestionCounts = pillarQuestions
-                    .GroupBy(q => q.PillarID)
-                    .ToDictionary(g => g.Key, g => g.Count());
+                var pillarQuestionsList = await _context.Questions
+                        .Where(x => payload.Questions.Select(q=>q.PillarID).Contains(x.PillarID) && !x.IsDeleted)
+                        .ToListAsync();
+
+                var i = 1;
 
                 foreach (var q in payload.Questions)
                 {
+                    var pillarQuestions = pillarQuestionsList
+                        .Where(x => x.PillarID == q.PillarID && !x.IsDeleted)
+                        .ToList();
                     if (pillarQuestions.Any(x => x.QuestionText == q.QuestionText && x.PillarID == q.PillarID))
                     {
                         continue;
                     }
+
+                    var displayOrder = pillarQuestions.Count + i++;
 
                     var question = new Question
                     {
                         IsDeleted = false,
                         QuestionText = q.QuestionText,
                         PillarID = q.PillarID,
-                        DisplayOrder = pillarQuestionCounts[q.PillarID]++,
+                        DisplayOrder = displayOrder,
                         QuestionOptions = new List<QuestionOption>()
                     };
-                    var tier = (QuestionWeightTier)q.WeightID;
-                    question.Weight = tier.GetWeight();
+
                     // Add provided options
                     foreach (var o in q.QuestionOptions)
                     {
                         var option = new QuestionOption
                         {
                             OptionText = o.OptionText,
-                            DisplayOrder = GetDisplayOrder(o),
+                            DisplayOrder = (o.ScoreValue ?? -1) + 1,
                             ScoreValue = o.ScoreValue
                         };
                         question.QuestionOptions.Add(option);
                     }
+
+                    // Add default options (N/A & Unknown)
+                    question.QuestionOptions.Add(new QuestionOption
+                    {
+                        DisplayOrder = 6,
+                        OptionText = "N/A",
+                        ScoreValue = null
+                    });
+                    question.QuestionOptions.Add(new QuestionOption
+                    {
+                        DisplayOrder = 7,
+                        OptionText = "Unknown",
+                        ScoreValue = null
+                    });
 
                     newQuestions.Add(question);
                 }
@@ -309,69 +294,58 @@ namespace HornScope.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        public async Task<ResultResponseDto<GetPillarQuestionByProgramResponse>> GetQuestionsByProgramIDAsync(StaffProgramPillerRequestDto request, int userId)
+        public async Task<ResultResponseDto<GetPillarQuestionByCountryResponse>> GetQuestionsByCountryIdAsync(CountryPillerRequestDto request, int userId)
         {
             try
             {
-                var valid = _context.StaffProgramMappings.Any(x => x.StaffProgramMappingID == request.StaffProgramMappingID && x.UserID == userId && !x.IsDeleted);
+                var valid = _context.UserCountryMappings.Any(x => x.UserCountryMappingID == request.UserCountryMappingID && x.UserID == userId && !x.IsDeleted);
                 if (valid)
                 {
+                    var year = DateTime.Now.Year;
+                    // Load assessment once (if exists)
                     var answeredPillarIds = new List<int>();
                     var assessment = await _context.Assessments
                         .Include(x => x.PillarAssessments).ThenInclude(x => x.Responses)
-                        .Where(a => a.StaffProgramMappingID == request.StaffProgramMappingID && a.IsActive)
+                        .Where(a => a.UserCountryMappingID == request.UserCountryMappingID && a.UpdatedAt.Year == year && a.IsActive)
                         .FirstOrDefaultAsync();
+
+                    if (assessment != null && (assessment.AssessmentPhase == AssessmentPhase.Completed || assessment.AssessmentPhase == AssessmentPhase.EditRejected || assessment.AssessmentPhase == AssessmentPhase.EditRequested))
+                    {
+                        return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
+                            new[] { "You have submitted assessment for this country" });
+                    }
+
                     if (assessment != null)
                     {
-                      answeredPillarIds = assessment?.PillarAssessments
-                     .Where(x => x.Responses != null && x.Responses.Any())
-                     .OrderByDescending(r => r.Responses
-                     .Select(resp => (DateTime?)resp.UpdatedAt).Max())
-                     .Select(r => r.PillarID)
-                     .ToList() ?? new List<int>();
+                        answeredPillarIds = assessment.PillarAssessments
+                       .Select(r => r.PillarID)
+                       .ToList();
                     }
-                    int pillarCount = (await _commonService.GetPillars()).Count;
+                    var allPillars = await _commonService.GetPillars();
+                    var pillarCount = allPillars.Count;
+                    var lastDisplayOrder = allPillars.Count == 0 ? 0 : allPillars.Max(p => p.DisplayOrder);
+
                     if (assessment != null && answeredPillarIds.Count == pillarCount && !request.PillarID.HasValue)
                     {
                         request.PillarID = assessment.PillarAssessments.First().PillarID;
                     }
-                    
-                    if (!request.PillarID.HasValue)
-                    {
-                        if (answeredPillarIds.Any())
-                        {
-                            request.PillarID = answeredPillarIds.First();
-                        }
-                        else
-                        {
-                            request.PillarID = (await _commonService.GetPillars()).FirstOrDefault()?.PillarID;
-                        }
-                    }
-                    // Calculate the submitted pillar display order from the max pillar ID in answeredPillarIds
-                    int submittedPillarDisplayOrder = 0;
-                    if (answeredPillarIds.Any())
-                    {
-                        var maxAnsweredPillarId = answeredPillarIds.Max();
-                        var cachedPillars = await _commonService.GetPillars();
-                        submittedPillarDisplayOrder = cachedPillars
-                            .FirstOrDefault(p => p.PillarID == maxAnsweredPillarId)?.DisplayOrder ?? 0;
-                    }
 
                     // Get next unanswered pillar
                     var selectPillar = await _context.Pillars
-                   .Where(x => x.IsActive && !x.IsDeleted && x.PillarID == request.PillarID)
-                   .Include(p => p.Questions.Where(x => !x.IsDeleted))
-                   .ThenInclude(q => q.QuestionOptions)
-                   .FirstOrDefaultAsync();
+                        .Include(p => p.Questions)
+                            .ThenInclude(q => q.QuestionOptions)
+                        .Where(p => !request.PillarID.HasValue ? !answeredPillarIds.Contains(p.PillarID) : p.PillarID == request.PillarID)
+                        .OrderBy(p => p.DisplayOrder)
+                        .FirstOrDefaultAsync();
 
-                    var summitedPillar = (await _commonService.GetPillars())
+                    var summitedPillar = allPillars
                         .Where(p => !answeredPillarIds.Contains(p.PillarID))
                         .OrderBy(p => p.DisplayOrder)
                         .FirstOrDefault();
 
                     if (selectPillar == null || selectPillar?.Questions == null)
                     {
-                        return ResultResponseDto<GetPillarQuestionByProgramResponse>.Failure(new[] { "You have submitted assessment for this program" });
+                        return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(new[] { "You have submitted assessment for this country" });
                     }
 
                     var editAssessmentResponse = new Dictionary<int, AssessmentResponse>();
@@ -380,7 +354,11 @@ namespace HornScope.Services
                         editAssessmentResponse = assessment.PillarAssessments
                         .Where(a => a.PillarID == request.PillarID)
                         .SelectMany(x => x.Responses)
-                        .ToDictionary(x => x.QuestionID);
+                        .GroupBy(x => x.QuestionID)
+                            .ToDictionary(
+                                g => g.Key,
+                                g => g.Last()
+                            );
                     }
 
                     // Project questions
@@ -407,69 +385,74 @@ namespace HornScope.Services
                                 ScoreValue = x.ScoreValue,
                                 Justification = submittedQuestion.Justification,
                                 Source = submittedQuestion.Source
-                            }).OrderBy(x=>x.DisplayOrder).ToList(),
+                            }).ToList(),
                         };
                     }).ToList();
 
-                    var result = new GetPillarQuestionByProgramResponse
+                    var result = new GetPillarQuestionByCountryResponse
                     {
                         AssessmentID = assessment?.AssessmentID ?? 0,
-                        StaffProgramMappingID = request.StaffProgramMappingID,
+                        UserCountryMappingID = request.UserCountryMappingID,
                         PillarName = selectPillar.PillarName,
                         PillarID = selectPillar.PillarID,
                         Description = selectPillar.Description,
                         DisplayOrder = selectPillar.DisplayOrder,
-                        SubmittedPillarDisplayOrder = submittedPillarDisplayOrder,
+                        SubmittedPillarDisplayOrder = answeredPillarIds.Count == pillarCount ? lastDisplayOrder : summitedPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
                         Questions = questions
                     };
-                    return ResultResponseDto<GetPillarQuestionByProgramResponse>.Success(result, new[] { "get questions successfully" });
+                    return ResultResponseDto<GetPillarQuestionByCountryResponse>.Success(result, new[] { "get questions successfully" });
                 }
                 return null;
 
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetQuestionsByProgramIDAsync", ex);
-                return ResultResponseDto<GetPillarQuestionByProgramResponse>.Failure(new string[] { "There is an error please try later" });
+                await _appLogger.LogAsync("Error Occure in GetQuestionsByCityIdAsync", ex);
+                return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        public async Task<Tuple<string, byte[]>> ExportAssessment(int staffProgramMappingID, int userId, UserRole role)
+
+        public async Task<Tuple<string, byte[]>> ExportAssessment(int userCountryMappingID, int userId, UserRole role)
         {
             try
             {
 
-                var fileName = (from m in _context.StaffProgramMappings.Where(us => us.UserID == userId)
-                                join p in _context.ClimatePrograms on m.ClimateProgramID equals p.ClimateProgramID
-                                join u in _context.Users.Where(x => x.UserID == userId && !x.IsDeleted) on m.UserID equals u.UserID
-                                join assignedByUser in _context.Users.Where(x => !x.IsDeleted) on m.AssignedByUserId equals assignedByUser.UserID into assignedUsers
-                                from assignedByUser in assignedUsers.DefaultIfEmpty()
-                                where m.StaffProgramMappingID == staffProgramMappingID
+                var fileName = (from m in _context.UserCountryMappings.Where(us=>us.UserID == userId)
+                                join c in _context.Countries on m.CountryID equals c.CountryID
+                                join u in _context.Users.Where(x=>x.UserID == userId && !x.IsDeleted) on m.UserID equals u.UserID  
+                                where m.UserCountryMappingID == userCountryMappingID 
                                 select new
                                 {
-                                    ProgramName = p.ProgramName,
-                                    FullName = u.FullName,
-                                    Year = p.Year,
-                                    Role = u.Role,
-                                    AssignedByUsername = assignedByUser != null ? assignedByUser.FullName : null,
-                                    AssignedByRole = assignedByUser.Role
+                                    CountryName = c.CountryName,
+                                    FullName = u.FullName
                                 }).FirstOrDefault();
 
-                var sheetName = fileName?.ProgramName + "_" + fileName?.FullName;
-                var pillarAssessments = _context.Assessments
+                var sheetName = fileName?.CountryName + "_" + fileName?.FullName;
+
+
+                var year = DateTime.Now.Year;
+
+
+                var assessment = await _context.Assessments
                     .Include(x => x.PillarAssessments)
                     .ThenInclude(x => x.Responses)
-                    .Where(a => a.StaffProgramMappingID == staffProgramMappingID && a.IsActive)
-                    .SelectMany(x => x.PillarAssessments).ToList();
+                    .Where(a => a.UserCountryMappingID == userCountryMappingID && a.IsActive && a.UpdatedAt.Year == year).FirstOrDefaultAsync();
 
+                var isAssessmentCompeleted = AssessmentPhase.Completed == assessment?.AssessmentPhase;
+
+                var pillarAssessments = (isAssessmentCompeleted ?
+                    assessment?.PillarAssessments?.Where(x => x.PillarID == ROSEWPillarID).ToList()
+                    : assessment?.PillarAssessments?.ToList()) ?? new List<PillarAssessment>();
+                    
                 // Get next unanswered pillar
                 var nextPillars = await _context.Pillars
                     .Include(p => p.Questions.Where(x => !x.IsDeleted))
-                    .ThenInclude(q => q.QuestionOptions)
-                    .Where(x => x.IsActive && !x.IsDeleted)
+                        .ThenInclude(q => q.QuestionOptions)
+                    .Where(x => x.IsActive && !x.IsDeleted && (!isAssessmentCompeleted || x.PillarID == ROSEWPillarID ))
                     .OrderBy(p => p.DisplayOrder)
                     .ToListAsync();
-               
-                var byteArray = MakePillarSheetClientReadable_Updated(nextPillars, pillarAssessments, staffProgramMappingID, fileName);
+
+                var byteArray = MakePillarSheetClientReadable_Updated(nextPillars, pillarAssessments, userCountryMappingID, fileName);
 
                 return new(sheetName, byteArray);
             }
@@ -497,8 +480,8 @@ namespace HornScope.Services
         private byte[] MakePillarSheetClientReadable_Updated(
              List<Pillar> pillars,
              List<PillarAssessment> pillarAssessments,
-             int StaffProgramMappingID,
-             dynamic? file)
+             int userCountryMappingID,
+             dynamic? countryUser)
         {
             using var workbook = new XLWorkbook();
 
@@ -523,7 +506,7 @@ namespace HornScope.Services
 
                 // -- Row 1 : Title -------------------------------------
                 var title = ws.Range("A1:D1").Merge();
-                title.Value = "Veridian Climate Pulse - Program Assessment";
+                title.Value = "Africa Market Intelligence � Country Assessment";
                 title.Style.Font.Bold = true;
                 title.Style.Font.FontSize = 13;
                 title.Style.Font.FontColor = XLColor.White;
@@ -532,7 +515,7 @@ namespace HornScope.Services
                 title.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 ws.Row(1).Height = 26;
 
-                // -- Row 2 : Pillar name -------------------------------
+                // -- Row 2 : Domain name -------------------------------
                 var pillarTitle = ws.Range("A2:D2").Merge();
                 pillarTitle.Value = $"Pillar: {pillar.PillarName}";
                 pillarTitle.Style.Font.Bold = true;
@@ -543,13 +526,12 @@ namespace HornScope.Services
                 ws.Row(2).Height = 20;
 
                 // -- Rows 3-4 : Meta -----------------------------------
-                ws.Cell(3, 1).Value = "Program:";
-                ws.Cell(3, 2).Value = file?.ProgramName?.ToString() ?? "";
-                ws.Cell(3, 3).Value = "Program Year:";
-                ws.Cell(3, 4).Value = file?.Year;
-                ws.Cell(3, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
-                ws.Cell(4, 1).Value = "AssignedBy:";
-                ws.Cell(4, 2).Value = $"{file?.AssignedByUsername ?? ""} ({file?.AssignedByRole ?? ""})";
+                ws.Cell(3, 1).Value = "Country:";
+                ws.Cell(3, 2).Value = countryUser?.CountryName?.ToString() ?? "";
+                ws.Cell(3, 3).Value = "Year:";
+                ws.Cell(3, 4).Value = DateTime.Now.Year;
+                ws.Cell(4, 1).Value = "Evaluator:";
+                ws.Cell(4, 2).Value = countryUser?.FullName?.ToString() ?? "";
 
                 foreach (int r in new[] { 3, 4 })
                 {
@@ -564,7 +546,7 @@ namespace HornScope.Services
                 // -- Row 5 : thin gap ----------------------------------
                 ws.Row(5).Height = 4;
 
-                // -- Row 6 : Pillar description -------------------------
+                // -- Row 6 : Domain description -------------------------
                 var desc = ws.Range("A6:D6").Merge();
                 desc.Value = CleanHtml(pillar.Description);
                 desc.Style.Fill.BackgroundColor = ColDescBg;
@@ -573,7 +555,7 @@ namespace HornScope.Services
                 desc.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
                 desc.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                 desc.Style.Border.OutsideBorderColor = ColDescBorder;
-                ws.Row(6).Height = 50;
+                ws.Row(6).Height = 120;
 
                 // -- Row 7 : thin gap ----------------------------------
                 ws.Row(7).Height = 4;
@@ -616,12 +598,13 @@ namespace HornScope.Services
 
                     // -- Build option texts (score desc first, then N/A / Unknown) --
                     var options = (q.QuestionOptions ?? new List<QuestionOption>())
-                                  .OrderBy(x => x.DisplayOrder)
+                                  .OrderByDescending(x => x.ScoreValue)
+                                  .ThenBy(x => x.OptionText)
                                   .ToList();
 
                     var optionTexts = options.Select(opt =>
                     {
-                        string prefix = !string.IsNullOrEmpty(opt.ScoreValue) ? $"{opt.ScoreValue} - " : "";
+                        string prefix = opt.ScoreValue.HasValue ? $"{opt.ScoreValue} - " : "";
                         return (prefix + opt.OptionText.Trim()).Trim();
                     }).ToList();
 
@@ -649,7 +632,7 @@ namespace HornScope.Services
                         var sel = options.FirstOrDefault(x => x.OptionID == ans.QuestionOptionID);
                         if (sel != null)
                         {
-                            string prefix = !string.IsNullOrEmpty(sel.ScoreValue) ? $"{sel.ScoreValue} - " : "";
+                            string prefix = sel.ScoreValue.HasValue ? $"{sel.ScoreValue} - " : "";
                             currentAnswer = (prefix + sel.OptionText.Trim()).Trim();
                         }
                     }
@@ -683,8 +666,6 @@ namespace HornScope.Services
 
                     // -- Col D : Dropdown answer cell ------------------
                     var ansCell = ws.Cell(ansRow, 4);
-                    ws.Column(4).Width = 89;
-                    ws.Row(ansRow).AdjustToContents();
                     ansCell.Value = currentAnswer;
                     ansCell.Style.Fill.BackgroundColor = ColEditableYellow;
                     ansCell.Style.Alignment.WrapText = true;
@@ -692,13 +673,13 @@ namespace HornScope.Services
                     ansCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                     ansCell.Style.Border.OutsideBorderColor = ColAccentBlue;
 
-                    // DATA VALIDATION - list via Named Range (cross-sheet refs don't work in ClosedXML dv.Value)
+                    // DATA VALIDATION � list via Named Range (cross-sheet refs don't work in ClosedXML dv.Value)
                     if (optionTexts.Any())
                     {
                         var dv = ansCell.GetDataValidation();
                         dv.Clear();
                         dv.AllowedValues = XLAllowedValues.List;
-                        // Reference the Named Range we created above - this IS supported by ClosedXML
+                        // Reference the Named Range we created above � this IS supported by ClosedXML
                         // and produces a real clickable dropdown arrow in Excel / LibreOffice.
                         dv.Value = namedRangeKey;
                         dv.IgnoreBlanks = true;
@@ -716,7 +697,7 @@ namespace HornScope.Services
                     // -- Col J (hidden) : Numeric score formula ---------
                     // Extracts the leading digit from the dropdown text (e.g. "3 - Good...") ? 3
                     // Returns "" for N/A, Unknown, or blank
-
+                   
 
                     ws.Cell(ansRow, 10).FormulaA1 =
                         $"=IF(D{ansRow}=\"\",\"\",IFERROR(VALUE(LEFT(D{ansRow},FIND(\" -\",D{ansRow})-1)),\"\"))";
@@ -747,7 +728,7 @@ namespace HornScope.Services
                     ws.Cell(commentRow, 4).Style.Border.OutsideBorderColor = ColInputBorder;
                     ws.Row(commentRow).Height = 40;
 
-                    // -- Source row (row+2) - also carries hidden IDs --
+                    // -- Source row (row+2) � also carries hidden IDs --
                     int sourceRow = ansRow + 2;
 
                     ws.Cell(sourceRow, 1).Style.Fill.BackgroundColor = qBg;
@@ -768,8 +749,8 @@ namespace HornScope.Services
                     ws.Cell(sourceRow, 4).Style.Border.OutsideBorderColor = ColInputBorder;
                     ws.Row(sourceRow).Height = 25;
 
-                    // Hidden IDs (cols K-O = 11-15)
-                    ws.Cell(sourceRow, 11).Value = StaffProgramMappingID;
+                    // Hidden IDs (cols K�O = 11�15)
+                    ws.Cell(sourceRow, 11).Value = userCountryMappingID;
                     ws.Cell(sourceRow, 12).Value = pillar.PillarID;
                     ws.Cell(sourceRow, 13).Value = q.QuestionID;
                     ws.Cell(sourceRow, 14).Value = ans.QuestionOptionID;
@@ -829,8 +810,8 @@ namespace HornScope.Services
                 ws.Row(row).Height = 22;
                 row++;
 
-                // ValidAnswered / Total count row
-                ws.Cell(row, 3).Value = "Valid Answers";
+                // Answered / Total count row
+                ws.Cell(row, 3).Value = "Answered";
                 ws.Cell(row, 3).Style.Font.Bold = true;
                 ws.Cell(row, 3).Style.Font.FontColor = ColGrayText;
                 ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
@@ -891,10 +872,12 @@ namespace HornScope.Services
 
             return safeName;
         }
-        public async Task<ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>> GetQuestionsHistoryByPillar(GetProgramPillarHistoryRequestDto requestDto, UserRole userRole)
+        public async Task<ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>> GetQuestionsHistoryByPillar(GetCountryPillarHistoryRequestDto requestDto, UserRole userRole)
         {
             try
             {
+                var year = requestDto.UpdatedAt.Year;
+
                 // =========================
                 // 1. PILLAR + QUESTIONS
                 // =========================
@@ -908,14 +891,14 @@ namespace HornScope.Services
                 if (pillar == null)
                 {
                     return ResultResponseDto<List<QuestionsByUserPillarsResponsetDto>>
-                        .Failure(new[] { "Pillar not found" });
+                        .Failure(new[] { "Domain not found" });
                 }
 
                 // =========================
                 // 2. USER MAPPINGS
                 // =========================
-                var userMappings = await _context.StaffProgramMappings
-                    .Where(x => x.ClimateProgramID == requestDto.ClimateProgramID
+                var userMappings = await _context.UserCountryMappings
+                    .Where(x => x.CountryID == requestDto.CountryID
                                 && !x.IsDeleted
                                 && (x.AssignedByUserId == requestDto.UserID
                                     || x.UserID == requestDto.UserID
@@ -923,22 +906,23 @@ namespace HornScope.Services
                     .AsNoTracking()
                     .ToListAsync();
 
-                var mappingIds = userMappings.Select(x => x.StaffProgramMappingID).ToList();
+                var mappingIds = userMappings.Select(x => x.UserCountryMappingID).ToList();
 
                 // =========================
                 // 3. ASSESSMENTS
                 // =========================
                 var assessments = await _context.Assessments
-                    .Include(x => x.StaffProgramMapping)
+                    .Include(x => x.UserCountryMapping)
                     .Include(a => a.PillarAssessments
                         .Where(pa => pa.PillarID == requestDto.PillarID))
                     .ThenInclude(pa => pa.Responses)
-                    .Where(a => mappingIds.Contains(a.StaffProgramMappingID)
-                                && a.IsActive)
+                    .Where(a => mappingIds.Contains(a.UserCountryMappingID)
+                                && a.IsActive
+                                && a.UpdatedAt.Year == year)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var userIds = assessments.Select(x => x.StaffProgramMapping.UserID).Distinct().ToList();
+                var userIds = assessments.Select(x => x.UserCountryMapping.UserID).Distinct().ToList();
 
                 // =========================
                 // 4. USERS DICTIONARY
@@ -952,7 +936,7 @@ namespace HornScope.Services
                 // 5. USER RESPONSES
                 // =========================
                 var responsesByUser = assessments
-                    .GroupBy(a => a.StaffProgramMapping.UserID)
+                    .GroupBy(a => a.UserCountryMapping.UserID)
                     .ToDictionary(
                         g => g.Key,
                         g => g.SelectMany(a => a.PillarAssessments)
@@ -964,8 +948,9 @@ namespace HornScope.Services
                 // 6. AI DATA (NEW)
                 // =========================
                 var aiRaw = await _context.AIEstimatedQuestionScores
-                    .Where(x => x.ClimateProgramID == requestDto.ClimateProgramID
-                                && x.PillarID == requestDto.PillarID)
+                    .Where(x => x.CountryID == requestDto.CountryID
+                                && x.PillarID == requestDto.PillarID
+                                && x.Year == year)
                     .ToListAsync();
 
                 var aiDict = aiRaw
@@ -1010,7 +995,7 @@ namespace HornScope.Services
                         // ? ADD AI RESULT ROW
                         if (aiDict.TryGetValue(q.QuestionID, out var ai))
                         {
-                            var option = q.QuestionOptions.FirstOrDefault(x => x.ScoreValue == ai.Score.ToString());
+                            var option = q.QuestionOptions.FirstOrDefault(x => x.ScoreValue == ai.Score);
 
 
                             userInfos.Insert(0, new QuestionsByUserInfo
@@ -1058,83 +1043,83 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<GetPillarQuestionByProgramResponse>> GetQuestionsByProgramMappingIdForAnalyst(
-            StaffProgramPillerRequestDto request, int userId)
+        public async Task<ResultResponseDto<GetPillarQuestionByCountryResponse>> GetQuestionsByCountryMappingIdForAnalyst(
+            CountryPillerRequestDto request, int userId)
         {
             try
             {
-                var staffProgramMappings = await _context.StaffProgramMappings
-                    .FirstOrDefaultAsync(x => x.StaffProgramMappingID == request.StaffProgramMappingID
+                var userCountryMappings = await _context.UserCountryMappings
+                    .FirstOrDefaultAsync(x => x.UserCountryMappingID == request.UserCountryMappingID
                                            && x.UserID == userId
                                            && !x.IsDeleted);
 
-                if (staffProgramMappings == null)
-                    return ResultResponseDto<GetPillarQuestionByProgramResponse>.Failure(
-                        new[] { "Invalid request" });
-                
-                Expression<Func<Assessment, bool>> predicate = a =>
-                                    a.StaffProgramMappingID == request.StaffProgramMappingID &&
-                                    a.IsActive;
+                if (userCountryMappings == null)
+                    return null;
+
+                var year = DateTime.Now.Year;
 
                 // Load assessment with related data
                 var assessment = await _context.Assessments
-                   .Include(x => x.PillarAssessments)
-                   .ThenInclude(x => x.Responses)
-                   .FirstOrDefaultAsync(predicate);
+                    .Include(x => x.PillarAssessments)
+                        .ThenInclude(x => x.Responses)
+                    .Where(a => a.UserCountryMappingID == request.UserCountryMappingID
+                             && a.UpdatedAt.Year == year
+                             && a.IsActive)
+                    .FirstOrDefaultAsync();
+
+                if (assessment != null && (assessment.AssessmentPhase == AssessmentPhase.Completed || assessment.AssessmentPhase == AssessmentPhase.EditRejected || assessment.AssessmentPhase == AssessmentPhase.EditRequested))
+                {
+                    return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
+                        new[] { "You have submitted assessment for this country" });
+                }
 
                 var answeredPillarIds = assessment?.PillarAssessments
-                     .Where(x => x.Responses != null && x.Responses.Any())
-                     .OrderByDescending(r => r.Responses
-                     .Select(resp => (DateTime?)resp.UpdatedAt).Max())
-                     .Select(r => r.PillarID)
-                     .ToList() ?? new List<int>();
+                    .Select(r => r.PillarID)
+                    .ToList() ?? new List<int>();
 
+                var allPillars = await _commonService.GetPillars();
+                var pillarCount = allPillars.Count;
+                var lastDisplayOrder = allPillars.Count == 0 ? 0 : allPillars.Max(p => p.DisplayOrder);
 
-                int pillarCount = (await _commonService.GetPillars()).Count;
-                
                 if (assessment != null && answeredPillarIds.Count == pillarCount && !request.PillarID.HasValue)
                     request.PillarID = assessment.PillarAssessments.First().PillarID;
 
-                if (!request.PillarID.HasValue)
-                {
-                    if (answeredPillarIds.Any())
-                    {
-                        request.PillarID = answeredPillarIds.First();
-                    }
-                    else
-                    {
-                        request.PillarID = (await _commonService.GetPillars()).FirstOrDefault()?.PillarID;
-                    }
-                }
-
-                // Calculate the submitted pillar display order from the max pillar ID in answeredPillarIds
-                int submittedPillarDisplayOrder = 0;
-                if (answeredPillarIds.Any())
-                {
-                    var maxAnsweredPillarId = answeredPillarIds.Max();
-                    var cachedPillars = await _commonService.GetPillars();
-                    submittedPillarDisplayOrder = cachedPillars
-                        .FirstOrDefault(p => p.PillarID == maxAnsweredPillarId)?.DisplayOrder ?? 0;
-                }
-
                 // Get the target pillar (next unanswered or specific)
                 var selectPillar = await _context.Pillars
-                   .Where(x => x.IsActive && !x.IsDeleted && x.PillarID == request.PillarID)
-                   .Include(p => p.Questions.Where(x => !x.IsDeleted))
-                   .ThenInclude(q => q.QuestionOptions)
-                   .FirstOrDefaultAsync();
+                    .Include(p => p.Questions)
+                        .ThenInclude(q => q.QuestionOptions)
+                    .Where(p => !request.PillarID.HasValue
+                        ? !answeredPillarIds.Contains(p.PillarID)
+                        : p.PillarID == request.PillarID)
+                    .OrderBy(p => p.DisplayOrder)
+                    .FirstOrDefaultAsync();
 
-                if (selectPillar == null || !selectPillar.Questions.Any())
-                    return ResultResponseDto<GetPillarQuestionByProgramResponse>.Failure(
-                        new[] { "You have submitted assessment for this program" });
+                var nextUnansweredPillar = allPillars
+                    .Where(p => !answeredPillarIds.Contains(p.PillarID))
+                    .OrderBy(p => p.DisplayOrder)
+                    .FirstOrDefault();
 
-                // Build lookup for existing responses for the selected pillar
+                if (selectPillar?.Questions == null)
+                    return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
+                        new[] { "You have submitted assessment for this country" });
                 var editAssessmentResponse = assessment?.PillarAssessments
                     .Where(a => a.PillarID == request.PillarID)
                     .SelectMany(x => x.Responses)
                     .GroupBy(x => x.QuestionID)
-                    .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.UpdatedAt).First())
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Last()
+                    )
                     ?? new Dictionary<int, AssessmentResponse>();
+
+                // Build option text lookup for history display
+                var optionTextLookup = selectPillar.Questions
+                    .SelectMany(q => q.QuestionOptions)
+                    .GroupBy(x => x.OptionID)
+                    .ToDictionary(
+                        g => g.Key,
+                        g => g.Last()
+                    );
 
                 // Project questions with pre-filled answers
                 var questions = selectPillar.Questions
@@ -1162,19 +1147,19 @@ namespace HornScope.Services
                                 ScoreValue = x.ScoreValue,
                                 Justification = submitted.QuestionOptionID == x.OptionID ? submitted.Justification : string.Empty,
                                 Source = submitted.QuestionOptionID == x.OptionID ? submitted.Source : string.Empty
-                            }).OrderBy(x=>x.DisplayOrder).ToList()
+                            }).ToList()
                         };
                     }).ToList();
 
-                // Load program-level user mappings assigned by this analyst
-                var staffProgramMappingsList = await _context.StaffProgramMappings
-                    .Where(x => x.ClimateProgramID == staffProgramMappings.ClimateProgramID
-                             && x.AssignedByUserId == staffProgramMappings.UserID)
+                // Load country-level user mappings assigned by this analyst
+                var userCountryMappingsList = await _context.UserCountryMappings
+                    .Where(x => x.CountryID == userCountryMappings.CountryID
+                             && x.AssignedByUserId == userCountryMappings.UserID)
                     .AsNoTracking()
                     .ToListAsync();
 
-                var mappingIds = staffProgramMappingsList.Select(x => x.StaffProgramMappingID).ToList();
-                var userIds = staffProgramMappingsList.Select(x => x.UserID).ToList();
+                var mappingIds = userCountryMappingsList.Select(x => x.UserCountryMappingID).ToList();
+                var userIds = userCountryMappingsList.Select(x => x.UserID).ToList();
 
                 var users = await _context.Users
                     .Where(x => userIds.Contains(x.UserID))
@@ -1183,15 +1168,16 @@ namespace HornScope.Services
 
                 // Load analyst responses for this pillar
                 var analystResponses = await _context.Assessments
-                    .Where(a => mappingIds.Contains(a.StaffProgramMappingID)
-                             && a.IsActive)
+                    .Where(a => mappingIds.Contains(a.UserCountryMappingID)
+                             && a.IsActive
+                             && a.UpdatedAt.Year == year)
                     .SelectMany(a => a.PillarAssessments
                         .Where(pa => pa.PillarID == selectPillar.PillarID)
                         .SelectMany(pa => pa.Responses
                             .Where(r => r != null)
                             .Select(r => new HistoryQuestionAnswerRawDto
                             {
-                                UserID = a.StaffProgramMapping.UserID,
+                                UserID = a.UserCountryMapping.UserID,
                                 QuestionID = r.QuestionID,
                                 OptionID = r.QuestionOptionID,
                                 ScoreValue = (int?)r.Score,
@@ -1208,8 +1194,9 @@ namespace HornScope.Services
 
                 // Load AI estimated scores for this pillar
                 var aiRawData = await _context.AIEstimatedQuestionScores
-                    .Where(x => x.ClimateProgramID == staffProgramMappings.ClimateProgramID
-                             && x.PillarID == selectPillar.PillarID)
+                    .Where(x => x.CountryID == userCountryMappings.CountryID
+                             && x.PillarID == selectPillar.PillarID
+                             && x.Year == year)
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -1234,7 +1221,7 @@ namespace HornScope.Services
 
                     foreach (var entry in relatedEntries)
                     {
-                        var option = question.QuestionOptions.FirstOrDefault(x => x.OptionID == entry.OptionID || x.ScoreValue == entry.ScoreValue.ToString());
+                        var option = question.QuestionOptions.FirstOrDefault(x => x.OptionID == entry.OptionID || x.ScoreValue == entry.ScoreValue);
                         question.History.Add(new HistoryQuestionAnswerRawDto
                         {
                             UserID = entry.UserID,
@@ -1248,25 +1235,28 @@ namespace HornScope.Services
                     }
                 }
 
-                var result = new GetPillarQuestionByProgramResponse
+                var result = new GetPillarQuestionByCountryResponse
                 {
                     AssessmentID = assessment?.AssessmentID ?? 0,
-                    StaffProgramMappingID = request.StaffProgramMappingID,
+                    UserCountryMappingID = request.UserCountryMappingID,
                     PillarName = selectPillar.PillarName,
                     PillarID = selectPillar.PillarID,
                     Description = selectPillar.Description,
                     DisplayOrder = selectPillar.DisplayOrder,
-                    SubmittedPillarDisplayOrder = submittedPillarDisplayOrder,
+                    SubmittedPillarDisplayOrder = answeredPillarIds.Count == pillarCount
+                                                   ? lastDisplayOrder
+                                                   : nextUnansweredPillar?.DisplayOrder ?? selectPillar.DisplayOrder,
+                    //LastPillarDisplayOrder= lastDisplayOrder,
                     Questions = questions
                 };
 
-                return ResultResponseDto<GetPillarQuestionByProgramResponse>.Success(
+                return ResultResponseDto<GetPillarQuestionByCountryResponse>.Success(
                     result, new[] { "get questions successfully" });
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetQuestionsByProgramMappingIdForAnalyst", ex);
-                return ResultResponseDto<GetPillarQuestionByProgramResponse>.Failure(
+                await _appLogger.LogAsync("Error Occure in GetQuestionsByCityIdAsync", ex);
+                return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
                     new[] { "There is an error please try later" });
             }
         }

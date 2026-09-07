@@ -7,19 +7,14 @@ namespace HornScope.IServices
 {
     public interface IPublicService
     {
-        Task<ResultResponseDto<List<PartnerProgramResponseDto>>> GetAllPrograms();
-        Task<ResultResponseDto<PartnerProgramFilterResponse>> GetPartnerProgramsFilterRecord();
+        Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries();
         Task<ResultResponseDto<List<PillarResponseDto>>> GetAllPillarAsync();
-        Task<PaginationResponse<PartnerProgramResponseDto>> GetPartnerPrograms(PartnerProgramRequestDto r);
-        Task<ProgramResponse> GetProgramsAndPrograms_WithStaleSupport();
-        Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedPrograms();
+        Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
+        Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
         Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues();
-        /// <summary>
-        /// Fetches emerging trends from AI, enriches programs, and caches on success only.
-        /// </summary>
-        Task<bool> RefreshEmergingTrendsCacheAsync(int programCount, CancellationToken cancellationToken = default);
+        Task<bool> RefreshEmergingTrendsCacheAsync(int countryCount, CancellationToken cancellationToken = default);
         Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
-        Task<ResultResponseDto<ROSEWPublicDashboardDto>> GetResilienceScorecard();
+        Task<ResultResponseDto<OverallAfricaMarketResponse>> GetOverAllAfricaMarketScore();
 
     }
 }

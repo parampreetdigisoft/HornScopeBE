@@ -3,7 +3,7 @@ namespace HornScope.Common.Models
     public class AiPillarStatsLast4MonthsView
     {
         public int PillarID { get; set; }
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int MonthNo { get; set; }
         public decimal TotalScore { get; set; }
         public int TotalAns { get; set; }

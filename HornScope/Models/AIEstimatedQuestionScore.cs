@@ -3,7 +3,7 @@ namespace HornScope.Models
     public class AIEstimatedQuestionScore
     {
         public int QuestionScoreID { get; set; }
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int PillarID { get; set; }
         public int QuestionID { get; set; }
         public int Year { get; set; }
@@ -27,12 +27,12 @@ namespace HornScope.Models
         public string? RelationalDependencies { get; set; }
 
         // Stress Tests
-        public string? StressGeopoliticalShock { get; set; }
-        public string? StressFinanceShock { get; set; }
-        public string? StressLegitimacyShock { get; set; }
+        public string? StressPoliticalShock { get; set; }
+        public string? StressEconomicShock { get; set; }
+        public string? StressNarrativeShock { get; set; }
         public string? StressOverallResilienceShock { get; set; }
 
-        public string? InclusionEquityAdjustment { get; set; }
+        public string? InequalityAdjustment { get; set; }
         public string? OpacityRisk { get; set; }
 
         public string? RedFlag { get; set; }   // ? renamed
@@ -49,7 +49,7 @@ namespace HornScope.Models
         public DateTime UpdatedAt { get; set; }
 
         // Navigation Properties
-        public ClimateProgram? Program { get; set; }
+        public Country? Country { get; set; }
         public Pillar? Pillar { get; set; }
         public Question? Question { get; set; }
     }

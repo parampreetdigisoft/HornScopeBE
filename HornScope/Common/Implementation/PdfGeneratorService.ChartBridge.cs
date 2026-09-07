@@ -35,7 +35,7 @@ namespace HornScope.Common.Implementation
     public partial class PdfGeneratorService
     {
         // ── Donut / gauge chart ──────────────────────────────────────────────
-        /// <param name="score">0–100 Program progress score.</param>
+        /// <param name="score">0–100 country progress score.</param>
         internal static void PaintDonutPublic(SKCanvas c, QPDF.Size s, float score)
             => PaintDonut(c, s, score);
 
@@ -52,33 +52,35 @@ namespace HornScope.Common.Implementation
         internal static void DrawKpiBarChartCanvas(
             SKCanvas c, QPDF.Size s, List<KpiChartItem> data, int offset)
         {
+            // PdfGeneratorService.DrawKpiBarChart uses IContainer (QuestPDF).
+            // Replicate the canvas-only portion here since it is already
+            // purely SkiaSharp.  This is the ONLY method that needs a copy
+            // because the original wraps an IContainer.Background().Canvas() call.
+
             if (!data.Any()) return;
+
             const float lp = 8f, rp = 8f, tp = 22f, bp = 26f;
             float chartW = s.Width - lp - rp;
             float chartH = s.Height - tp - bp;
-            float halfH = chartH / 2f;
             int n = data.Count;
-            float barW = chartW / n;
+            float barW  = chartW / n;
             float innerW = barW * 0.62f;
             float barGap = (barW - innerW) / 2f;
-            float zeroY = tp + halfH;
 
             using var gridPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background), StrokeWidth = 0.6f };
-            using var gridLbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.BlueGrayLight), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Left };
-            foreach (float pct in new[] { -100f, -80f, -60f, -40f, -20f, 0f, 20f, 40f, 60f, 80f, 100f })
+            using var gridLbl   = new SKPaint { Color = SKColor.Parse(ReportThemeColors.BlueGrayLight), TextSize = 7f, IsAntialias = true, TextAlign = SKTextAlign.Left };
+            foreach (float pct in new[] { 25f, 50f, 75f, 100f })
             {
-                float gy = zeroY - (pct / 100f * halfH);
+                float gy = tp + chartH - pct / 100f * chartH;
                 c.DrawLine(lp, gy, lp + chartW, gy, gridPaint);
                 c.DrawText($"{(int)pct}", lp + 2, gy - 2, gridLbl);
             }
 
-            float y70 = zeroY - (70f / 100f * halfH);
+            float y70 = tp + chartH - 0.70f * chartH;
             using var thPaint = new SKPaint
             {
-                Color = SKColor.Parse(ReportThemeColors.AccentGreen).WithAlpha(100),
-                StrokeWidth = 0.9f,
-                PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0),
-                IsAntialias = true
+                Color = SKColor.Parse(ReportThemeColors.AccentGreen).WithAlpha(100), StrokeWidth = 0.9f,
+                PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0), IsAntialias = true
             };
             c.DrawLine(lp, y70, lp + chartW, y70, thPaint);
 
@@ -87,44 +89,30 @@ namespace HornScope.Common.Implementation
 
             for (int i = 0; i < n; i++)
             {
-                float v = (float)(data[i].Value);
-                var shortName = data[i].ShortName;
+                float v  = (float)(data[i].Value);
+                var shortName  = data[i].ShortName;
                 float bx = lp + i * barW + barGap;
-
-                bool isNeg = v < 0;
-                float bh = Math.Abs(v) / 100f * halfH;
-                // "by" = top edge of the bar rect, "bottom" = bottom edge
-                float by = isNeg ? zeroY : zeroY - bh;
-                float bottom = isNeg ? zeroY + bh : zeroY;
-                // the "tip" of the bar (the end furthest from the zero line)
-                float tip = isNeg ? bottom : by;
-
+                float bh = v / 100f * chartH;
+                float by = tp + chartH - bh;
                 SKColor color = GetColorStatic(v);
                 SKColor textColor = v > 85 ? SKColor.Parse(ReportThemeColors.White) : SKColor.Parse(ReportThemeColors.Black);
 
                 using var ghost = new SKPaint { Color = color.WithAlpha(35), IsAntialias = true };
                 c.DrawRoundRect(new SKRoundRect(new SKRect(bx, tp, bx + innerW, tp + chartH), 2), ghost);
 
-                // gradient: always full color at the tip, fading toward the zero line
-                var gradStart = isNeg ? new SKPoint(0, bottom) : new SKPoint(0, by);
-                var gradEnd = new SKPoint(0, zeroY);
                 using var shader = SKShader.CreateLinearGradient(
-                    gradStart, gradEnd,
+                    new SKPoint(0, by), new SKPoint(0, tp + chartH),
                     new[] { color, color.WithAlpha(180) }, null, SKShaderTileMode.Clamp);
                 using var barPaint = new SKPaint { Shader = shader, IsAntialias = true };
-                c.DrawRoundRect(new SKRoundRect(new SKRect(bx, by, bx + innerW, bottom), 2), barPaint);
+                c.DrawRoundRect(new SKRoundRect(new SKRect(bx, by, bx + innerW, tp + chartH), 2), barPaint);
 
-                // cap line at the tip (top for positive, bottom for negative)
                 using var cap = new SKPaint { Color = color, StrokeWidth = 2.5f, StrokeCap = SKStrokeCap.Round, IsAntialias = true };
-                c.DrawLine(bx + 1, tip, bx + innerW - 1, tip, cap);
+                c.DrawLine(bx + 1, by, bx + innerW - 1, by, cap);
 
-                // value label near the tip, flipped depending on sign
-                float vly = isNeg ? tip + 9f : tip - 3f;
-                if (!isNeg && vly < tp + 8f) vly = tip + 10f;
-                if (isNeg && vly > tp + chartH - 4f) vly = tip - 4f;
+                float vly = by - 3f;
+                if (vly < tp + 8f) vly = by + 10f;
                 valLbl.Color = textColor;
                 c.DrawText($"{v:F1}%", bx + innerW / 2f, vly, valLbl);
-
                 c.DrawText($"{offset + i + 1}. " + shortName, bx + innerW / 2f, s.Height - 6f, numLbl);
             }
         }
@@ -143,7 +131,7 @@ namespace HornScope.Common.Implementation
             float avg   = (float)data.Average(x => x.Value ?? 0);
 
             using var title = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Text), TextSize = 10f, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true };
-            c.DrawText("Pillar Performance", cx, 14f, title);
+            c.DrawText("Domain Performance", cx, 14f, title);
 
             for (int i = 0; i < data.Count; i++)
             {
@@ -200,70 +188,102 @@ namespace HornScope.Common.Implementation
         }
 
         // ── Population bar chart (canvas-only, no IContainer wrapper) ───────
-        //internal static void DrawPopulationBarsCanvas(
-        //    SKCanvas c, QPDF.Size s,
-        //    List<PeerProgramHistoryReportDto> programs, AiProgramSummeryDto programDetails)
-        //{
-        //    if (!programs.Any()) return;
-        //    //long maxPop = (long)(programs.Max(p => p.Population) ?? 1);
-        //    float rowH   = s.Height / Math.Max(programs.Count, 1);
-        //    float labelW = 130f, barArea = s.Width - labelW - 72f;
-        //    string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
+        internal static void DrawPopulationBarsCanvas(
+            SKCanvas c, QPDF.Size s,
+            List<PeerCountryHistoryReportDto> countries, AiCountrySummeryDto countryDetails)
+        {
+            if (!countries.Any()) return;
+            long maxPop = (long)(countries.Max(p => p.Population) ?? 1);
+            float rowH   = s.Height / Math.Max(countries.Count, 1);
+            float labelW = 130f, barArea = s.Width - labelW - 72f;
+            string[] palette = { "F0B429", "4CAF8A", "1E88E5", "FB8C00", "7B61FF", "E05252" };
 
-        //    for (int i = 0; i < programs.Count; i++)
-        //    {
-        //        var program = programs[i];
-        //        float y  = i * rowH;
-        //        float bw = (float)((program.Population ?? 0) / (double)maxPop * barArea);
-        //        bool isMain = IsSameProgramStatic(program.ProgramName, programDetails.ProgramName);
-        //        if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background) });
-        //        if (isMain)     c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.WarningAmberBg) });
+            for (int i = 0; i < countries.Count; i++)
+            {
+                var country = countries[i];
+                float y  = i * rowH;
+                float bw = (float)((country.Population ?? 0) / (double)maxPop * barArea);
+                bool isMain = IsSameCountryStatic(country.CountryName, countryDetails.CountryName);
+                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background) });
+                if (isMain)     c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.WarningAmberBg) });
 
-        //        using var txt = new SKPaint { Color = SKColor.Parse(isMain ? ReportThemeColors.Text : ReportThemeColors.Gray850), TextSize = 9f, IsAntialias = true, FakeBoldText = isMain };
-        //        c.DrawText(program.ProgramName, 4, y + rowH * 0.65f, txt);
-        //        string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
-        //        c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 4, labelW + bw, y + rowH - 6), 3), new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
-        //        using var num = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 9f, IsAntialias = true };
-        //        c.DrawText(FormatPopStatic(program.Population), labelW + bw + 5, y + rowH * 0.65f, num);
-        //    }
-        //}
+                using var txt = new SKPaint { Color = SKColor.Parse(isMain ? ReportThemeColors.Text : ReportThemeColors.Gray850), TextSize = 9f, IsAntialias = true, FakeBoldText = isMain };
+                c.DrawText(country.CountryName, 4, y + rowH * 0.65f, txt);
+                string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
+                c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 4, labelW + bw, y + rowH - 6), 3), new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true });
+                using var num = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 9f, IsAntialias = true };
+                c.DrawText(FormatPopStatic(country.Population), labelW + bw + 5, y + rowH * 0.65f, num);
+            }
+        }
 
         // ── Regional score bars (canvas only) ───────────────────────────────
-        //internal static void DrawRegionalBarsCanvas(
-        //    SKCanvas c, QPDF.Size s, List<PeerProgramHistoryReportDto> all)
-        //{
-        //    var byRegion = all
-        //        .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? p.Program ?? "Unknown" : p.Region)
-        //        .OrderByDescending(g => g.Count()).ToList();
+        internal static void DrawRegionalBarsCanvas(
+            SKCanvas c, QPDF.Size s, List<PeerCountryHistoryReportDto> all)
+        {
+            var byRegion = all
+                .GroupBy(p => string.IsNullOrWhiteSpace(p.Region) ? p.Country ?? "Unknown" : p.Region)
+                .OrderByDescending(g => g.Count()).ToList();
 
-        //    float barH   = s.Height / Math.Max(byRegion.Count, 1);
-        //    float labelW = 120f, barArea = s.Width - labelW - 65f;
-        //    string[] palette = { "12352F","336B58","4CAF8A","F0B429","E05252","7B61FF","1E88E5" };
+            float barH   = s.Height / Math.Max(byRegion.Count, 1);
+            float labelW = 120f, barArea = s.Width - labelW - 65f;
+            string[] palette = { "12352F","336B58","4CAF8A","F0B429","E05252","7B61FF","1E88E5" };
 
-        //    for (int i = 0; i < byRegion.Count; i++)
-        //    {
-        //        var g    = byRegion[i];
-        //        float y  = i * barH;
-        //        float avg = (float)g.Average(Program => GetLatestScoreOrZeroStatic(Program));
-        //        if (avg < 0) avg = 0;
-        //        float bw = avg / 100f * barArea;
-        //        if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + barH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background) });
-        //        using var lbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray900), TextSize = 9f, IsAntialias = true };
-        //        c.DrawText(g.Key, 4, y + barH * 0.65f, lbl);
-        //        c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 3, labelW + bw, y + barH - 6), 3),
-        //            new SKPaint { Color = SKColor.Parse(palette[i % palette.Length]), IsAntialias = true });
-        //        using var sc = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 9f, IsAntialias = true };
-        //        c.DrawText($"{avg:F1}  (n={g.Count()})", labelW + bw + 5, y + barH * 0.65f, sc);
-        //    }
-        //}
+            for (int i = 0; i < byRegion.Count; i++)
+            {
+                var g    = byRegion[i];
+                float y  = i * barH;
+                float avg = (float)g.Average(country => GetLatestScoreOrZeroStatic(country));
+                if (avg < 0) avg = 0;
+                float bw = avg / 100f * barArea;
+                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + barH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background) });
+                using var lbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray900), TextSize = 9f, IsAntialias = true };
+                c.DrawText(g.Key, 4, y + barH * 0.65f, lbl);
+                c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 3, labelW + bw, y + barH - 6), 3),
+                    new SKPaint { Color = SKColor.Parse(palette[i % palette.Length]), IsAntialias = true });
+                using var sc = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 9f, IsAntialias = true };
+                c.DrawText($"{avg:F1}  (n={g.Count()})", labelW + bw + 5, y + barH * 0.65f, sc);
+            }
+        }
 
-       
-       
-        // ── Pillar line chart ─────────────────────────────────────────────────
+        // ── Multi-line trend chart ────────────────────────────────────────────
+        internal static void DrawMultiLineTrendChartCanvas(
+            SKCanvas c, QPDF.Size s,
+            List<int> years, List<PeerCountryHistoryReportDto> peers,
+            PeerCountryHistoryReportDto? mainCountry, AiCountrySummeryDto countryDetails,
+            List<(int Year, float Avg, bool HasData)> peerAvg)
+        {
+            if (years.Count < 2) return;
+            const float padL = 36f, padR = 12f, padT = 10f, padB = 24f;
+            float w = s.Width - padL - padR, h = s.Height - padT - padB;
+            float Xp(int yr) => padL + (yr - years.First()) / (float)(years.Last() - years.First()) * w;
+            float Yp(float v) => padT + h - Math.Clamp(v, 0, 100) / 100f * h;
+
+            using var grid  = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray250), StrokeWidth = 0.5f };
+            using var glbl  = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayMuted), TextSize = 7f, IsAntialias = true };
+            foreach (int sc in new[] { 0, 25, 50, 75, 100 }) { float y = Yp(sc); c.DrawLine(padL, y, padL + w, y, grid); c.DrawText(sc.ToString(), 2, y - 5, glbl); }
+            foreach (int yr in years)                          { float x = Xp(yr); c.DrawLine(x, padT, x, padT + h, new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray150), StrokeWidth = 0.5f }); c.DrawText(yr.ToString(), x - 14, padT + h + 7, glbl); }
+
+            // Peer lines
+            string[] pal = { "F0B429","4CAF8A","1E88E5","FB8C00","7B61FF","E05252" };
+            for (int pi = 0; pi < peers.Count; pi++)
+            {
+                var pts = (peers[pi].CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
+                    .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress))).ToList();
+                DrawPolylineStatic(c, pts, new SKPaint { Color = SKColor.Parse(pal[1 + (pi % (pal.Length - 1))]).WithAlpha(180), StrokeWidth = 1.2f, IsAntialias = true, IsStroke = true });
+            }
+
+            // Main city line
+            var mainPts = (mainCountry?.CountryHistory ?? new()).Where(h => years.Contains(h.Year)).OrderBy(h => h.Year)
+                .Select(h => new SKPoint(Xp(h.Year), Yp((float)h.ScoreProgress))).ToList();
+            DrawPolylineStatic(c, mainPts, new SKPaint { Color = SKColor.Parse(pal[0]), StrokeWidth = 2.5f, IsAntialias = true, IsStroke = true });
+            foreach (var pt in mainPts) c.DrawCircle(pt.X, pt.Y, 4f, new SKPaint { Color = SKColor.Parse(pal[0]), IsAntialias = true });
+        }
+
+        // ── Domain line chart ─────────────────────────────────────────────────
         internal static void DrawPillarLineChartCanvas(
             SKCanvas c, QPDF.Size s,
-            List<int> years, List<PeerProgramYearHistoryDto> history,
-            List<PeerProgramPillarHistoryReportDto> pillars)
+            List<int> years, List<PeerCountryYearHistoryDto> history,
+            List<PeerCountryPillarHistoryReportDto> pillars)
         {
             if (years.Count < 2) return;
             string[] pal = { "12352F","336B58","4CAF8A","F0B429","F5A623","E05252","7B61FF","1E88E5","43A047","FB8C00","0097A7","8D6E63","E91E63","607D8B" };
@@ -274,7 +294,7 @@ namespace HornScope.Common.Implementation
 
             using var grid = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray250), StrokeWidth = 0.5f };
             using var glbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayMuted), TextSize = 7f, IsAntialias = true };
-            foreach (int sc in new[] { -100, -40, -20, 0, 20, 40, 100 }) { float y = Yp(sc); c.DrawLine(padL, y, padL + w, y, grid); c.DrawText(sc.ToString(), 2, y - 5, glbl); }
+            foreach (int sc in new[] { 0, 25, 50, 75, 100 }) { float y = Yp(sc); c.DrawLine(padL, y, padL + w, y, grid); c.DrawText(sc.ToString(), 2, y - 5, glbl); }
             foreach (int yr in years) c.DrawText(yr.ToString(), Xp(yr) - 12, padT + h + 5, glbl);
 
             for (int pi = 0; pi < pillars.Count; pi++)
@@ -301,12 +321,12 @@ namespace HornScope.Common.Implementation
         private static SKColor GetColorStatic(float v)
             => v >= 70 ? SKColor.Parse(ReportThemeColors.AccentGreen) : v >= 40 ? SKColor.Parse(ReportThemeColors.WarningOrange) : SKColor.Parse(ReportThemeColors.DangerRed);
 
-        private static bool IsSameProgramStatic(string? a, string? b)
+        private static bool IsSameCountryStatic(string? a, string? b)
             => string.Equals(a?.Trim(), b?.Trim(), StringComparison.OrdinalIgnoreCase);
 
-        private static float GetLatestScoreOrZeroStatic(PeerProgramHistoryReportDto Program)
+        private static float GetLatestScoreOrZeroStatic(PeerCountryHistoryReportDto country)
         {
-            var last = Program.ProgramHistory?.OrderByDescending(h => h.Year).FirstOrDefault();
+            var last = country.CountryHistory?.OrderByDescending(h => h.Year).FirstOrDefault();
             return last != null ? (float)last.ScoreProgress : -1f;
         }
 
@@ -331,22 +351,22 @@ namespace HornScope.Common.Implementation
         // ── Scatter plot (population or income vs score) ─────────────────────
         internal static void DrawScatterPlotCanvas(
             SKCanvas c, QPDF.Size s,
-            List<PeerProgramHistoryReportDto> programs,
-            AiProgramSummeryDto ProgramDetails,
-            Func<PeerProgramHistoryReportDto, float> xVal,
-            Func<PeerProgramHistoryReportDto, float> yVal,
+            List<PeerCountryHistoryReportDto> countries,
+            AiCountrySummeryDto countryDetails,
+            Func<PeerCountryHistoryReportDto, float> xVal,
+            Func<PeerCountryHistoryReportDto, float> yVal,
             string xLabel, string yLabel)
         {
-            if (!programs.Any()) return;
+            if (!countries.Any()) return;
 
-            string[] palette = ReportThemeColors.ProgramChartPalette;
+            string[] palette = ReportThemeColors.CountryChartPalette;
 
             const float padL = 42f, padR = 14f, padT = 12f, padB = 28f;
             float w = s.Width - padL - padR;
             float h = s.Height - padT - padB;
 
-            float xMin = programs.Min(xVal);
-            float xMax = programs.Max(xVal);
+            float xMin = countries.Min(xVal);
+            float xMax = countries.Max(xVal);
             if (xMax <= xMin) xMax = xMin + 1;
 
             float Xp(float v) => padL + (v - xMin) / (xMax - xMin) * w;
@@ -358,7 +378,7 @@ namespace HornScope.Common.Implementation
             using var glbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.GrayLight), TextSize = 7f, IsAntialias = true };
             c.DrawLine(padL, padT, padL, padT + h, axis);
             c.DrawLine(padL, padT + h, padL + w, padT + h, axis);
-            foreach (int sc in new[] { -100, -40, -20, 0, 20, 40, 100 })
+            foreach (int sc in new[] { 0, 25, 50, 75, 100 })
             {
                 float y = Yp(sc);
                 c.DrawLine(padL, y, padL + w, y, grid);
@@ -366,11 +386,11 @@ namespace HornScope.Common.Implementation
             }
 
             // Dots
-            for (int i = 0; i < programs.Count; i++)
+            for (int i = 0; i < countries.Count; i++)
             {
-                bool isMain = IsSameProgramStatic(programs[i].ProgramName, ProgramDetails.ProgramName);
-                float x = Xp(xVal(programs[i]));
-                float y = Yp(yVal(programs[i]));
+                bool isMain = IsSameCountryStatic(countries[i].CountryName, countryDetails.CountryName);
+                float x = Xp(xVal(countries[i]));
+                float y = Yp(yVal(countries[i]));
                 string clr = isMain ? palette[0] : palette[1 + (i % (palette.Length - 1))];
 
                 using var dot = new SKPaint { Color = SKColor.Parse(clr), IsAntialias = true };
@@ -397,60 +417,60 @@ namespace HornScope.Common.Implementation
         }
 
         // ── Income quartile vertical bars ─────────────────────────────────────
-        //internal static void DrawIncomeQuartileBarsCanvas(
-        //    SKCanvas c, QPDF.Size s,
-        //    List<PeerProgramHistoryReportDto> all)
-        //{
-        //    string[] categoryOrder = { "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income" };
-        //    string[] segColors = ReportThemeColors.IncomeTierPalette;
+        internal static void DrawIncomeQuartileBarsCanvas(
+            SKCanvas c, QPDF.Size s,
+            List<PeerCountryHistoryReportDto> all)
+        {
+            string[] categoryOrder = { "Low Income", "Lower-Middle Income", "Upper-Middle Income", "High Income" };
+            string[] segColors = ReportThemeColors.IncomeTierPalette;
 
-        //    var segments = all
-        //        .GroupBy(x => PdfGeneratorService.GetIncomeCategory(x.Income ?? 0))
-        //        .ToDictionary(g => g.Key, g => g.ToList());
+            var segments = all
+                .GroupBy(x => PdfGeneratorService.GetIncomeCategory(x.Income ?? 0))
+                .ToDictionary(g => g.Key, g => g.ToList());
 
-        //    float totalW = s.Width - 40f;
-        //    float slotW = totalW / 4f;
-        //    float barW = slotW * 0.62f;
-        //    float baseY = s.Height - 32f;
-        //    float maxBarH = baseY - 10f;
+            float totalW = s.Width - 40f;
+            float slotW = totalW / 4f;
+            float barW = slotW * 0.62f;
+            float baseY = s.Height - 32f;
+            float maxBarH = baseY - 10f;
 
-        //    using var valPaint = new SKPaint { TextSize = 9f, IsAntialias = true, FakeBoldText = true, TextAlign = SKTextAlign.Center };
-        //    using var catPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 7f, IsAntialias = true };
-        //    using var nPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray600), TextSize = 7f, IsAntialias = true };
+            using var valPaint = new SKPaint { TextSize = 9f, IsAntialias = true, FakeBoldText = true, TextAlign = SKTextAlign.Center };
+            using var catPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray800), TextSize = 7f, IsAntialias = true };
+            using var nPaint = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray600), TextSize = 7f, IsAntialias = true };
 
-        //    for (int i = 0; i < categoryOrder.Length; i++)
-        //    {
-        //        string label = categoryOrder[i];
-        //        float slotX = 20f + i * slotW;
-        //        float barX = slotX + (slotW - barW) / 2f;
+            for (int i = 0; i < categoryOrder.Length; i++)
+            {
+                string label = categoryOrder[i];
+                float slotX = 20f + i * slotW;
+                float barX = slotX + (slotW - barW) / 2f;
 
-        //        if (!segments.TryGetValue(label, out var programs) || !programs.Any())
-        //        {
-        //            using var noData = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray400), IsAntialias = true };
-        //            c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - 4, barX + barW, baseY), 4), noData);
-        //            c.DrawText(label.Length > 14 ? label[..14] + "…" : label, slotX, baseY + 12, catPaint);
-        //            continue;
-        //        }
+                if (!segments.TryGetValue(label, out var countries) || !countries.Any())
+                {
+                    using var noData = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Gray400), IsAntialias = true };
+                    c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - 4, barX + barW, baseY), 4), noData);
+                    c.DrawText(label.Length > 14 ? label[..14] + "…" : label, slotX, baseY + 12, catPaint);
+                    continue;
+                }
 
-        //        float avg = programs.Average(Program => { float sc = GetLatestScoreOrZeroStatic(Program); return sc < 0 ? 0 : sc; });
-        //        float barH = avg / 100f * maxBarH;
+                float avg = countries.Average(country => { float sc = GetLatestScoreOrZeroStatic(country); return sc < 0 ? 0 : sc; });
+                float barH = avg / 100f * maxBarH;
 
-        //        using var barPaint = new SKPaint { Color = SKColor.Parse(segColors[i]), IsAntialias = true };
-        //        c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - barH, barX + barW, baseY), 6), barPaint);
+                using var barPaint = new SKPaint { Color = SKColor.Parse(segColors[i]), IsAntialias = true };
+                c.DrawRoundRect(new SKRoundRect(new SKRect(barX, baseY - barH, barX + barW, baseY), 6), barPaint);
 
-        //        valPaint.Color = SKColor.Parse(ReportThemeColors.Text);
-        //        c.DrawText($"{avg:F1}", barX + barW / 2f, baseY - barH - 5, valPaint);
+                valPaint.Color = SKColor.Parse(ReportThemeColors.Text);
+                c.DrawText($"{avg:F1}", barX + barW / 2f, baseY - barH - 5, valPaint);
 
-        //        string shortLabel = label.Length > 14 ? label[..14] + "…" : label;
-        //        c.DrawText(shortLabel, slotX, baseY + 12, catPaint);
-        //        c.DrawText($"n={programs.Count}", slotX, baseY + 22, nPaint);
-        //    }
-        //}
+                string shortLabel = label.Length > 14 ? label[..14] + "…" : label;
+                c.DrawText(shortLabel, slotX, baseY + 12, catPaint);
+                c.DrawText($"n={countries.Count}", slotX, baseY + 22, nPaint);
+            }
+        }
 
         // Add this alongside the other internal helpers at the bottom of the partial class
         /// <summary>Exposed so DocxGeneratorService can pass it as a Func delegate.</summary>
-        internal static float GetLatestScoreOrZeroForDocx(PeerProgramHistoryReportDto Program)
-            => GetLatestScoreOrZeroStatic(Program);
+        internal static float GetLatestScoreOrZeroForDocx(PeerCountryHistoryReportDto country)
+            => GetLatestScoreOrZeroStatic(country);
 
         // ── Score distribution histogram ──────────────────────────────────────
         internal static void DrawHistogramCanvas(

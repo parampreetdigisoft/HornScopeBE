@@ -27,7 +27,7 @@ namespace HornScope.Backgroundjob
             _actionHandlers = new Dictionary<string, Func<Download, Task>>
             {
                 { "InsertAnalyticalLayerResults", InsertAnalyticalLayerResults },
-                { "AiResearchByClimateProgramID", AiResearchByClimateProgramID },
+                { "AiResearchByCountryId", AiResearchByCountryId },
             };
         }
         #endregion
@@ -44,7 +44,7 @@ namespace HornScope.Backgroundjob
                     {
                         if (queueItem.Type == "InsertAnalyticalLayerResults")
                         {
-                            await DebounceAsync(queueItem.ClimateProgramID ?? 0,
+                            await DebounceAsync(queueItem.CountryID ?? 0,
                                 () => action(queueItem));
                         }
                         else
@@ -64,9 +64,9 @@ namespace HornScope.Backgroundjob
 
         #region Debounce
 
-        private async Task DebounceAsync(int climateProgramID, Func<Task> action)
+        private async Task DebounceAsync(int countryId, Func<Task> action)
         {
-            var cts = _debounceTokens.AddOrUpdate(climateProgramID, _ => new CancellationTokenSource(), (_, existing) =>
+            var cts = _debounceTokens.AddOrUpdate(countryId, _ => new CancellationTokenSource(), (_, existing) =>
             {
                 existing.Cancel();
                 existing.Dispose();
@@ -77,7 +77,7 @@ namespace HornScope.Backgroundjob
             {
                 await Task.Delay(_debounceInterval, cts.Token);
 
-                var semaphore = _cityLocks.GetOrAdd(climateProgramID, _ => new SemaphoreSlim(1, 1));
+                var semaphore = _cityLocks.GetOrAdd(countryId, _ => new SemaphoreSlim(1, 1));
                 await semaphore.WaitAsync(cts.Token);
 
                 try
@@ -95,7 +95,7 @@ namespace HornScope.Backgroundjob
             }
             finally
             {
-                _debounceTokens.TryRemove(climateProgramID, out _);
+                _debounceTokens.TryRemove(countryId, out _);
             }
         }
 
@@ -109,14 +109,14 @@ namespace HornScope.Backgroundjob
             var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
             var dbContext = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            var climateProgramIDParam = new SqlParameter("@ClimateProgramID", channel.ClimateProgramID ?? 0);
+            var countryIdParam = new SqlParameter("@CountryID", channel.CountryID ?? 0);
 
             try
             {
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults @ClimateProgramID", climateProgramIDParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_InsertAnalyticalLayerResults @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -127,7 +127,7 @@ namespace HornScope.Backgroundjob
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateProgramScore @ClimateProgramID", climateProgramIDParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiRecalculateCountryScore @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -138,7 +138,7 @@ namespace HornScope.Backgroundjob
                 await ExecuteWithRetry(
                     async () =>
                     {
-                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @ClimateProgramID", climateProgramIDParam);
+                        await dbContext.Database.ExecuteSqlRawAsync("EXEC sp_AiInsertAnalyticalLayerResults @CountryID", countryIdParam);
                     },
                     onFinalFailure: ex =>
                     {
@@ -179,33 +179,33 @@ namespace HornScope.Backgroundjob
 
         #endregion
 
-        #region AiResearchByClimateProgramID
+        #region AiResearchByCountryId
 
-        private async Task AiResearchByClimateProgramID(Download channel)
+        private async Task AiResearchByCountryId(Download channel)
         {
             try
             {
                 using var scope = _serviceProvider.CreateScope();
                 var aiService = scope.ServiceProvider.GetRequiredService<IAIAnalyzeService>();
-                if(channel.ClimateProgramID > 0)
+                if(channel.CountryID > 0)
                 {
                     if (channel.QuestionEnable)
-                        await aiService.AnalyzeQuestionsOfProgram(channel.ClimateProgramID.Value);
+                        await aiService.AnalyzeQuestionsOfCountry(channel.CountryID.Value);
 
                     if (channel.PillarEnable)
-                        await aiService.AnalyzeProgramPillars(channel.ClimateProgramID.Value);
+                        await aiService.AnalyzeCountryPillars(channel.CountryID.Value);
 
-                    if (channel.ProgramEnable)
-                        await aiService.AnalyzeSingleProgram(channel.ClimateProgramID.Value);
+                    if (channel.CountryEnable)
+                        await aiService.AnalyzeSingleCountry(channel.CountryID.Value);
 
-                    if (!channel.ProgramEnable && channel.ImmediateSummaryEnable)
-                        await aiService.AnalyzeProgramImmediateSituation(channel.ClimateProgramID.Value);
+                    if (!channel.CountryEnable && channel.ImmediateSummaryEnable)
+                        await aiService.AnalyzeCountryImmediateSituation(channel.CountryID.Value);
 
                     if (channel.RegenerateMissingQuestionsEnable && !channel.QuestionEnable)
                     {
-                        var p = new MissingProgramQuestionRequest { ClimateProgramID = channel.ClimateProgramID.Value };
+                        var p = new MissingCountryQuestionRequest { CountryID = channel.CountryID.Value };
 
-                        await aiService.AnalyzeProgramMissingQuestions(p);
+                        await aiService.AnalyzeCountryMissingQuestions(p);
                     }
 
                 }
@@ -216,7 +216,7 @@ namespace HornScope.Backgroundjob
             {
                 using var scope = _serviceProvider.CreateScope();
                 var _appLogger = scope.ServiceProvider.GetRequiredService<IAppLogger>();
-                await _appLogger.LogAsync("AiResearchByClimateProgramID", ex);
+                await _appLogger.LogAsync("AiResearchByCountryId", ex);
             }
         }
         #endregion

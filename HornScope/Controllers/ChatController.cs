@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using HornScope.Dtos.AiDto;
 using HornScope.Dtos.chatDto;
 using HornScope.IServices;
 using HornScope.Models;
+using HornScope.Services;
 using System.Security.Claims;
 
 namespace HornScope.Controllers
@@ -56,8 +59,8 @@ namespace HornScope.Controllers
             return Ok(resp);
         }
 
-        [HttpPost("askAboutProgram")]
-        public async Task<IActionResult> AskAboutProgram([FromBody] ProgramChatRequestDto request)
+        [HttpPost("askAboutCountry")]
+        public async Task<IActionResult> AskAboutCountry([FromBody] CountryChatRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -72,7 +75,7 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.AskAboutProgram(request, userId.GetValueOrDefault(), userRole));
+            return Ok(await _chatService.AskAboutCountry(request, userId.GetValueOrDefault(), userRole));
         }
 
         [HttpPost("askGlobalQuestion")]
@@ -115,8 +118,8 @@ namespace HornScope.Controllers
             return Ok(await _chatService.CrossComparision(request, userId.GetValueOrDefault(), userRole));
         }
 
-        [HttpPost("programSlides")]
-        public async Task<IActionResult> GetProgramSlides([FromBody] int climateProgramID)
+        [HttpPost("countrySlides")]
+        public async Task<IActionResult> GetCountrySlides([FromBody] int countryId)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -131,7 +134,7 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _chatService.GetProgramSlides(climateProgramID, userId.GetValueOrDefault(), userRole));
+            return Ok(await _chatService.GetCountrySlides(countryId, userId.GetValueOrDefault(), userRole));
         }
     }
 }

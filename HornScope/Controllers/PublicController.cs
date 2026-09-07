@@ -16,26 +16,17 @@ namespace HornScope.Controllers
             _publicService = publicService;
         }
 
-        [HttpGet("getAllPrograms")]
-        public async Task<IActionResult> getAllPrograms()
+        [HttpGet("getAllCountries")]
+        public async Task<IActionResult> getAllCountries()
         {
-            var response = await _publicService.GetAllPrograms();
+            var response = await _publicService.getAllCountries();
             return Ok(response);
         }
-
-        [HttpGet("GetPartnerProgramsFilterRecord")]
-        public async Task<IActionResult> GetPartnerProgramsFilterRecord() => Ok(await _publicService.GetPartnerProgramsFilterRecord());
 
         [HttpGet]
         [Route("GetAllPillarAsync")]
         public async Task<IActionResult> GetAllPillarAsync() => Ok(await _publicService.GetAllPillarAsync());
 
-        [HttpGet("GetPartnerPrograms")]
-        public async Task<IActionResult> GetPartnerPrograms([FromQuery] PartnerProgramRequestDto r)
-        {
-            var response = await _publicService.GetPartnerPrograms(r);
-            return Ok(response);
-        }
         [HttpGet("DownloadExecutiveSummeryPdf")]
         public IActionResult DownloadExecutiveSummeryPdf()
         {
@@ -76,17 +67,17 @@ namespace HornScope.Controllers
                 return StatusCode(500, "Internal server error");
             }
         }
-        [HttpGet("programs-WithStaleSupport")]
-        public async Task<IActionResult> GetProgramsAndPrograms_WithStaleSupport()
+        [HttpGet("countries-Countries")]
+        public async Task<IActionResult> GetCountriesCountries()
         {
-            var data = await _publicService.GetProgramsAndPrograms_WithStaleSupport();
+            var data = await _publicService.GetCountriesAndCountries_WithStaleSupport();
             return Ok(data);
         }
 
-        [HttpGet("promoted-Programs")]
-        public async Task<IActionResult> GetPromotedPrograms()
+        [HttpGet("promoted-Countries")]
+        public async Task<IActionResult> GetPromotedCountries()
         {
-            var data = await _publicService.GetPromotedPrograms();
+            var data = await _publicService.GetPromotedCountries();
             return Ok(data);
         }
 
@@ -102,11 +93,10 @@ namespace HornScope.Controllers
             return Ok(await _publicService.GetPillarLiveSignals());
         }
 
-        [HttpGet("getResilienceScorecard")]
-        public async Task<IActionResult> GetResilienceScorecard()
+        [HttpGet("overAllAfricaMarketScore")]
+        public async Task<IActionResult> GetOverAllAfricaMarketScore()
         {
-            var result = await _publicService.GetResilienceScorecard();
-            return Ok(result);
+            return Ok(await _publicService.GetOverAllAfricaMarketScore());
         }
     }
 }

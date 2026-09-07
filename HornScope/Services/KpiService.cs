@@ -1,10 +1,16 @@
 using ClosedXML.Excel;
+using ClosedXML.Graphics;
+
+using DocumentFormat.OpenXml.Spreadsheet;
+
 using Microsoft.EntityFrameworkCore;
+
 using HornScope.Common.Implementation;
 using HornScope.Common.Models;
 using HornScope.Data;
+
 using HornScope.Dtos.CommonDto;
-using HornScope.Dtos.ClientDto;
+using HornScope.Dtos.CountryUserDto;
 using HornScope.Dtos.kpiDto;
 using HornScope.Enums;
 using HornScope.IServices;
@@ -20,35 +26,41 @@ namespace HornScope.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly IAIAnalyzeService _aiAnalyzeService;
+
         public KpiService(ApplicationDbContext context, IAppLogger appLogger, IAIAnalyzeService aiAnalyzeService)
         {
             _context = context;
             _appLogger = appLogger;
             _aiAnalyzeService = aiAnalyzeService;
         }
-        
+
         #region GetAnalyticalLayerResults
-        public async Task<PaginationResponse<GetAnalyticalLayerResultDto>> GetAnalyticalLayerResults(GetAnalyticalLayerRequestDto request, int userId, UserRole role, TieredAccessPlan userPlan = TieredAccessPlan.Pending)
+        public async Task<PaginationResponse<GetAnalyticalLayerResultDto>> 
+            GetAnalyticalLayerResults(GetAnalyticalLayerRequestDto request, int userId, UserRole role, TieredAccessPlan userPlan = TieredAccessPlan.Pending)
         {
             try
             {
-                IQueryable<AnalyticalLayerResult> baseQuery = _context.AnalyticalLayerResults
+                var year = request.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year + 1, 1, 1);
+
+                var baseQuery = _context.AnalyticalLayerResults
                     .AsNoTracking()
                     .Include(ar => ar.AnalyticalLayer)
                         .ThenInclude(al => al.FiveLevelInterpretations)
-                    .Include(ar => ar.Program);
-                    
+                    .Include(ar => ar.Country)
+                    .Where(x => (x.LastUpdated >= startDate && x.LastUpdated < endDate) || (x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate));
 
-                if (role == UserRole.ProgramUser )
+                if (role == UserRole.CountryUser )
                 {
-                    var validPrograms = _context.ClientProgramMappings
+                    var validCountries = _context.PublicUserCountryMappings
                         .Where(x =>
                             x.IsActive &&
                             x.UserID == userId &&
-                            (!request.ClimateProgramID.HasValue || x.ClimateProgramID == request.ClimateProgramID))
-                        .Select(x => x.ClimateProgramID);
+                            (!request.CountryID.HasValue || x.CountryID == request.CountryID))
+                        .Select(x => x.CountryID);
 
-                    var validPillarIds = _context.ClientPillarMappings
+                    var validPillarIds = _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userId)
                         .Select(x => x.PillarID);
 
@@ -61,25 +73,25 @@ namespace HornScope.Services
 
                     baseQuery = baseQuery
                         .Where(ar =>
-                            validPrograms.Contains(ar.ClimateProgramID) &&
+                            validCountries.Contains(ar.CountryID) &&
                             validLayerIds.Contains(ar.LayerID));
                 }
                 else if (role == UserRole.Analyst || role == UserRole.Evaluator)
                 {
-                    var validPrograms = _context.StaffProgramMappings
+                    var validCountries = _context.UserCountryMappings
                         .Where(x =>
                             !x.IsDeleted &&
                             x.UserID == userId &&
-                            (!request.ClimateProgramID.HasValue || x.ClimateProgramID == request.ClimateProgramID))
-                        .Select(x => x.ClimateProgramID);
+                            (!request.CountryID.HasValue || x.CountryID == request.CountryID))
+                        .Select(x => x.CountryID);
                     baseQuery = baseQuery
-                        .Where(ar => validPrograms.Contains(ar.ClimateProgramID)&&
+                        .Where(ar => validCountries.Contains(ar.CountryID)&&
                         (!request.LayerID.HasValue || ar.LayerID == request.LayerID));
                 }
                 else
                 {
                     baseQuery = baseQuery.Where(ar =>
-                        (!request.ClimateProgramID.HasValue || ar.ClimateProgramID == request.ClimateProgramID) &&
+                        (!request.CountryID.HasValue || ar.CountryID == request.CountryID) &&
                         (!request.LayerID.HasValue || ar.LayerID == request.LayerID));
                 }
                 var response = await baseQuery.Select(Projection).ApplyPaginationAsync(request);
@@ -98,7 +110,7 @@ namespace HornScope.Services
         {
             LayerResultID = ar.LayerResultID,
             LayerID = ar.LayerID,
-            ClimateProgramID = ar.ClimateProgramID,
+            CountryID = ar.CountryID,
             InterpretationID = ar.InterpretationID,           
             CalValue5 = ar.CalValue5,
             LastUpdated = ar.LastUpdated,
@@ -110,7 +122,7 @@ namespace HornScope.Services
             Purpose = ar.AnalyticalLayer.Purpose,            
             CalText5 = ar.AnalyticalLayer.CalText5,
             FiveLevelInterpretations = ar.AnalyticalLayer.FiveLevelInterpretations.OrderByDescending(f => f.MaxRange).ToList(),
-            Program = ar.Program
+            Country = ar.Country
         };
 
         #endregion
@@ -121,13 +133,13 @@ namespace HornScope.Services
                 IQueryable<AnalyticalLayer> query = _context.AnalyticalLayers
                     .Where(x => !x.IsDeleted);
 
-                if (role == UserRole.ProgramUser)
+                if (role == UserRole.CountryUser)
                 {
                     query =
                         from layer in _context.AnalyticalLayers
                         join map in _context.AnalyticalLayerPillarMappings
                             on layer.LayerID equals map.LayerID
-                        join userMap in _context.ClientPillarMappings
+                        join userMap in _context.CountryUserPillarMappings
                             on map.PillarID equals userMap.PillarID
                         where !layer.IsDeleted
                               && userMap.IsActive
@@ -148,53 +160,15 @@ namespace HornScope.Services
                 return ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "An error occurred" });
             }
         }
-
-        public async Task<ResultResponseDto<List<AnalyticalLayer>>> GetAllKpiPillarMapping(int userId, UserRole role)
+        public async Task<ResultResponseDto<CompareCountryResponseDto>> CompareCountries(CompareCountryRequestDto c, int userId, UserRole role, bool applyPagination = true)
         {
             try
             {
-                // Get LayerIDs that exist in AnalyticalLayerPillarMappings
-                var layerIdsWithMappings = await _context.AnalyticalLayerPillarMappings
-                    .Select(m => m.LayerID)
-                    .Distinct()
-                    .ToListAsync();
+                var year = c.UpdatedAt.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year + 1, 1, 1);
 
-                IQueryable<AnalyticalLayer> query = _context.AnalyticalLayers
-                    .Where(x => !x.IsDeleted && layerIdsWithMappings.Contains(x.LayerID));
 
-                if (role == UserRole.ProgramUser)
-                {
-                    query =
-                        from layer in _context.AnalyticalLayers
-                        join map in _context.AnalyticalLayerPillarMappings
-                            on layer.LayerID equals map.LayerID
-                        join userMap in _context.ClientPillarMappings
-                            on map.PillarID equals userMap.PillarID
-                        where !layer.IsDeleted
-                              && userMap.IsActive
-                              && userMap.UserID == userId
-                              && layerIdsWithMappings.Contains(layer.LayerID)
-                        select layer;
-                }
-
-                var result = await query
-                    .AsNoTracking()
-                    .Distinct()
-                    .ToListAsync();
-
-                return ResultResponseDto<List<AnalyticalLayer>>.Success(result);
-            }
-            catch (Exception ex)
-            {
-                await _appLogger.LogAsync("Error occurred in GetAllKpiWithMappingStatus", ex);
-                return ResultResponseDto<List<AnalyticalLayer>>.Failure(new List<string> { "An error occurred while fetching KPIs with mapping status" });
-            }
-        }
-
-        public async Task<ResultResponseDto<CompareProgramResponseDto>> ComparePrograms(CompareProgramsRequestDto c, int userId, UserRole role, bool applyPagination = true)
-        {
-            try
-            {
                 var validKpiIds = new List<int>();
 
                 if (c.Kpis.Count == 0)
@@ -219,46 +193,47 @@ namespace HornScope.Services
                     validKpiIds = c.Kpis;
                 }
 
-                Expression<Func<ClimateProgram, bool>> expression = role switch
+                Expression<Func<Country, bool>> expression = role switch
                 {
-                    UserRole.Admin => x => !x.IsDeleted && c.Programs.Contains(x.ClimateProgramID),
-                    UserRole.Analyst => x => !x.IsDeleted && c.Programs.Contains(x.ClimateProgramID),
-                    UserRole.Evaluator => x => !x.IsDeleted && c.Programs.Contains(x.ClimateProgramID),
+                    UserRole.Admin => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
+                    UserRole.Analyst => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
+                    UserRole.Evaluator => x => !x.IsDeleted && c.Countries.Contains(x.CountryID),
                     _ => x => false
                 };
 
-                // Step 2: Get all selected programs (even if no analytical data)
-                var selectedPrograms = await _context.ClimatePrograms
+                // Step 2: Get all selected countries (even if no analytical data)
+                var selectedCountries = await _context.Countries
                     .Where(expression)
                     .Distinct()
                     .ToListAsync();
 
-                var selectedClimateProgramIDs = selectedPrograms.Select(x => x.ClimateProgramID).ToList();
+                var selectedCountryIds = selectedCountries.Select(x => x.CountryID).ToList();
 
                 if(role == UserRole.Analyst || role == UserRole.Evaluator)
                 {
-                    var validMappedClimateProgramIDs = await _context.StaffProgramMappings
+                    var validMappedCountryIds = await _context.UserCountryMappings
                        .Where(x => x.UserID == userId && !x.IsDeleted)
-                       .Select(x => x.ClimateProgramID)
+                       .Select(x => x.CountryID)
                        .ToListAsync();
 
-                    // ? Check if all selected programs are valid
-                    bool allValid = selectedClimateProgramIDs.All(id => validMappedClimateProgramIDs.Contains(id));
+                    // ? Check if all selected countries are valid
+                    bool allValid = selectedCountryIds.All(id => validMappedCountryIds.Contains(id));
 
                     if (!allValid)
                     {
-                        return ResultResponseDto<CompareProgramResponseDto>.Failure(new List<string> { "No valid programs found." });
+                        return ResultResponseDto<CompareCountryResponseDto>.Failure(new List<string> { "No valid countries found." });
                     }
                 }
 
-                // Step 3: Fetch analytical layer results for selected programs
+                // Step 3: Fetch analytical layer results for selected countries
                 var analyticalResults = await _context.AnalyticalLayerResults
                     .Include(ar => ar.AnalyticalLayer)
-                    .Where(x => selectedClimateProgramIDs.Contains(x.ClimateProgramID) 
+                    .Where(x => selectedCountryIds.Contains(x.CountryID) 
+                    && ((x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate || x.LastUpdated >= startDate && x.LastUpdated < endDate))
                     && validKpiIds.Contains(x.LayerID))
                     .Select(ar => new
                     {
-                        ar.ClimateProgramID,
+                        ar.CountryID,
                         ar.LayerID,
                         ar.AnalyticalLayer.LayerCode,
                         ar.AnalyticalLayer.LayerName,
@@ -276,28 +251,28 @@ namespace HornScope.Services
                     .ToList();
 
                 // Step 5: Prepare response DTO
-                var response = new CompareProgramResponseDto
+                var response = new CompareCountryResponseDto
                 {
                     Categories = new List<string>(),
                     Series = new List<ChartSeriesDto>(),
                     TableData = new List<ChartTableRowDto>()
                 };
 
-                // Initialize chart series for each Program
-                foreach (var program in selectedPrograms)
+                // Initialize chart series for each Country
+                foreach (var Country in selectedCountries)
                 {
                     response.Series.Add(new ChartSeriesDto
                     {
-                        Name = program.ProgramName,
+                        Name = Country.CountryName,
                         Data = new List<decimal>(),
                         AiData = new List<decimal>()
                     });
                 }
 
-                // Add Peer Program Score series
+                // Add Peer Country Score series
                 var peerSeries = new ChartSeriesDto
                 {
-                    Name = "Peer Program Score",
+                    Name = "Peer Country Score",
                     Data = new List<decimal>(),
                     AiData = new List<decimal>()
                 };
@@ -307,29 +282,29 @@ namespace HornScope.Services
                 {
                     response.Categories.Add(layer.LayerCode);
 
-                    // Map KPI values for each Program (0 if missing)
+                    // Map KPI values for each Country (0 if missing)
                     var values = new Dictionary<int, List<decimal>>();
 
-                    foreach (var program in selectedPrograms)
+                    foreach (var Country in selectedCountries)
                     {
                         var value = analyticalResults
-                            .FirstOrDefault(r => r.ClimateProgramID == program.ClimateProgramID && r.LayerID == layer.LayerID);
+                            .FirstOrDefault(r => r.CountryID == Country.CountryID && r.LayerID == layer.LayerID);
 
                         var evaluatedValue = Math.Round(value?.CalValue5 ?? 0, 2);
                         var aiValue = Math.Round(value?.AiCalValue5 ?? 0, 2);
-                        values[program.ClimateProgramID] = new List<decimal> { evaluatedValue, aiValue };
+                        values[Country.CountryID] = new List<decimal> { evaluatedValue, aiValue };
 
                         // Add to series
-                        var programSeries = response.Series.First(s => s.Name == program.ProgramName);
-                        programSeries.Data.Add(evaluatedValue);
+                        var CountrySeries = response.Series.First(s => s.Name == Country.CountryName);
+                        CountrySeries.Data.Add(evaluatedValue);
 
-                        programSeries.AiData.Add(aiValue);
+                        CountrySeries.AiData.Add(aiValue);
                     }
-                    // ? Calculate Peer Program Score (average of all programs for this layer)
-                    var peerProgramScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.First()).Average(), 2) : 0;
-                    peerSeries.Data.Add(peerProgramScore);
-                    var aiPeerProgramScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.Last()).Average(), 2) : 0;
-                    peerSeries.AiData.Add(aiPeerProgramScore);
+                    // ? Calculate Peer Country Score (average of all countries for this layer)
+                    var peerCountryScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.First()).Average(), 2) : 0;
+                    peerSeries.Data.Add(peerCountryScore);
+                    var aiPeerCountryScore = values.Values.Any() ? Math.Round(values.Values.Select(x => x.Last()).Average(), 2) : 0;
+                    peerSeries.AiData.Add(aiPeerCountryScore);
 
                     // Add table data
                     response.TableData.Add(new ChartTableRowDto
@@ -338,26 +313,26 @@ namespace HornScope.Services
                         LayerCode = layer.LayerCode,
                         LayerName = layer.LayerName,
                         Purpose = layer.Purpose,
-                        ProgramValues = selectedPrograms.Select(p => new ProgramValueDto
+                        CountryValues = selectedCountries.Select(c => new CountryValueDto
                         {
-                            ClimateProgramID = p.ClimateProgramID,
-                            ProgramName = p.ProgramName,
-                            Value = values[p.ClimateProgramID].First(),
-                            AiValue = values[p.ClimateProgramID].Last()
+                            CountryID = c.CountryID,
+                            CountryName = c.CountryName,
+                            Value = values[c.CountryID].First(),
+                            AiValue = values[c.CountryID].Last()
                         }).ToList(),
-                        PeerProgramScore = peerProgramScore // You can rename property if needed
+                        PeerCountryScore = peerCountryScore // You can rename property if needed
                     });
                 }
 
-                // Append Peer Program Score series
+                // Append Peer Country Score series
                 response.Series.Add(peerSeries);
 
-                return ResultResponseDto<CompareProgramResponseDto>.Success(response);
+                return ResultResponseDto<CompareCountryResponseDto>.Success(response);
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in ComparePrograms", ex);
-                return ResultResponseDto<CompareProgramResponseDto>.Failure(new List<string> { "An error occurred while comparing programs." });
+                await _appLogger.LogAsync("Error occurred in CompareCountries", ex);
+                return ResultResponseDto<CompareCountryResponseDto>.Failure(new List<string> { "An error occurred while comparing countries." });
             }
         }
 
@@ -369,22 +344,26 @@ namespace HornScope.Services
         {
             try
             {
-                if (role == UserRole.ProgramUser)
+                var year = request.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = startDate.AddYears(1);
+
+                if (role == UserRole.CountryUser)
                 {
-                    var validClimateProgramIDs = await _context.ClientProgramMappings
+                    var validCountryIds = await _context.PublicUserCountryMappings
                         .Where(x =>
                             x.IsActive &&
                             x.UserID == userId)
-                        .Select(x => x.ClimateProgramID)
+                        .Select(x => x.CountryID)
                         .ToListAsync();
 
-                    bool hasInvalidProgram = request.ClimateProgramIDs
-						.Any(ClimateProgramID => !validClimateProgramIDs.Contains(ClimateProgramID));
+                    bool hasInvalidCountry = request.CountryIDs
+						.Any(CountryId => !validCountryIds.Contains(CountryId));
 
-                    if (hasInvalidProgram)
+                    if (hasInvalidCountry)
                     {
                         return ResultResponseDto<GetMutiplekpiLayerResultsDto>
-                            .Failure(new List<string> { "You are not authorized to access one or more selected programs." });
+                            .Failure(new List<string> { "You are not authorized to access one or more selected countries." });
                     }
                 }
 
@@ -392,8 +371,12 @@ namespace HornScope.Services
                 var query = _context.AnalyticalLayerResults
                     .AsNoTracking()
                     .Where(x =>
-                        request.ClimateProgramIDs.Contains(x.ClimateProgramID) &&
-                        x.LayerID == request.LayerID);
+                        request.CountryIDs.Contains(x.CountryID) &&
+                        x.LayerID == request.LayerID &&
+                        (
+                            (x.LastUpdated >= startDate && x.LastUpdated < endDate) ||
+                            (x.AiLastUpdated >= startDate && x.AiLastUpdated < endDate)
+                        ));
 
                 var response = await query
                     .GroupBy(x => x.LayerID)
@@ -408,16 +391,16 @@ namespace HornScope.Services
 
                         FiveLevelInterpretations = g.First().AnalyticalLayer.FiveLevelInterpretations,
 
-                        Programs = g.Select(x => new MutipleProgramskpiLayerResults
+                        Countries = g.Select(x => new MutipleCountrieskpiLayerResults
                         {
-                            ClimateProgramID = x.ClimateProgramID,
+                            CountryID = x.CountryID,
                             InterpretationID = x.InterpretationID,                        
                             CalValue5 = x.CalValue5,
                             LastUpdated = x.LastUpdated,
                             AiInterpretationID = x.AiInterpretationID,                         
                             AiCalValue5 = x.AiCalValue5,
                             AiLastUpdated = x.AiLastUpdated,
-                            Program = x.Program
+                            Country = x.Country
                         }).ToList()
                     })
                     .FirstOrDefaultAsync();
@@ -434,33 +417,36 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<Tuple<string, byte[]>> ExportComparePrograms(CompareProgramsRequestDto c, int userId, UserRole role)
+
+
+        public async Task<Tuple<string, byte[]>> ExportCompareCountries(CompareCountryRequestDto c, int userId, UserRole role)
         {
             try
             {
-                var result = await ComparePrograms(c, userId, role, false);
+                var result = await CompareCountries(c, userId, role, false);
                 var data = result.Result;
 
                 if (data == null || data.TableData == null || !data.TableData.Any())
                 {
-                    return new Tuple<string, byte[]>("Program_Comparison.xlsx", Array.Empty<byte>());
+                    return new Tuple<string, byte[]>("Country_Comparison.xlsx", Array.Empty<byte>());
                 }
 
                 using (var workbook = new XLWorkbook())
                 {
-                    var ws = workbook.Worksheets.Add("Program Comparison");
+                    var ws = workbook.Worksheets.Add("Country Comparison");
 
                     // =========================
                     // ?? DYNAMIC HEADER SETUP
                     // =========================
-                    var programs = data.TableData.First().ProgramValues;
-                    int totalCols = 2 + (programs.Count * 2);
+                    var countries = data.TableData.First().CountryValues;
+                    int totalCols = 2 + (countries.Count * 2);
 
                     // =========================
                     // ?? REPORT HEADER (TOP)
                     // =========================
                     ws.Range(1, 1, 1, totalCols).Merge().Value = "Key Performance Integrated Report";
-                    ws.Range(2, 1, 2, totalCols).Merge().Value = $"Generated On: {DateTime.Now:dd-MMM-yyyy HH:mm}";
+                    ws.Range(2, 1, 2, totalCols).Merge().Value = $"Report Year: {DateTime.Now.Year}";
+                    ws.Range(3, 1, 3, totalCols).Merge().Value = $"Generated On: {DateTime.Now:dd-MMM-yyyy HH:mm}";
 
                     var titleRange = ws.Range(1, 1, 3, totalCols);
                     titleRange.Style.Fill.BackgroundColor = XLColor.FromHtml("#2F7D6D");
@@ -487,13 +473,13 @@ namespace HornScope.Services
                     ws.Range(row, col, row + 1, col).Merge().Value = "Purpose";
                     col++;
 
-                    // Dynamic Programs
-                    foreach (var program in programs)
+                    // Dynamic Cities
+                    foreach (var country in countries)
                     {
                         int startCol = col;
 
-                        // Program Name (merged)
-                        ws.Range(row, startCol, row, startCol + 1).Merge().Value = program.ProgramName;
+                        // Country Name (merged)
+                        ws.Range(row, startCol, row, startCol + 1).Merge().Value = country.CountryName;
 
                         // Sub headers
                         ws.Cell(row + 1, startCol).Value = "Eval";
@@ -533,10 +519,10 @@ namespace HornScope.Services
                             comment.Visible = false;
                         }
 
-                        foreach (var program in kpi.ProgramValues)
+                        foreach (var Country in kpi.CountryValues)
                         {
-                            ws.Cell(row, col++).Value = program.Value;
-                            ws.Cell(row, col++).Value = program.AiValue;
+                            ws.Cell(row, col++).Value = Country.Value;
+                            ws.Cell(row, col++).Value = Country.AiValue;
                         }
 
                         row++;
@@ -624,13 +610,13 @@ namespace HornScope.Services
                     using (var stream = new MemoryStream())
                     {
                         workbook.SaveAs(stream);
-                        return new Tuple<string, byte[]>("Program_Comparison.xlsx", stream.ToArray());
+                        return new Tuple<string, byte[]>("Country_Comparison.xlsx", stream.ToArray());
                     }
                 }
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in ExportComparePrograms", ex);
+                await _appLogger.LogAsync("Error in ExportCompareCountries", ex);
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
         }
@@ -657,7 +643,7 @@ namespace HornScope.Services
                     .AsNoTracking()
                     .Include(ar => ar.AnalyticalLayer)
                         .ThenInclude(al => al.FiveLevelInterpretations)
-                    .Include(ar => ar.Program)
+                    .Include(ar => ar.Country)
                     .FirstOrDefaultAsync(ar => ar.LayerResultID == request.LayerResultID);
 
                 if (layerResult?.AnalyticalLayer == null)
@@ -696,7 +682,7 @@ namespace HornScope.Services
                 }
 
                 // Role-based score filtering:
-                // Admin/Analyst → manual + AI; ProgramUser → AI only; Evaluator blocked above.
+                // Admin/Analyst → manual + AI; CountryUser → AI only; Evaluator blocked above.
                 decimal? manualScore = null;
                 string? manualCondition = null;
                 if (role == UserRole.Admin || role == UserRole.Analyst)
@@ -716,7 +702,7 @@ namespace HornScope.Services
 
                 var aiRequest = new KpiSummaryAiRequest
                 {
-                    ProgramName = layerResult.Program?.ProgramName,
+                    CountryName = layerResult.Country?.CountryName,
                     LayerName = layerResult.AnalyticalLayer.LayerName ?? string.Empty,
                     LayerCode = layerResult.AnalyticalLayer.LayerCode ?? string.Empty,
                     Purpose = StripHtml(layerResult.AnalyticalLayer.Purpose ?? string.Empty),
@@ -772,17 +758,17 @@ namespace HornScope.Services
             if (role == UserRole.Admin)
                 return null;
 
-            if (role == UserRole.ProgramUser)
+            if (role == UserRole.CountryUser)
             {
-                var hasProgram = await _context.ClientProgramMappings
-                    .AnyAsync(x => x.IsActive && x.UserID == userId && x.ClimateProgramID == layerResult.ClimateProgramID);
+                var hasCountry = await _context.PublicUserCountryMappings
+                    .AnyAsync(x => x.IsActive && x.UserID == userId && x.CountryID == layerResult.CountryID);
 
-                if (!hasProgram)
-                    return "You don't have access to this program data.";
+                if (!hasCountry)
+                    return "You don't have access to this country data.";
 
                 var hasLayer = await (
                     from map in _context.AnalyticalLayerPillarMappings
-                    join userMap in _context.ClientPillarMappings
+                    join userMap in _context.CountryUserPillarMappings
                         on map.PillarID equals userMap.PillarID
                     where map.LayerID == layerResult.LayerID
                           && userMap.IsActive
@@ -798,11 +784,11 @@ namespace HornScope.Services
 
             if (role == UserRole.Analyst)
             {
-                var hasProgram = await _context.StaffProgramMappings
-                    .AnyAsync(x => !x.IsDeleted && x.UserID == userId && x.ClimateProgramID == layerResult.ClimateProgramID);
+                var hasCountry = await _context.UserCountryMappings
+                    .AnyAsync(x => !x.IsDeleted && x.UserID == userId && x.CountryID == layerResult.CountryID);
 
-                if (!hasProgram)
-                    return "You don't have access to this program data.";
+                if (!hasCountry)
+                    return "You don't have access to this country data.";
 
                 return null;
             }
@@ -818,20 +804,19 @@ namespace HornScope.Services
             return Regex.Replace(input, "<.*?>", string.Empty).Trim();
         }
 
-       public async Task<ResultResponseDto<List<AnalyticalLayerPillarMappingDTO>>> GetKPIDetailsByLayerID(int layerID)
-       {
+        public async Task<ResultResponseDto<List<AnalyticalLayerPillarMappingDTO>>> GetKPIDetailsByLayerID(int layerID)
+        {
             try
             {
                 var layer = await _context.AnalyticalLayers.AsNoTracking().FirstOrDefaultAsync(x => !x.IsDeleted && x.LayerID == layerID);
-                
+
                 if (layer == null)
                 {
                     return ResultResponseDto<List<AnalyticalLayerPillarMappingDTO>>.Failure(new List<string> { "Layer not found" });
                 }
-                
-                // Base mapping query, always scoped to this LayerID
+
                 IQueryable<AnalyticalLayerPillarMapping> mappingQuery = _context.AnalyticalLayerPillarMappings.AsNoTracking().Where(m => m.LayerID == layerID);
-                
+
                 var result = await mappingQuery
                     .Join(_context.Pillars, mapping => mapping.PillarID, pillar => pillar.PillarID,
                     (mapping, pillar) => new AnalyticalLayerPillarMappingDTO
@@ -843,7 +828,7 @@ namespace HornScope.Services
                         CategoryNumber = mapping.CategoryNumber,
                         PillarName = pillar.PillarName
                     }).ToListAsync();
-                
+
                 return ResultResponseDto<List<AnalyticalLayerPillarMappingDTO>>.Success(result);
             }
             catch (Exception ex)

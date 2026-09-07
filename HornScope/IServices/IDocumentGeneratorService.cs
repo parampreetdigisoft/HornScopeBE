@@ -22,25 +22,25 @@ namespace HornScope.IServices
     /// </summary>
     public interface IDocumentGeneratorService
     {
-        /// <summary>Full program report: dashboard, summary, pillars, peer comparison, trends, KPI dashboard.</summary>
-        Task<byte[]> GenerateProgramDetails(
-            AiProgramSummeryDto programDetails,
-            List<AiProgramPillarResponse> pillars,
+        /// <summary>Full country report: dashboard, summary, pillars, peer comparison, trends, KPI dashboard.</summary>
+        Task<byte[]> GenerateCountryDetails(
+            AiCountrySummeryDto country,
+            List<AiCountryPillarResponse> pillars,
             List<KpiChartItem> kpis,
-            List<PeerProgramHistoryReportDto> peerPrograms,
+            List<PeerCountryHistoryReportDto> peerCountry,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);
 
         /// <summary>Single pillar detail report.</summary>
         Task<byte[]> GeneratePillarDetails(
-            AiProgramPillarResponse pillarData,
+            AiCountryPillarResponse pillarData,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);
 
-        /// <summary>Combined report covering every program in the list.</summary>
-        Task<byte[]> GenerateAllProgramsDetails(
-            List<AiProgramSummeryDto> programs,
-            Dictionary<int, List<AiProgramPillarResponse>> pillarsDict,
+        /// <summary>Combined report covering every country in the list.</summary>
+        Task<byte[]> GenerateAllCountriesDetails(
+            List<AiCountrySummeryDto> countries,
+            Dictionary<int, List<AiCountryPillarResponse>> pillarsDict,
             List<KpiChartItem> kpis,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);

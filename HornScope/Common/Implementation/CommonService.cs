@@ -1,15 +1,17 @@
 using HornScope.Common.Interface;
+using HornScope.Common.Models;
 using HornScope.Common.Models.settings;
 using HornScope.Common.Models.views;
 using HornScope.Data;
 using HornScope.Dtos.AssessmentDto;
-using HornScope.Dtos.ProgramDto;
+using HornScope.Dtos.CountryDto;
+using HornScope.Dtos.PillarDto;
 using HornScope.IServices;
+using HornScope.Models;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
-using HornScope.Dtos.PillarDto;
 
 namespace HornScope.Common.Implementation
 {
@@ -22,66 +24,72 @@ namespace HornScope.Common.Implementation
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly IWebHostEnvironment _env;
-        private readonly AppSettings _appSettings;
         public CommonService(
             ApplicationDbContext context,
             IAppLogger appLogger,
             IWebHostEnvironment env,
-            IOptions<AppSettings> appSettings,
             IMemoryCache memoryCache)
         {
             _context = context;
             _appLogger = appLogger;
             _env = env;
-            _appSettings = appSettings.Value;
             _memoryCache = memoryCache;
         }
 
         #endregion
-        public static string ProgramScoreSummery(decimal? progress, string? programName = "The program", int pillarCount = 21, int kpiCount = 65)
+
+        public static string CountryScoreSummery(decimal? progress,string? countryName = "The country", int pillarCount = 23, int kpiCount = 37)
         {
-            var evidenceSummaryStaringLine = $"{programName ?? "The program"} records an overall VCP score of {progress ?? 0}, reflecting performance across {pillarCount} pillars and {kpiCount} KPIs.";
+            var evidenceSummaryStaringLine = $"{countryName ?? "The country"} records an overall AMI score of {progress ?? 0}, reflecting performance across {pillarCount} domains and {kpiCount} KPIs.";
 
             return evidenceSummaryStaringLine;
         }
+
         public static string InitailLineOfExecutiveSummery(
             string evidenceSummary,
+            string? immediateSituationSummary,
             decimal? progress,
-            string? programName = "The program", int pillarCount = 23, int kpiCount = 37)
+            string? countryName = "The country", int pillarCount = 23, int kpiCount = 37)
         {
-            var initialSummery = ProgramScoreSummery(progress, programName, pillarCount, kpiCount); 
-            return initialSummery + " " + evidenceSummary;
+            immediateSituationSummary = immediateSituationSummary ?? "";
+
+            var evidenceSummaryStaringLine= $"{countryName ?? "The country"} records an overall AMI score of {progress ?? 0}, reflecting performance across {pillarCount} domains and {kpiCount} KPIs.";
+
+            return immediateSituationSummary + "\n\n " + evidenceSummaryStaringLine + " " + evidenceSummary;
         }
 
-        public async Task<List<EvaluationProgramProgressResultDto>> GetProgramProgressAsync(int userId, int role, int climateProgramID = 0)
+
+        public async Task<List<EvaluationCountryProgressResultDto>> GetCountriesProgressAsync(int userId, int role, int year, int countryID = 0)
         {
             try
             {
-                return await _context.ProgramProgressResults
+                return await _context.CountryProgressResults
                  .FromSqlRaw(
-                     "EXEC usp_getProgramsProgressByUserId @userID, @role, @climateProgramID",
+                     "EXEC usp_getCountriesProgressByUserId @userID, @role, @year, @countryID",
                      new SqlParameter("@userID", userId),
                      new SqlParameter("@role", role),
-                     new SqlParameter("@climateProgramID", climateProgramID)
+                     new SqlParameter("@year", year),
+                     new SqlParameter("@countryID", countryID)
                  )
                  .AsNoTracking()
                  .ToListAsync();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in Executing usp_getProgramsProgressByUserId", ex);
-                return new List<EvaluationProgramProgressResultDto>();
+                await _appLogger.LogAsync("Error in Executing usp_getCountriesProgressByUserId", ex);
+                return new List<EvaluationCountryProgressResultDto>();
             }
         }
 
-        public async Task<List<GetAssessmentResponseDto>> GetUserDetailsAssignedToProgram(int climateProgramID = 0)
+        public async Task<List<GetAssessmentResponseDto>> GetUserDetailsAssignedToCountry(int year, int countryID = 0)
         {
             try
             {
                 return await _context.GetAssessmentResponseDto
                  .FromSqlRaw(
-                     "EXEC usp_GetUsersAssignedToProgram  @climateProgramID",
-                     new SqlParameter("@climateProgramID", climateProgramID)
+                     "EXEC usp_GetUsersAssignedToCountry  @year, @countryID",
+                     new SqlParameter("@year", year),
+                     new SqlParameter("@countryID", countryID)
                  )
                  .AsNoTracking()
                  .ToListAsync();
@@ -93,66 +101,69 @@ namespace HornScope.Common.Implementation
             }
         }
 
-        public async Task<List<ProgramRankingResultDto>> GetProgramRankings(int climateProgramID = 0)
+        public async Task<List<CountryRankingResultDto>> GetCountriesRankings(int countryId, int year)
         {
             try
             {
-                return await _context.ProgramRankingResults
+                return await _context.CountryRankingResults
                  .FromSqlRaw(
-                     "EXEC usp_getProgramRanking @climateProgramID",
-                     new SqlParameter("@climateProgramID", climateProgramID)
+                     "EXEC usp_getCountryRanking @countryId, @year",
+                     new SqlParameter("@countryId", countryId),
+                     new SqlParameter("@year", year)
                  )
                  .AsNoTracking()
                  .ToListAsync();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in Executing usp_getProgramRanking", ex);
-                return new List<ProgramRankingResultDto>();
+                await _appLogger.LogAsync("Error in Executing usp_getCountryRanking", ex);
+                return new List<CountryRankingResultDto>();
             }
         }
 
-        public async Task<List<EvaluationProgramProgressHistoryResultDto>> GetProgramProgressHistoryAsync(int userId, int role)
+        public async Task<List<EvaluationCountryProgressHistoryResultDto>> GetCountriesProgressHistoryAsync(int userId, int role, int fromYear, int toYear)
         {
             try
             {
-                return await _context.ProgramProgressHistoryResults
+                return await _context.CountryProgressHistoryResults
                  .FromSqlRaw(
-                     "EXEC usp_getProgramProgressByUserIdHistory @userID, @role",
+                     "EXEC usp_getCountriesProgressByUserIdHistory @userID, @role, @fromYear, @toYear",
                      new SqlParameter("@userID", userId),
-                     new SqlParameter("@role", role)
+                     new SqlParameter("@role", role),
+                     new SqlParameter("@fromYear", fromYear),
+                     new SqlParameter("@toYear", toYear)
                  )
                  .AsNoTracking()
                  .ToListAsync();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in Executing usp_getProgramProgressByUserIdHistory", ex);
-                return new List<EvaluationProgramProgressHistoryResultDto>();
+                await _appLogger.LogAsync("Error in Executing usp_getCountriesProgressByUserIdHistory", ex);
+                return new List<EvaluationCountryProgressHistoryResultDto>();
             }
         }
-
-        public async Task<List<GetProgramsProgressAdminDto>> GetProgramProgressForAdmin(int userId, int role)
+        public async Task<List<GetCountriesProgressAdminDto>> GetCountriesProgressForAdmin(int userId, int role, int year)
         {
             try
             {
-                return await _context.GetProgramsProgressAdminDto
-                 .FromSqlRaw("EXEC usp_getProgramProgress_Admin")
+                return await _context.GetCountriesProgressAdminDto
+                 .FromSqlRaw("EXEC usp_getCountriesProgress_Admin @year",new SqlParameter("@year", year))
                  .AsNoTracking()
                  .ToListAsync();
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error in Executing usp_getProgramsProgress_Admin", ex);
-                return new List<GetProgramsProgressAdminDto>();
+                await _appLogger.LogAsync("Error in Executing usp_getCountriesProgress_Admin", ex);
+                return new List<GetCountriesProgressAdminDto>();
             }
         }
 
-        public async Task<List<GetPillarDTO>> GetPillars()
+
+        public async Task<List<GetPillarDto>> GetPillars()
         {
             try
             {
-                if (_memoryCache.TryGetValue(PILLAR_CACHE_KEY, out List<GetPillarDTO> pillars))
+                if (_memoryCache.TryGetValue(PILLAR_CACHE_KEY, out List<GetPillarDto> pillars))
                 {
                     return pillars;
                 }
@@ -160,7 +171,7 @@ namespace HornScope.Common.Implementation
                 pillars = await _context.Pillars
                     .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(x=>x.DisplayOrder)
-                    .Select(x => new GetPillarDTO
+                    .Select(x=> new GetPillarDto
                     {
                         PillarID = x.PillarID,
                         PillarName = x.PillarName,
@@ -171,11 +182,12 @@ namespace HornScope.Common.Implementation
                         Reliability = x.Reliability,
                         PillarCode = x.PillarCode,
                         IsActive = x.IsActive,
-                        QuestionCount = x.Questions.Where(x => !x.IsDeleted).Count()
+                        QuestionCount = x.Questions.Where(x=>!x.IsDeleted).Count()
                     })
                     .ToListAsync();
 
-                var cacheOptions = new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromHours(1));
+                var cacheOptions = new MemoryCacheEntryOptions()
+                    .SetAbsoluteExpiration(TimeSpan.FromHours(1));
 
                 _memoryCache.Set(PILLAR_CACHE_KEY, pillars, cacheOptions);
 
@@ -184,7 +196,7 @@ namespace HornScope.Common.Implementation
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error in GetPillars", ex);
-                return new List<GetPillarDTO>();
+                return new List<GetPillarDto>();
             }
         }
         public void ClearPillarCache()
@@ -192,17 +204,17 @@ namespace HornScope.Common.Implementation
             _memoryCache.Remove(PILLAR_CACHE_KEY);
         }
 
-        public async Task<List<GetDashboardModeResult>> GetDashboardModeResults(int userId, int role, int dashboardModeID, int climateProgramID = 0)
+        public async Task<List<GetDashboardModeResult>> GetDashboardModeResults(int userId, int role, int dashboardModeID, int countryID = 0)
         {
             try
             {
                 var result = await _context.GetDashboardModeResults
                  .FromSqlRaw(
-                     "EXEC usp_getDashboardModeResult @userID, @role, @dashboardModeID, @climateProgramID",
+                     "EXEC usp_getDashboardModeResult @userID, @role, @DashboardModeID, @countryID",
                      new SqlParameter("@userID", userId),
                      new SqlParameter("@role", role),
-                     new SqlParameter("@dashboardModeID", dashboardModeID),
-                     new SqlParameter("@climateProgramID", climateProgramID)
+                     new SqlParameter("@DashboardModeID", dashboardModeID),
+                     new SqlParameter("@countryID", countryID)
                  )
                  .AsNoTracking()
                  .ToListAsync();
@@ -213,6 +225,50 @@ namespace HornScope.Common.Implementation
             {
                 await _appLogger.LogAsync("Error in Executing usp_getDashboardModeResult", ex);
                 return new List<GetDashboardModeResult>();
+            }
+        }
+
+        public async Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds,int userID, int year)
+        {
+            try
+            {
+                var date = DateTime.UtcNow;
+                year = year == 0 ? date.Year : year;
+                var permissionList = await _context.AIEditPermissions.Where(x => countryIds.Contains(x.CountryID) && x.Year == year).ToListAsync();
+                if (permissionList == null || permissionList.Count==0)
+                    return ResultResponseDto<bool>.Failure(new[] { "Permission not found." });
+
+                foreach(var permission in permissionList)
+                {
+                    permission.Status = permission.Status == AIEditPermissionStatus.PendingRequest
+                    ? AIEditPermissionStatus.Rejected
+                    : AIEditPermissionStatus.Revoked;
+                    permission.GrantedBy = userID;
+                    permission.GrantedAt = date;
+                    
+                }
+
+                var sessionIds = permissionList.Where(x => x.ActiveSessionID.HasValue).Select(x => x.ActiveSessionID);
+                var sessionList = await _context.AIEditSessions.Where(x => sessionIds.Contains(x.SessionID)).ToListAsync();
+
+                foreach (var session in sessionList)
+                {
+                    if (session != null && session.Status == AIEditSessionStatus.Draft)
+                    {
+                        session.Status = AIEditSessionStatus.Cancelled;
+                        session.ReviewedBy = userID;
+                        session.ReviewedAt = date;
+                        session.ReviewComment = "Permission revoked by admin.";
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                return ResultResponseDto<bool>.Success(true, new[] { "Permission revoked." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in RevokePermission", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Failed to revoke permission." });
             }
         }
     }

@@ -1,5 +1,3 @@
-using System.ComponentModel;
-
 namespace HornScope.Enums
 {
     public enum TieredAccessPlan : byte  // maps well to SQL tinyint

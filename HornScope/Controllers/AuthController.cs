@@ -1,10 +1,11 @@
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using HornScope.Dtos.ProgramDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Dtos.EmailExistDto;
 using HornScope.Dtos.UserDtos;
 using HornScope.IServices;
+using HornScope.Services;
 
 namespace HornScope.Controllers
 {
@@ -57,10 +58,10 @@ namespace HornScope.Controllers
             return Ok(response);
         }
 
-        [HttpPost("ClientSignUp")]
-        public async Task<IActionResult> ClientSignUp([FromBody] ClientSignUpDto request)
+        [HttpPost("CountryUserSignUp")]
+        public async Task<IActionResult> CountryUserSignUp([FromBody] CountryUserSignUpDto request)
         {
-            var user = await _authService.ClientSignUp(request);
+            var user = await _authService.CountryUserSignUp(request);
             return Ok(user);
         }
 
@@ -153,7 +154,7 @@ namespace HornScope.Controllers
 
         [HttpPost("sendMailForEditAssessment")]
         [Authorize]
-        public async Task<IActionResult> SendMailForEditAssessment([FromBody] SendRequestMailToUpdateProgram request)
+        public async Task<IActionResult> SendMailForEditAssessment([FromBody] SendRequestMailToUpdateCountry request)
         {
             var user = await _authService.SendMailForEditAssessment(request);
             if (user == null)

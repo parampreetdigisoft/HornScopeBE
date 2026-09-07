@@ -1,20 +1,23 @@
+using HornScope.Common.Models;
 using HornScope.Common.Models.views;
 using HornScope.Dtos.AssessmentDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Dtos.PillarDto;
-using HornScope.Dtos.ProgramDto;
 using HornScope.Models;
 
 namespace HornScope.Common.Interface
 {
     public interface ICommonService
     {
-        Task<List<EvaluationProgramProgressResultDto>> GetProgramProgressAsync(int userId,int role, int climateProgramID = 0);
-        Task<List<EvaluationProgramProgressHistoryResultDto>> GetProgramProgressHistoryAsync(int userId, int role);
-        Task<List<GetProgramsProgressAdminDto>> GetProgramProgressForAdmin(int userId, int role);
-        Task<List<ProgramRankingResultDto>> GetProgramRankings(int climateProgramID);
-        Task<List<GetPillarDTO>> GetPillars();
+        Task<List<EvaluationCountryProgressResultDto>> GetCountriesProgressAsync(int userId,int role, int year, int countryID = 0);
+        Task<List<EvaluationCountryProgressHistoryResultDto>> GetCountriesProgressHistoryAsync(int userId, int role, int fromYear, int toYear);
+        Task<List<GetCountriesProgressAdminDto>> GetCountriesProgressForAdmin(int userId, int role, int year);
+        Task<List<CountryRankingResultDto>> GetCountriesRankings(int countryId, int year);
+        Task<List<GetPillarDto>> GetPillars();
         void ClearPillarCache();
-        Task<List<GetAssessmentResponseDto>> GetUserDetailsAssignedToProgram(int climateProgramID = 0);
-        Task<List<GetDashboardModeResult>> GetDashboardModeResults(int userId, int role, int dashboardModeID, int climateProgramID = 0);
+        Task<List<GetAssessmentResponseDto>> GetUserDetailsAssignedToCountry(int year, int countryID = 0);
+
+        Task<List<GetDashboardModeResult>> GetDashboardModeResults(int userId, int role, int dashboardModeID, int countryID = 0);
+        Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds, int userID, int year);
     }
 }

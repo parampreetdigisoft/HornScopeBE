@@ -10,11 +10,10 @@ using HornScope.Models;
 using ClosedXML.Excel;
 using Microsoft.EntityFrameworkCore;
 using System.Linq.Expressions;
-using QuestPDF.Fluent;
 using System.Text.Json;
-using HornScope.Common.Constants;
-using HornScope.Common.Implementation;
+using QuestPDF.Fluent;
 using HornScope.Common.Interface;
+using HornScope.Common.Implementation;
 
 namespace HornScope.Services
 {
@@ -24,7 +23,7 @@ namespace HornScope.Services
         private readonly IAppLogger _appLogger;
         private readonly Download _download;
         private readonly ICommonService _commonService;
-
+        int ROSEWPillarID = 22;
         public PillarService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
         {
             _context = context;
@@ -33,23 +32,23 @@ namespace HornScope.Services
             _commonService = commonService;
         }
 
-        public async Task<List<GetPillarDTO>> GetAllAsync(int userId, UserRole userRole)
+        public async Task<List<GetPillarDto>> GetAllAsync(int userId, UserRole userRole)
         {
             try
             {
-                if(userRole != UserRole.ProgramUser)
+                if(userRole != UserRole.CountryUser)
                 {
                     return await _commonService.GetPillars();
                 }
                 else
                 {
-                    var userPillar = await _context.ClientPillarMappings
+                    var userPillar = await _context.CountryUserPillarMappings
                         .Where(x => x.IsActive && x.UserID == userId)
                         .Select(x => x.Pillar)
                         .Where(x => x != null)
                         .Select(x => x!)
                         .Where(x => !x.IsDeleted)
-                        .Select(x => new GetPillarDTO
+                        .Select(x => new GetPillarDto
                         {
                             PillarID = x.PillarID,
                             PillarName = x.PillarName,
@@ -71,7 +70,7 @@ namespace HornScope.Services
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
-                return new List<GetPillarDTO>();
+                return new List<GetPillarDto>();
             }
         }
 
@@ -109,7 +108,7 @@ namespace HornScope.Services
             try
             {
                 if (string.IsNullOrWhiteSpace(pillar.PillarName))
-                    return ResultResponseDto<Pillar>.Failure(new[] { "Pillar name is required." });
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Domain name is required." });
 
                 if (string.IsNullOrWhiteSpace(pillar.Description))
                     return ResultResponseDto<Pillar>.Failure(new[] { "Description is required." });
@@ -147,7 +146,7 @@ namespace HornScope.Services
                 await SyncPillarKpiMappingsAsync(newPillar.PillarID, pillar.KpiUpdates);
                 await _context.SaveChangesAsync();
 
-                return ResultResponseDto<Pillar>.Success(newPillar, new[] { "Pillar created successfully." });
+                return ResultResponseDto<Pillar>.Success(newPillar, new[] { "Domain created successfully." });
             }
             catch (Exception ex)
             {
@@ -209,13 +208,14 @@ namespace HornScope.Services
             }
         }
 
+
         public async Task<ResultResponseDto<List<PillarKpiMappingDto>>> GetPillarKpiMappingsAsync(int pillarId)
         {
             try
             {
                 var pillarExists = await _context.Pillars.AnyAsync(p => p.PillarID == pillarId && p.IsActive && !p.IsDeleted);
                 if (!pillarExists)
-                    return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Pillar not found." });
+                    return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Domain not found." });
 
                 var mappings = await (
                     from map in _context.AnalyticalLayerPillarMappings
@@ -261,7 +261,6 @@ namespace HornScope.Services
 
             foreach (var update in kpiUpdates.Where(u => u.LayerID > 0 && pillarId > 0))
             {
-                // Remove the mapping row from the OLD pillar, if one exists and it's actually different
                 if (update.ReplacedPillarID > 0 && update.ReplacedPillarID != update.NewPillarID)
                 {
                     var oldMapping = await _context.AnalyticalLayerPillarMappings
@@ -270,7 +269,6 @@ namespace HornScope.Services
                         _context.AnalyticalLayerPillarMappings.Remove(oldMapping);
                 }
 
-                // Add the mapping row for the NEW pillar, if it doesn't already exist
                 var existingNewMapping = await _context.AnalyticalLayerPillarMappings
                     .FirstOrDefaultAsync(x => x.LayerID == update.LayerID && x.PillarID == pillarId);
 
@@ -287,23 +285,21 @@ namespace HornScope.Services
             }
         }
 
+
         public async Task<ResultResponseDto<bool>> DeleteAsync(int id)
         {
             try
             {
+                if(id == ROSEWPillarID)
+                {
+                    return ResultResponseDto<bool>.Failure(new[] { "You cannot delete the ROSEW pillar." });
+                }
                 var pillar = await _context.Pillars.FindAsync(id);
                 if (pillar == null)
-                    return ResultResponseDto<bool>.Failure(new[] { "Pillar not found." });
+                    return ResultResponseDto<bool>.Failure(new[] { "Domain not found." });
 
                 if (pillar.IsDeleted)
-                    return ResultResponseDto<bool>.Failure(new[] { "Pillar already deleted." });
-
-                var pillarKPIMapping = await _context.AnalyticalLayerPillarMappings.Where(x => x.PillarID == id).FirstOrDefaultAsync();
-
-                if (pillarKPIMapping != null)
-                {
-                    return ResultResponseDto<bool>.Failure(new[] { "Pillar cannot be deleted as it is bound to KPI's." });
-                }
+                    return ResultResponseDto<bool>.Failure(new[] { "Domain already deleted." });
 
                 pillar.IsDeleted = true;
                 _context.Pillars.Update(pillar);
@@ -322,8 +318,8 @@ namespace HornScope.Services
                 await _context.SaveChangesAsync();
 
                 var message = questions.Count > 0
-                    ? $"Pillar deleted successfully. {questions.Count} associated question(s) have also been deleted."
-                    : "Pillar deleted successfully.";
+                    ? $"Domain deleted successfully. {questions.Count} associated question(s) have also been deleted."
+                    : "Domain deleted successfully.";
 
                 return ResultResponseDto<bool>.Success(true, new[] { message });
             }
@@ -334,10 +330,12 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<List<PillarWithQuestionsDto>>> GetPillarsWithQuestions(GetProgramPillarHistoryRequestDto request)
+        public async Task<ResultResponseDto<List<PillarWithQuestionsDto>>> GetPillarsWithQuestions(GetCountryPillarHistoryRequestDto request)
         {
             try
             {
+                var year = request.UpdatedAt.Year;
+
                 // 1. Validate user
                 var user = await _context.Users
                     .AsNoTracking()
@@ -347,26 +345,29 @@ namespace HornScope.Services
                     return ResultResponseDto<List<PillarWithQuestionsDto>>.Failure(new[] { "Invalid user" });
 
                 // 2. Role-based mapping filter
-                Expression<Func<StaffProgramMapping, bool>> predicate = user.Role switch
+                Expression<Func<UserCountryMapping, bool>> predicate = user.Role switch
                 {
-                    UserRole.Analyst => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID && (x.AssignedByUserId == request.UserID || x.UserID == request.UserID),
-                    UserRole.Evaluator => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID && x.UserID == request.UserID,
-                    _ => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID //default
+                    UserRole.Analyst => x => !x.IsDeleted && x.CountryID == request.CountryID && x.AssignedByUserId == request.UserID || x.UserID == request.UserID,
+                    UserRole.Evaluator => x => !x.IsDeleted && x.CountryID == request.CountryID && x.UserID == request.UserID,
+                    _ => x => !x.IsDeleted && x.CountryID == request.CountryID
                 };
 
-                var mappingIds = await _context.StaffProgramMappings
+                var mappingIds = await _context.UserCountryMappings
                     .Where(predicate)
-                    .Select(x => x.StaffProgramMappingID)
+                    .Select(x => x.UserCountryMappingID)
                     .ToListAsync();
 
                 // 3. Load assessments
                 var assessments = await _context.Assessments
-                    .Include(a => a.StaffProgramMapping)
+                    .Include(a => a.UserCountryMapping)
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(pa => pa.Responses)
-                    .Where(a => mappingIds.Contains(a.StaffProgramMappingID)
+                    .Where(a => mappingIds.Contains(a.UserCountryMappingID)
                                 && a.IsActive
-                                )
+                                && a.UpdatedAt.Year == year
+                                && (a.AssessmentPhase == AssessmentPhase.Completed
+                                    || a.AssessmentPhase == AssessmentPhase.EditRejected
+                                    || a.AssessmentPhase == AssessmentPhase.EditRequested))
                     .AsNoTracking()
                     .ToListAsync();
 
@@ -380,7 +381,7 @@ namespace HornScope.Services
                     .ToListAsync();
 
                 // 5. Users dictionary
-                var userIds = assessments.Select(a => a.StaffProgramMapping.UserID).Distinct().ToList();
+                var userIds = assessments.Select(a => a.UserCountryMapping.UserID).Distinct().ToList();
 
                 var usersDict = await _context.Users
                     .Where(u => userIds.Contains(u.UserID))
@@ -395,7 +396,7 @@ namespace HornScope.Services
                     {
                         Response = r,
                         x.pa.PillarID,
-                        UserID = x.a.StaffProgramMapping.UserID
+                        UserID = x.a.UserCountryMapping.UserID
                     }))
                     .GroupBy(x => (x.Response.QuestionID, x.PillarID, x.UserID))
                     .ToDictionary(g => g.Key, g => g.First().Response);
@@ -404,8 +405,9 @@ namespace HornScope.Services
                 // ? AI DATA FIXED
                 // =========================================
                 var aiRaw = await _context.AIEstimatedQuestionScores
-                    .Where(x => x.ClimateProgramID == request.ClimateProgramID
-                                && (!request.PillarID.HasValue || x.PillarID == request.PillarID))
+                    .Where(x => x.CountryID == request.CountryID
+                                && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
+                                && x.Year == year)
                     .ToListAsync();
 
                 var aiDict = aiRaw
@@ -417,7 +419,7 @@ namespace HornScope.Services
                             UserID = int.MaxValue,
                             FullName = "AI_Result",
                             QuestionID = x.QuestionID,
-                            Score = x.AIScore.ToString(),
+                            Score = (int?)x.AIScore,
                             Justification = x.EvidenceSummary,
                             OptionText = ""
                         }).FirstOrDefault()
@@ -452,7 +454,7 @@ namespace HornScope.Services
                                     UserID = uid,
                                     FullName = usersDict.TryGetValue(uid, out var name) ? name : "",
                                     QuestionID = q.QuestionID,
-                                    Score = option?.ScoreValue,
+                                    Score = (int?)response?.Score,
                                     Justification = response?.Justification ?? "",
                                     OptionText = option?.OptionText ?? ""
                                 };
@@ -489,13 +491,13 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<Tuple<string, byte[]>> ExportPillarsHistoryByUserId(GetProgramPillarHistoryRequestDto requestDto)
+        public async Task<Tuple<string, byte[]>> ExportPillarsHistoryByUserId(GetCountryPillarHistoryRequestDto requestDto)
         {
             try
             {
                 var response = await GetPillarsWithQuestions(requestDto);
-                var climateProgram = await _context.ClimatePrograms
-                    .FirstOrDefaultAsync(x => x.ClimateProgramID == requestDto.ClimateProgramID);
+                var country = await _context.Countries
+                    .FirstOrDefaultAsync(x => x.CountryID == requestDto.CountryID);
 
                 if (!response.Succeeded || response.Result == null)
                 {
@@ -508,15 +510,15 @@ namespace HornScope.Services
                 if (requestDto.ExportType == Enums.ExportType.Pdf)
                 {
                     // ? Use structured data directly (NO flattening)
-                    fileBytes = GeneratePdf(response.Result, climateProgram);
+                    fileBytes = GeneratePdf(response.Result, country, requestDto.UpdatedAt.Year);
 
-                    fileName = $"ExportPillarsHistory_{requestDto.ClimateProgramID}_{requestDto.PillarID}.pdf";
+                    fileName = $"ExportPillarsHistory_{requestDto.CountryID}_{requestDto.PillarID}.pdf";
                 }
                 else
                 {
                     // ? Excel (existing)
-                    fileBytes = MakePillarSheet(response.Result, climateProgram);
-                    fileName = $"ExportPillarsHistory_{requestDto.ClimateProgramID}_{requestDto.PillarID}.xlsx";
+                    fileBytes = MakePillarSheet(response.Result, country);
+                    fileName = $"ExportPillarsHistory_{requestDto.CountryID}_{requestDto.PillarID}.xlsx";
                 }
 
                 return new Tuple<string, byte[]>(fileName, fileBytes);
@@ -527,17 +529,16 @@ namespace HornScope.Services
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
         }
-        public byte[] GeneratePdf(List<PillarWithQuestionsDto> data, ClimateProgram climateProgram)
+        public byte[] GeneratePdf(List<PillarWithQuestionsDto> data, Country country, int year)
         {
-            var logoPath = Path.Combine(
-                Directory.GetCurrentDirectory(),
-                "wwwroot/assets/images/vcp.png");
+            var logoPath = ReportThemeColors.LogoPath;
 
             return Document.Create(container =>
             {
                 container.Page(page =>
                 {
                     page.Margin(20);
+                    page.PageColor(ReportThemeColors.PageBg);
 
                     page.Content().Column(col =>
                     {
@@ -545,9 +546,8 @@ namespace HornScope.Services
 
                         foreach (var pillar in data)
                         {
-                            // ================= HEADER =================
                             col.Item()
-                                .Background("#1f4b3f")
+                                .Background(ReportThemeColors.DarkBg)
                                 .Padding(15)
                                 .Row(row =>
                                 {
@@ -556,28 +556,27 @@ namespace HornScope.Services
                                         left.Item().Text($"{pillarIndex}. {pillar.PillarName}")
                                             .FontSize(18)
                                             .Bold()
-                                            .FontColor("#ffffff");
+                                            .FontColor(ReportThemeColors.HeaderSubtitle);
 
-                                        left.Item().Text($"{climateProgram?.ProgramName}, {climateProgram.Location} | Program Year: {climateProgram.Year}")
+                                        left.Item().Text($"{country?.CountryName}, {country?.Continent} | Data Year: {year}")
                                             .FontSize(10)
-                                            .FontColor("#cfe7df");
+                                            .FontColor(ReportThemeColors.Secondary);
 
                                         left.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                                             .FontSize(9)
-                                            .FontColor("#cfe7df");
+                                            .FontColor(ReportThemeColors.HeaderTextMuted);
                                     });
 
-                                    // Right logo
-                                    row.ConstantItem(80)
-                                       .Background(ReportThemeColors.DarkBlue)
+                                    row.ConstantItem(88)
                                         .AlignCenter()
                                         .AlignMiddle()
-                                        .Padding(4)
+                                        .Height(62)
                                         .Image(logoPath)
                                         .FitArea();
 
                                 });
 
+                            col.Item().Height(2).Background(ReportThemeColors.Primary);
                             col.Item().PaddingBottom(10);
 
                             int questionIndex = 1;
@@ -590,7 +589,7 @@ namespace HornScope.Services
                                 col.Item()
                                     .Background("#ffffff")
                                     .Border(1)
-                                    .BorderColor("#e5e5e5")
+                                    .BorderColor(ReportThemeColors.Border)
                                     .Padding(12)
                                     .Column(qCol =>
                                     {
@@ -624,42 +623,34 @@ namespace HornScope.Services
                                                     .Text("Option").SemiBold().FontSize(10);
                                             });
 
-                                            table.ColumnsDefinition(columns =>
-                                            {
-                                                columns.ConstantColumn(120); // NAME (fixed)
-                                                columns.ConstantColumn(80);  // SCORE (smaller & controlled)
-                                                columns.RelativeColumn();    // OPTION (takes remaining space)
-                                            });
                                             // ROWS
                                             foreach (var user in question.Users.Values
                                                          .OrderBy(x => x.UserID == -1 ? 1 : 0))
                                             {
                                                 bool isAI = user.UserID == -1;
-                                                string bgColor = isAI ? "#e6f4ef" : "#ffffff";
+                                                string bgColor = isAI ? ReportThemeColors.SuccessGreenBg : ReportThemeColors.White;
 
                                                 // NAME
                                                 var nameCell = table.Cell()
-                                                    .Padding(2)
+                                                    .Padding(8)
                                                     .Background(bgColor)
                                                     .Text(isAI ? "AI" : user.FullName)
-                                                    .FontColor(isAI ? "#0a7d5e" : "#000");
+                                                    .FontColor(isAI ? ReportThemeColors.HoverPrimary : ReportThemeColors.Text);
 
                                                 if (isAI)
                                                     nameCell.Bold();
 
                                                 // SCORE
                                                 table.Cell()
-                                                    .Padding(2)
+                                                    .Padding(8)
                                                     .Background(bgColor)
-                                                    .Text(user.Score?.ToString() ?? "")
-                                                    .WrapAnywhere();
+                                                    .Text(user.Score?.ToString() ?? "");
 
                                                 // OPTION
                                                 table.Cell()
-                                                    .Padding(2)
+                                                    .Padding(8)
                                                     .Background(bgColor)
-                                                    .Text(user.OptionText ?? "")
-                                                    .WrapAnywhere();
+                                                    .Text(user.OptionText ?? "");
                                             }
                                         });
                                     });
@@ -676,11 +667,11 @@ namespace HornScope.Services
             }).GeneratePdf();
         }
 
-        private byte[] MakePillarSheet(List<PillarWithQuestionsDto> pillars, Models.ClimateProgram? climateProgram)
+        private byte[] MakePillarSheet(List<PillarWithQuestionsDto> pillars, Models.Country? country)
         {
             using (var workbook = new XLWorkbook())
             {
-                var name = climateProgram == null ? $"{pillars.Count}-Pillars-Result" : climateProgram?.ProgramName+"-"+ $"-{pillars.Count}-Pillars-Result";
+                var name = country == null ? $"{pillars.Count}-Pillars-Result" : country?.CountryName+"-"+country?.Continent+ $"-{pillars.Count}-Pillars-Result";
                 var shortName = name.Length > 30 ? name.Substring(0, 30) : name;
 
                 var ws = workbook.Worksheets.Add(shortName);
@@ -723,7 +714,7 @@ namespace HornScope.Services
                     ++row;
                     c = 1;
 
-                    // Pillar row
+                    // Domain row
                     ws.Cell(row, c++).Value = pillarCounter++; // pillar serial number
                     ws.Cell(row, c++).Value = pillar.PillarName;
                     ws.Cell(row, 2).Style.Font.Bold = true;
@@ -737,20 +728,20 @@ namespace HornScope.Services
 
                         var count = userData.Count;
 
-                        //var filteredData = userData
-                        //    .Where(x => x.Value.Score!=null)
-                        //    .Select(x => (decimal)x.Value.Score.ToString());
+                        var filteredData = userData
+                            .Where(x => x.Value.Score!=null)
+                            .Select(x => (decimal)x.Value.Score.Value);
 
-                        //decimal score = filteredData.Any()
-                        //  ? filteredData.Average()
-                        //  :0m;
+                        decimal score = filteredData.Any()
+                          ? filteredData.Average()
+                          :0m;
 
                         var richText = ws.Cell(row, c++).GetRichText();
 
-                        richText.AddText("Total Score:  ")
+                        richText.AddText("Average Score:  ")
                             .SetBold().SetFontColor(XLColor.DarkGray);
 
-                        richText.AddText($"{Math.Round(1.00,2)}\n")
+                        richText.AddText($"{Math.Round(score,2)}\n")
                             .SetFontColor(XLColor.Black);
                     }
 
@@ -826,26 +817,30 @@ namespace HornScope.Services
         {
             try
             {
+                var year = request.UpdatedAt.Year;
+                var startDate = new DateTime(year, 1, 1);
+                var endDate = new DateTime(year + 1, 1, 1);
                 // Role based filter
-                IQueryable<StaffProgramMapping> staffProgramMappings = _context.StaffProgramMappings
+                IQueryable<UserCountryMapping> userCountryMappings = _context.UserCountryMappings
                     .AsNoTracking()
-                    .Where(x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID);
+                    .Where(x => !x.IsDeleted && x.CountryID == request.CountryID);
 
-                staffProgramMappings = userRole switch
+                userCountryMappings = userRole switch
                 {
-                    UserRole.Analyst => staffProgramMappings.Where(x => x.AssignedByUserId == request.UserId),
-                    UserRole.Evaluator => staffProgramMappings.Where(x => x.UserID == request.UserId),
-                    _ => staffProgramMappings
+                    UserRole.Analyst => userCountryMappings.Where(x => x.AssignedByUserId == request.UserId),
+                    UserRole.Evaluator => userCountryMappings.Where(x => x.UserID == request.UserId),
+                    _ => userCountryMappings
                 };
 
                 // Main query (single DB round-trip)
                 var rawData = await (
-                    from ucm in staffProgramMappings
-                    join a in _context.Assessments on ucm.StaffProgramMappingID equals a.StaffProgramMappingID
-                    where a.IsActive && (a.AssessmentPhase == AssessmentPhase.Completed || a.AssessmentPhase == AssessmentPhase.EditRejected || a.AssessmentPhase == AssessmentPhase.EditRequested)
+                    from ucm in userCountryMappings
+                    join a in _context.Assessments on ucm.UserCountryMappingID equals a.UserCountryMappingID
+                    where a.IsActive && (a.UpdatedAt >= startDate && a.UpdatedAt <= endDate 
+                    && (a.AssessmentPhase == AssessmentPhase.Completed || a.AssessmentPhase == AssessmentPhase.EditRejected || a.AssessmentPhase == AssessmentPhase.EditRequested))
                     from pa in a.PillarAssessments
                     where !request.PillarID.HasValue || pa.PillarID == request.PillarID
-                    join p in _context.Pillars.Where(x => x.IsActive && !x.IsDeleted) on pa.PillarID equals p.PillarID
+                    join p in _context.Pillars.Where(x => x.IsActive && !x.IsDeleted) on pa.PillarID equals p.PillarID 
                     select new
                     {
                         p.PillarID,
@@ -853,43 +848,49 @@ namespace HornScope.Services
                         p.DisplayOrder,
                         UserID = ucm.UserID,
                         TotalQuestion = p.Questions.Count(x => !x.IsDeleted),
-                        Responses = pa.Responses.Select(r => new
-                        {
-                            r.Score,
-                            r.QuestionOptionID,
-                            Weight = r.Question.Weight,
-                            // Needed for N/A / Indeterminate exclusion — don't rely on Score being null
-                            OptionScoreValue = r.Question.QuestionOptions
-                                .Where(o => o.OptionID == r.QuestionOptionID)
-                                .Select(o => o.ScoreValue)
-                                .FirstOrDefault()
-                        })
+                        Responses = pa.Responses
                     }
                 ).ToListAsync();
 
                 if (!rawData.Any())
                     return new PaginationResponse<PillarsHistroyResponseDto>();
 
+                // Users dictionary
                 var userIds = rawData.Select(x => x.UserID).Distinct().ToList();
 
                 var usersDict = await _context.Users
                     .Where(u => userIds.Contains(u.UserID))
                     .ToDictionaryAsync(u => u.UserID, u => u.FullName);
 
-
                 // =========================
                 // 2. AI DATA
                 // =========================
                 var aiDataList = await _context.AIPillarScores
-                    .Where(x => x.ClimateProgramID == request.ClimateProgramID
-                        && (!request.PillarID.HasValue || x.PillarID == request.PillarID))
+                    .Where(x => x.CountryID == request.CountryID
+                        && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
+                        && x.Year == year)
                     .GroupBy(x => x.PillarID)
                     .Select(g => new
                     {
                         PillarID = g.Key,
                         Score = g.Sum(x => x.AIScore ?? 0),
                         ScoreProgress = g.Average(x => x.AIProgress ?? 0),
-                        Count = _context.AIEstimatedQuestionScores.Where(x => x.PillarID == g.Key && x.ClimateProgramID == request.ClimateProgramID).Count()
+                        Count = _context.AIEstimatedQuestionScores.Where(x=> x.PillarID == g.Key && x.CountryID == request.CountryID && x.Year == year).Count()
+                    })
+                    .ToListAsync();
+
+
+                // =========================
+                // 3. ALL PILLARS (MAIN FIX)
+                // =========================
+                var pillars = await _context.Pillars
+                    .Where(p => p.IsActive && !p.IsDeleted && (!request.PillarID.HasValue || p.PillarID == request.PillarID))
+                    .Select(p => new
+                     {
+                        p.PillarID,
+                        p.PillarName,
+                        p.DisplayOrder,
+                        TotalQuestion = p.Questions.Count(x=>!x.IsDeleted)
                     })
                     .ToListAsync();
 
@@ -899,26 +900,13 @@ namespace HornScope.Services
                     {
                         UserID = int.MaxValue,
                         FullName = "AI_Result",
-                        Score =  Convert.ToDecimal(Math.Round(x.Score, 0)),
-                        ScoreProgress =  x.ScoreProgress,
+                        Score = Convert.ToDecimal(Math.Round(x.Score,0)),
+                        ScoreProgress = x.ScoreProgress,
                         AnsQuestion = x.Count,
-                        AnsPillar = 1
+                        AnsPillar =1
                     }
                 );
 
-                // =========================
-                // 3. ALL PILLARS (MAIN FIX)
-                // =========================
-                var pillars = await _context.Pillars
-                    .Where(p => p.IsActive && !p.IsDeleted && (!request.PillarID.HasValue || p.PillarID == request.PillarID))
-                    .Select(p => new
-                    {
-                        p.PillarID,
-                        p.PillarName,
-                        p.DisplayOrder,
-                        TotalQuestion = p.Questions.Count(x => !x.IsDeleted)
-                    })
-                    .ToListAsync();
 
                 // =========================
                 // 4. FINAL RESULT (FROM PILLARS)
@@ -936,23 +924,14 @@ namespace HornScope.Services
                             {
                                 var responses = userGroup
                                     .SelectMany(x => x.Responses)
-                                    .Where(r => r.Score.HasValue)
+                                    .Where(r => r.Score.HasValue &&
+                                                (int)r.Score.Value <= (int)ScoreValue.Four)
                                     .ToList();
-                                var criticalFailureCount = responses.Count(r =>
-                                     r.Weight == Constants.CriticalIndicatorWeight &&
-                                     r.Score <= Constants.LeastCriticalIndicatorValue);
-                                var criticalFailurePenalty = CommonStaticMethods.GetCriticalFailurePenalty(criticalFailureCount);
 
-                                // Step 1 & 2: Σ(Score × Weight)
-                                var weightedSum = responses.Sum(r => r.Score!.Value * r.Weight);
+                                var progress = responses.Any()
+                                 ? responses.Average(r => (decimal)((int?)r.Score ??0))
+                                 :0m;
 
-                                // Step 3: Σ(Weight)
-                                var totalWeight = responses.Sum(r => r.Weight);
-
-                                // Step 4 & 5: Weighted avg (-4 to +4) -> converted to 0-100 scale
-                                var progress = totalWeight > 0
-                                    ? ((((decimal)weightedSum / (decimal)totalWeight) + 4m) / 8m) * 100m - criticalFailurePenalty
-                                    : 0m;
 
                                 return new PillarsUserHistroyResponseDto
                                 {
@@ -962,11 +941,12 @@ namespace HornScope.Services
                                     ScoreProgress = progress,
                                     TotalQuestion = p.TotalQuestion,
                                     AnsQuestion = responses.Count,
-                                    AnsPillar = responses.Any() ? 1 : 0
+                                    AnsPillar = responses.Any() ?1 :0
                                 };
                             })
                             .ToList();
 
+                        // ? Insert AI row (always)
                         if (aiData.TryGetValue(p.PillarID, out var aiPillar))
                         {
                             aiPillar.TotalQuestion = p.TotalQuestion;
@@ -997,9 +977,11 @@ namespace HornScope.Services
                     .OrderBy(x => x.DisplayOrder)
                     .ToList();
 
+
                 // =========================
                 // 5. PAGINATION
                 // =========================
+
                 var count = 0;
                 var valid = 0;
                 var totalRecords = 0;
@@ -1007,7 +989,7 @@ namespace HornScope.Services
                 foreach (var r in result)
                 {
                     totalRecords += r.Users.Count;
-                    if (count + r.Users.Count <= request.PageSize)
+                    if (count+ r.Users.Count <= request.PageSize)
                     {
                         count += r.Users.Count;
                         valid++;
@@ -1022,10 +1004,13 @@ namespace HornScope.Services
                     PageNumber = request.PageNumber,
                     PageSize = request.PageSize
                 };
+
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error occurred in GetPillarsHistoryByUserId", ex);
+                await _appLogger.LogAsync(
+                    "Error occurred in GetPillarsHistoryByUserId", ex);
+
                 return new PaginationResponse<PillarsHistroyResponseDto>();
             }
         }

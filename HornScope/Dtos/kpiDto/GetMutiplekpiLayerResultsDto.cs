@@ -10,19 +10,19 @@ namespace HornScope.Dtos.kpiDto
         public string Purpose { get; set; } = string.Empty;
         public string? CalText4 { get; set; }
         public string? CalText5 { get; set; }
-        public List<MutipleProgramskpiLayerResults> Programs { get; set; } = new();
+        public List<MutipleCountrieskpiLayerResults> Countries { get; set; } = new();
         public ICollection<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = new List<FiveLevelInterpretation>();
     }
-    public class MutipleProgramskpiLayerResults
+    public class MutipleCountrieskpiLayerResults
     {
         public int LayerResultID { get; set; }
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int? InterpretationID { get; set; } 
         public decimal? CalValue5 { get; set; }
         public DateTime LastUpdated { get; set; } = DateTime.Now;
         public int? AiInterpretationID { get; set; } 
         public decimal? AiCalValue5 { get; set; }
         public DateTime? AiLastUpdated { get; set; }
-        public ClimateProgram? Program { get; set; }
+        public Country? Country { get; set; }
     }
 }

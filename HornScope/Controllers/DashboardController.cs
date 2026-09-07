@@ -57,7 +57,7 @@ namespace HornScope.Controllers
             if (userRole == UserRole.Admin || userRole == UserRole.Analyst || userRole == UserRole.Evaluator)
                 return true;
 
-            if (userRole != UserRole.ProgramUser)
+            if (userRole != UserRole.CountryUser)
                 return false;
 
             return tierName == TieredAccessPlan.Standard.ToString() ||
@@ -65,36 +65,36 @@ namespace HornScope.Controllers
                    tierName == TieredAccessPlan.Basic.ToString();
         }
 
-        [HttpGet("getAmbitionDeliveryIndexDashboard")]
-        public async Task<IActionResult> GetAmbitionDeliveryIndexDashboard([FromQuery] int climateProgramID)
+        [HttpGet("getPeaceStressTestDashboard")]
+        public async Task<IActionResult> GetPeaceStressTestDashboard([FromQuery] int countryID, int year)
         {
             var (userId, userRole, error) = ValidateRequest();
             if (error != null)
                 return error;
 
-            var result = await _signalDashboardService.GetAmbitionDeliveryIndexDashboard(climateProgramID, userId!.Value, userRole);
+            var result = await _signalDashboardService.GetPeaceStressTestDashboard(countryID, userId!.Value, userRole, year);
             return Ok(result);
         }
 
-        [HttpGet("getDiplomaticRiskDashboard")]
-        public async Task<IActionResult> GetDiplomaticRiskDashboard([FromQuery] int climateProgramID)
+        [HttpGet("getEarlyWarningDashboard")]
+        public async Task<IActionResult> GetEarlyWarningDashboard([FromQuery] int countryID, int year)
         {
             var (userId, userRole, error) = ValidateRequest();
             if (error != null)
                 return error;
 
-            var result = await _signalDashboardService.GetDiplomaticRiskDashboard(climateProgramID, userId!.Value, userRole);
+            var result = await _signalDashboardService.GetEarlyWarningDashboard(countryID, userId!.Value, userRole, year);
             return Ok(result);
         }
 
-        [HttpGet("getReadinessScorecardDashboard")]
-        public async Task<IActionResult> GetReadinessScorecardDashboard([FromQuery] int climateProgramID)
+        [HttpGet("getResilienceScorecard")]
+        public async Task<IActionResult> GetResilienceScorecard([FromQuery] int countryID, int year)
         {
             var (userId, userRole, error) = ValidateRequest();
             if (error != null)
                 return error;
 
-            var result = await _signalDashboardService.GetReadinessScorecardDashboard(climateProgramID, userId!.Value, userRole);
+            var result = await _signalDashboardService.GetResilienceScorecard(countryID, userId!.Value, userRole, year);
             return Ok(result);
         }        
     }

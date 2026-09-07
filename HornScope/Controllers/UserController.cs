@@ -37,8 +37,8 @@ namespace HornScope.Controllers
             return User.FindFirst(ClaimTypes.Role)?.Value;
         }
         [HttpGet]
-        [Route("GetUserByRoleWithAssignedProgram")]
-        public async Task<IActionResult> GetUserByRoleWithAssignedProgram([FromQuery] GetUserByRoleRequestDto request)
+        [Route("GetUserByRoleWithAssignedCountry")]
+        public async Task<IActionResult> GetUserByRoleWithAssignedCountry([FromQuery] GetUserByRoleRequestDto request)
         {
             var userId = GetUserIdFromClaims();
             if (userId == null)
@@ -53,7 +53,7 @@ namespace HornScope.Controllers
                 return Unauthorized("You Don't have access.");
             }
 
-            return Ok(await _userService.GetUserByRoleWithAssignedProgram(request, userId.GetValueOrDefault(), userRole));
+            return Ok(await _userService.GetUserByRoleWithAssignedCountry(request, userId.GetValueOrDefault(), userRole));
         }
 
         [HttpGet]
@@ -81,8 +81,8 @@ namespace HornScope.Controllers
 
         [HttpGet]
         [Authorize(Policy = "AdminOnly")]
-        [Route("getUsersAssignedToProgram/{climateProgramID}")]
-        public async Task<IActionResult> GetUsersAssignedToProgram(int climateProgramID) => Ok(await _userService.GetUsersAssignedToProgram(climateProgramID));
+        [Route("getUsersAssignedToCountry/{countryID}")]
+        public async Task<IActionResult> GetUsersAssignedToCountry(int countryID) => Ok(await _userService.GetUsersAssignedToCountry(countryID));
     }
 
     public class RegisterRequest

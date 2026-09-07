@@ -24,13 +24,13 @@ namespace HornScope.Backgroundjob
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            var programCount = _configuration.GetValue("EmergingTrendsCache:ProgramCount", 8);
+            var countryCount = _configuration.GetValue("EmergingTrendsCache:CountryCount", 8);
             var refreshInterval = TimeSpan.FromMinutes(
                 _configuration.GetValue("EmergingTrendsCache:RefreshIntervalMinutes", 10));
             var retryDelay = TimeSpan.FromSeconds(
                 _configuration.GetValue("EmergingTrendsCache:RetryDelaySeconds", 10));
 
-            await RefreshUntilCachedAsync(programCount, retryDelay, stoppingToken);
+            await RefreshUntilCachedAsync(countryCount, retryDelay, stoppingToken);
 
             while (!stoppingToken.IsCancellationRequested)
             {
@@ -43,18 +43,18 @@ namespace HornScope.Backgroundjob
                     break;
                 }
 
-                await TryRefreshAsync(programCount, stoppingToken);
+                await TryRefreshAsync(countryCount, stoppingToken);
             }
         }
 
         private async Task RefreshUntilCachedAsync(
-            int programCount,
+            int countryCount,
             TimeSpan retryDelay,
             CancellationToken stoppingToken)
         {
             while (!stoppingToken.IsCancellationRequested)
             {
-                if (await TryRefreshAsync(programCount, stoppingToken))
+                if (await TryRefreshAsync(countryCount, stoppingToken))
                 {
                     return;
                 }
@@ -70,7 +70,7 @@ namespace HornScope.Backgroundjob
             }
         }
 
-        private async Task<bool> TryRefreshAsync(int programCount, CancellationToken stoppingToken)
+        private async Task<bool> TryRefreshAsync(int countryCount, CancellationToken stoppingToken)
         {
             try
             {
@@ -78,14 +78,14 @@ namespace HornScope.Backgroundjob
                 var publicService = scope.ServiceProvider.GetRequiredService<IPublicService>();
 
                 var preserved = await publicService.RefreshEmergingTrendsCacheAsync(
-                    programCount,
+                    countryCount,
                     stoppingToken);
 
                 if (!preserved)
                 {
                     _logger.LogWarning(
-                        "Emerging trends cache refresh produced no usable data and no prior snapshot was available (programCount={ProgramCount})",
-                        programCount);
+                        "Emerging trends cache refresh produced no usable data and no prior snapshot was available (countryCount={CountryCount})",
+                        countryCount);
                 }
 
                 return preserved;
@@ -94,8 +94,8 @@ namespace HornScope.Backgroundjob
             {
                 _logger.LogWarning(
                     ex,
-                    "Emerging trends cache refresh failed (programCount={ProgramCount})",
-                    programCount);
+                    "Emerging trends cache refresh failed (countryCount={CountryCount})",
+                    countryCount);
                 return false;
             }
         }

@@ -2,7 +2,7 @@
 {
     public class AITransferAssessmentRequestDto
     {
-        public int ClimateProgramID { get; set; }
+        public int CountryID { get; set; }
         public int TransferToUserID { get; set; }
     }
 }

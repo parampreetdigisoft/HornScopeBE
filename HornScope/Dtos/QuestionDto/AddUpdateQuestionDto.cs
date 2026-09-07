@@ -7,8 +7,6 @@ namespace HornScope.Dtos.QuestionDto
     {
         public int QuestionID { get; set; } = 0;
         public int PillarID { get; set; }
-        public int WeightID { get; set; }
-        public double? Weight { get; set; }
         public string QuestionText { get; set; }
         public bool IsSelected { get; set; } = false;
         public List<QuestionOption> QuestionOptions { get; set; }
@@ -33,7 +31,7 @@ namespace HornScope.Dtos.QuestionDto
         public int OptionID { get; set; }
         public int QuestionID { get; set; }
         public string OptionText { get; set; }
-        public string ScoreValue { get; set; }
+        public int? ScoreValue { get; set; }
         public int? DisplayOrder { get; set; }
         public bool IsSelected { get; set; } = false;
         public string Justification { get; set; } 
