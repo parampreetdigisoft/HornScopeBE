@@ -1,0 +1,168 @@
+using HornScope.Dtos.AssessmentDto;
+using HornScope.Dtos.PillarDto;
+using HornScope.IServices;
+using HornScope.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
+namespace HornScope.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize(Policy = "StaffOnly")]
+    public class PillarController : ControllerBase
+    {
+        private readonly IPillarService _pillarService;
+        public PillarController(IPillarService pillarService)
+        {
+            _pillarService = pillarService;
+        }
+        private int? GetUserIdFromClaims()
+        {
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+                return userId;
+
+            return null;
+        }
+        private string? GetTierFromClaims()
+        {
+            return User.FindFirst("Tier")?.Value;
+        }
+        private string? GetRoleFromClaims()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
+
+        [HttpGet]
+        [Authorize]
+        [Route("Pillars")]
+        [Authorize]
+        public async Task<IActionResult> GetAll()
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            return Ok(await _pillarService.GetAllAsync(userId.GetValueOrDefault(), userRole));
+        }
+
+        [HttpGet("{pillarId:int}/kpiMappings")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> GetPillarKpiMappings(int pillarId)
+        {
+            var result = await _pillarService.GetPillarKpiMappingsAsync(pillarId);
+            if (!result.Succeeded)
+                return NotFound(result);
+
+            return Ok(result);
+        }
+
+        [HttpGet("{id}")]
+        [Authorize]
+        public async Task<IActionResult> GetById(int id)
+        {
+            var pillar = await _pillarService.GetByIdAsync(id);
+            if (pillar == null) return NotFound();
+            return Ok(pillar);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Add([FromBody] Pillar pillar)
+        {
+            var result = await _pillarService.AddAsync(pillar);
+            return Created($"/api/pillar/{result.PillarID}", result);
+        }
+
+        [HttpPost("add")]
+        [Consumes("multipart/form-data")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddPillar([FromForm] AddPillarDto pillar)
+        {
+            var result = await _pillarService.AddPillarAsync(pillar);
+            if (!result.Succeeded)
+                return BadRequest(result);
+
+            return Ok(result);
+        }
+       
+        [HttpPost("edit/{id}")]
+        [Consumes("multipart/form-data")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> UpdatePillar( int id, [FromForm] UpdatePillarDto pillar)
+        {          
+            var result = await _pillarService.UpdateAsync(id, pillar);
+            if (result == null) return NotFound();
+            return Ok(result);
+        }
+
+
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> Delete(int id)
+        {
+            var result = await _pillarService.DeleteAsync(id);
+            return Ok(result);
+        }
+
+        [HttpGet("ExportPillarsHistoryByUserId")]
+        [Authorize]
+        public async Task<IActionResult> ExportPillarsHistoryByUserId([FromQuery] GetProgramPillarHistoryRequestDto requestDto)
+        {
+            var claimUserId = GetUserIdFromClaims();
+            if (claimUserId == null || claimUserId != requestDto.UserID)
+                return Unauthorized("User ID not found.");
+
+            var content = await _pillarService.ExportPillarsHistoryByUserId(requestDto);
+
+            var fileName = content.Item1;
+            var fileBytes = content.Item2 ?? new byte[1];
+
+            // Detect content type based on file extension
+            string contentType = "application/octet-stream";
+
+            if (fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            }
+            else if (fileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase))
+            {
+                contentType = "application/pdf";
+            }
+
+            return File(fileBytes, contentType, fileName);
+        }
+
+        [HttpPost("GetResponsesByUserId")]
+        public async Task<IActionResult> GetResponsesByUserId([FromBody] GetPillarResponseHistoryRequestNewDto requestDto)
+        {
+            var claimUserId = GetUserIdFromClaims();
+            if (claimUserId == null)
+                return Unauthorized("User ID not found.");
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            requestDto.UserId = claimUserId;
+            var response = await _pillarService.GetResponsesByUserId(requestDto, userRole);
+            return Ok(response);
+        }
+    }
+}

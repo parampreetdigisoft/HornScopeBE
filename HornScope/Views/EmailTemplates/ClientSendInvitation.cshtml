@@ -1,0 +1,108 @@
+@model HornScope.Views.EmailModels.EmailInvitationSendRequestDto
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>@Model.Title</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body style="margin:0;padding:0;background-color:#040A1D;font-family:'Poppins',Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#040A1D"
+           style="background-color:#040A1D;background-image:linear-gradient(145deg,#040A1D 0%,#0A2240 42%,#061228 72%,#020816 100%);padding:40px 16px;">
+        <tr>
+            <td align="center">
+
+                <!-- MAIN CARD -->
+                <table width="100%" cellpadding="0" cellspacing="0" bgcolor="#0B1633"
+                       style="max-width:720px;margin:0 auto;background-color:#0B1633;border-radius:16px;overflow:hidden;border:1px solid #1a3a5c;box-shadow:0 32px 64px rgba(0,0,0,0.45);">
+
+                    <!-- HEADER -->
+                    <tr>
+                        <td align="center" bgcolor="#0A2240"
+                            style="padding:40px 30px 25px;background-color:#0A2240;background-image:linear-gradient(160deg,#061228 0%,#0A2240 42%,#1B5E3B 100%);">
+
+                            <img src="cid:vcp-logo"
+                                 alt="Veridian Climate Pulse"
+                                 style="width:auto;max-width:220px;height:auto;max-height:72px;margin:0 auto 20px;display:block;">
+
+                            <div style="font-size:26px;font-weight:600;color:#ffffff;text-align:center;">
+                                @Model.Title
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- CONTENT -->
+                    <tr>
+                        <td bgcolor="#0B1633"
+                            style="padding:35px 40px 25px;font-size:15px;color:#E8EEF8;line-height:1.7;background-color:#0B1633;">
+
+                            <p style="margin:0 0 18px;color:#E8EEF8;">@Model.Name,</p>
+
+                            <p style="margin:0 0 18px;color:#9AADC4;">
+                                Your Program User account for the <strong style="color:#E8EEF8;">Veridian Climate Pulse (VCP)</strong> platform has been activated.
+                                You now have access to view and work with program data according to your assigned plan and permissions.
+                            </p>
+
+                            <p style="margin:0 0 18px;color:#9AADC4;">
+                                Please use the secure link below to create your password and access your program user dashboard:
+                            </p>
+
+                            <!-- BUTTON -->
+                            <div style="text-align:center;margin:20px 0 20px;">
+                                <a href="@Model.ResetPasswordUrl"
+                                   style="display:inline-block;padding:14px 28px;background-color:#2E7D32;background-image:linear-gradient(135deg,#1B5E3B 0%,#2E7D32 48%,#4CAF50 100%);color:#ffffff;font-size:16px;border-radius:12px;font-weight:600;text-decoration:none;box-shadow:0 4px 14px rgba(46,125,50,0.32);">
+                                    Set Your Password
+                                </a>
+                            </div>
+
+                            <p style="margin:0 0 16px;color:#E8EEF8;"><strong>As a Program User, you will be able to:</strong></p>
+
+                            <div style="margin:20px 0;padding:18px;background-color:#0F2A1A;border-left:4px solid #A8E063;border-radius:8px;color:#E8EEF8;font-size:14px;">
+                                • Access and view program data based on your assigned plans<br />
+                                • Conduct research and gather relevant information for indicators<br />
+                                • Update or manage data where permitted under your plan<br />
+                                • Monitoring progress and participating in the overall workflow
+                            </div>
+
+                            <p style="margin:0 0 18px;color:#9AADC4;">
+                                If you already have an active password, you may log in directly and continue working according to your assigned plan.
+                            </p>
+
+                            <p style="margin:0 0 18px;color:#9AADC4;">
+                                For support or technical issues, please contact
+                                <a href="mailto:@Model.Mail" style="color:#A8E063;text-decoration:none;font-weight:600;">
+                                    @Model.Mail
+                                </a>.
+                            </p>
+                            <p style="margin:0 0 18px;color:#9AADC4;">
+                                Thank you for contributing to the Veridian Climate Pulse evaluation process.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td bgcolor="#061228"
+                            style="padding:25px 40px 35px;text-align:left;background-color:#061228;font-size:14px;color:#9AADC4;border-top:1px solid #1a3a5c;">
+                            <p style="margin:6px 0;color:#E8EEF8;">Warm regards,</p>
+                            <p style="margin:6px 0;color:#A8E063;font-weight:600;">
+                                <strong>Veridian Climate Pulse - Platform Administration</strong>
+                            </p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

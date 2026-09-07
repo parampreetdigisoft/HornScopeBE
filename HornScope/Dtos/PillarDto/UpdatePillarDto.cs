@@ -1,0 +1,17 @@
+namespace HornScope.Dtos.PillarDto
+{
+    public class UpdatePillarDto
+    {
+        public int PillarID { get; set; }
+        public string? PillarName { get; set; }
+        public string? Description { get; set; }
+        public int DisplayOrder { get; set; }
+        public double Weight { get; set; } = 1.0; // Default equal weight
+        public bool Reliability { get; set; } = true; // Default fully reliable     
+        public string? ImagePath { get; set; }
+        public IFormFile? ImageFile { get; set; }
+        public string? KpiLayerIds { get; set; }
+        public string? PillarCode { get; set; }
+        public string? KpiUpdates { get; set; }
+    }
+}

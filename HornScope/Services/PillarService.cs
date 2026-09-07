@@ -1,0 +1,1033 @@
+using HornScope.Backgroundjob;
+using HornScope.Common.Models;
+using HornScope.Data;
+using HornScope.Dtos.AssessmentDto;
+using HornScope.Dtos.CommonDto;
+using HornScope.Dtos.kpiDto;
+using HornScope.Dtos.PillarDto;
+using HornScope.IServices;
+using HornScope.Models;
+using ClosedXML.Excel;
+using Microsoft.EntityFrameworkCore;
+using System.Linq.Expressions;
+using QuestPDF.Fluent;
+using System.Text.Json;
+using HornScope.Common.Constants;
+using HornScope.Common.Implementation;
+using HornScope.Common.Interface;
+
+namespace HornScope.Services
+{
+    public class PillarService : IPillarService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IAppLogger _appLogger;
+        private readonly Download _download;
+        private readonly ICommonService _commonService;
+
+        public PillarService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
+        {
+            _context = context;
+            _appLogger = appLogger;
+            _download = download;
+            _commonService = commonService;
+        }
+
+        public async Task<List<GetPillarDTO>> GetAllAsync(int userId, UserRole userRole)
+        {
+            try
+            {
+                if(userRole != UserRole.ProgramUser)
+                {
+                    return await _commonService.GetPillars();
+                }
+                else
+                {
+                    var userPillar = await _context.ClientPillarMappings
+                        .Where(x => x.IsActive && x.UserID == userId)
+                        .Select(x => x.Pillar)
+                        .Where(x => x != null)
+                        .Select(x => x!)
+                        .Where(x => !x.IsDeleted)
+                        .Select(x => new GetPillarDTO
+                        {
+                            PillarID = x.PillarID,
+                            PillarName = x.PillarName,
+                            Description = x.Description,
+                            DisplayOrder = x.DisplayOrder,
+                            ImagePath = x.ImagePath,
+                            Weight = x.Weight,
+                            Reliability = x.Reliability,
+                            PillarCode = x.PillarCode,
+                            IsActive = x.IsActive,
+                            QuestionCount = x.Questions.Where(x => !x.IsDeleted).Count()
+                        })
+                        .Distinct()
+                        .ToListAsync();
+
+                    return userPillar;
+                }                
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
+                return new List<GetPillarDTO>();
+            }
+        }
+
+        public async Task<Pillar> GetByIdAsync(int id)
+        {
+            try
+            {
+                return await _context.Pillars.FirstAsync(x => x.IsActive && !x.IsDeleted && x.PillarID == id);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in GetByIdAsync", ex);
+                return new Pillar();
+            }
+        }
+
+        public async Task<Pillar> AddAsync(Pillar pillar)
+        {
+            try
+            {
+                _context.Pillars.Add(pillar);
+                await _context.SaveChangesAsync();
+                return pillar;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in AddAsync", ex);
+                return new Pillar();
+            }
+
+        }
+
+        public async Task<ResultResponseDto<Pillar>> AddPillarAsync(AddPillarDto pillar)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(pillar.PillarName))
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Pillar name is required." });
+
+                if (string.IsNullOrWhiteSpace(pillar.Description))
+                    return ResultResponseDto<Pillar>.Failure(new[] { "Description is required." });
+
+                var maxDisplayOrder = await _context.Pillars.Where(x => x.IsActive && !x.IsDeleted).MaxAsync(p => (int?)p.DisplayOrder) ?? 0;
+
+                var newPillar = new Pillar
+                {
+                    PillarName = pillar.PillarName.Trim(),
+                    Description = pillar.Description,
+                    DisplayOrder = pillar.DisplayOrder > 0 ? pillar.DisplayOrder : maxDisplayOrder + 1,
+                    PillarCode = string.IsNullOrWhiteSpace(pillar.PillarCode) ? null : pillar.PillarCode.Trim(),
+                    Weight = pillar.Weight,
+                    Reliability = pillar.Reliability,
+                    ImagePath = string.Empty,
+                    IsActive = true,
+                    IsDeleted = false
+                };
+
+                if (pillar.ImageFile != null)
+                {
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/assets/pillars");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+
+                    var fileName = Guid.NewGuid() + Path.GetExtension(pillar.ImageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await pillar.ImageFile.CopyToAsync(stream);
+                    newPillar.ImagePath = $"assets/pillars/{fileName}";
+                }
+                _commonService.ClearPillarCache();
+                _context.Pillars.Add(newPillar);
+                await _context.SaveChangesAsync();
+                await SyncPillarKpiMappingsAsync(newPillar.PillarID, pillar.KpiUpdates);
+                await _context.SaveChangesAsync();
+
+                return ResultResponseDto<Pillar>.Success(newPillar, new[] { "Pillar created successfully." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in AddPillarAsync", ex);
+                return ResultResponseDto<Pillar>.Failure(new[] { "Failed to create pillar." });
+            }
+        }
+
+        public async Task<Pillar> UpdateAsync(int id, UpdatePillarDto pillar)
+        {
+            try
+            {
+                var existing = await _context.Pillars
+                             .FirstOrDefaultAsync(x =>
+                                 x.PillarID == id &&
+                                 x.IsActive &&
+                                 !x.IsDeleted);
+                if (existing == null) return null;
+                existing.PillarName = pillar.PillarName ?? "";
+                existing.Description = pillar.Description ?? "";
+                existing.DisplayOrder = pillar.DisplayOrder;
+                existing.PillarCode = string.IsNullOrWhiteSpace(pillar.PillarCode) ? null : pillar.PillarCode.Trim();
+
+                if (pillar.ImageFile != null)
+                {
+                    if (!string.IsNullOrEmpty(existing.ImagePath))
+                    {
+                        var oldFilePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", existing.ImagePath);
+                        if (File.Exists(oldFilePath))
+                        {
+                            File.Delete(oldFilePath);
+                        }
+                    }
+                    var uploadsFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/assets/pillars");
+                    if (!Directory.Exists(uploadsFolder))
+                        Directory.CreateDirectory(uploadsFolder);
+                    var fileName = Guid.NewGuid() + Path.GetExtension(pillar.ImageFile.FileName);
+                    var filePath = Path.Combine(uploadsFolder, fileName);
+                    using var stream = new FileStream(filePath, FileMode.Create);
+                    await pillar.ImageFile.CopyToAsync(stream);
+                    existing.ImagePath = $"assets/pillars/{fileName}";
+                }
+
+                if (existing.Weight != pillar.Weight || existing.Reliability != pillar.Reliability)
+                {
+                    existing.Weight = pillar.Weight;
+                    existing.Reliability = pillar.Reliability;
+                    _download.InsertAnalyticalLayerResults();
+                }
+                 _commonService.ClearPillarCache();
+                await SyncPillarKpiMappingsAsync(id, pillar.KpiUpdates);
+                await _context.SaveChangesAsync();
+                return existing;
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured", ex);
+                return new Pillar();
+            }
+        }
+
+        public async Task<ResultResponseDto<List<PillarKpiMappingDto>>> GetPillarKpiMappingsAsync(int pillarId)
+        {
+            try
+            {
+                var pillarExists = await _context.Pillars.AnyAsync(p => p.PillarID == pillarId && p.IsActive && !p.IsDeleted);
+                if (!pillarExists)
+                    return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Pillar not found." });
+
+                var mappings = await (
+                    from map in _context.AnalyticalLayerPillarMappings
+                    join layer in _context.AnalyticalLayers on map.LayerID equals layer.LayerID
+                    where map.PillarID == pillarId && !layer.IsDeleted
+                    orderby layer.LayerName
+                    select new PillarKpiMappingDto
+                    {
+                        LayerID = layer.LayerID,
+                        LayerCode = layer.LayerCode,
+                        LayerName = layer.LayerName
+                    }).ToListAsync();
+
+                return ResultResponseDto<List<PillarKpiMappingDto>>.Success(mappings);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in GetPillarKpiMappingsAsync", ex);
+                return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Failed to load KPI mappings." });
+            }
+        }
+
+        private async Task SyncPillarKpiMappingsAsync(int pillarId, string? kpiUpdatesJson = null)
+        {
+            if (string.IsNullOrWhiteSpace(kpiUpdatesJson))
+                return;
+
+            List<KpiPillarReplacementDto> kpiUpdates;
+            try
+            {
+                kpiUpdates = JsonSerializer.Deserialize<List<KpiPillarReplacementDto>>(
+                    kpiUpdatesJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true }
+                ) ?? new List<KpiPillarReplacementDto>();
+            }
+            catch (JsonException)
+            {
+                kpiUpdates = new List<KpiPillarReplacementDto>();
+            }
+
+            if (kpiUpdates.Count == 0)
+                return;
+
+            foreach (var update in kpiUpdates.Where(u => u.LayerID > 0 && pillarId > 0))
+            {
+                // Remove the mapping row from the OLD pillar, if one exists and it's actually different
+                if (update.ReplacedPillarID > 0 && update.ReplacedPillarID != update.NewPillarID)
+                {
+                    var oldMapping = await _context.AnalyticalLayerPillarMappings
+                        .FirstOrDefaultAsync(x => x.LayerID == update.LayerID && x.PillarID == update.ReplacedPillarID);
+                    if (oldMapping != null)
+                        _context.AnalyticalLayerPillarMappings.Remove(oldMapping);
+                }
+
+                // Add the mapping row for the NEW pillar, if it doesn't already exist
+                var existingNewMapping = await _context.AnalyticalLayerPillarMappings
+                    .FirstOrDefaultAsync(x => x.LayerID == update.LayerID && x.PillarID == pillarId);
+
+                if (existingNewMapping == null)
+                {
+                    _context.AnalyticalLayerPillarMappings.Add(new AnalyticalLayerPillarMapping
+                    {
+                        LayerID = update.LayerID,
+                        PillarID = pillarId,
+                        Category = null,
+                        CategoryNumber = update.CategoryNumber
+                    });
+                }
+            }
+        }
+
+        public async Task<ResultResponseDto<bool>> DeleteAsync(int id)
+        {
+            try
+            {
+                var pillar = await _context.Pillars.FindAsync(id);
+                if (pillar == null)
+                    return ResultResponseDto<bool>.Failure(new[] { "Pillar not found." });
+
+                if (pillar.IsDeleted)
+                    return ResultResponseDto<bool>.Failure(new[] { "Pillar already deleted." });
+
+                var pillarKPIMapping = await _context.AnalyticalLayerPillarMappings.Where(x => x.PillarID == id).FirstOrDefaultAsync();
+
+                if (pillarKPIMapping != null)
+                {
+                    return ResultResponseDto<bool>.Failure(new[] { "Pillar cannot be deleted as it is bound to KPI's." });
+                }
+
+                pillar.IsDeleted = true;
+                _context.Pillars.Update(pillar);
+
+                var questions = await _context.Questions
+                    .Where(q => q.PillarID == id && !q.IsDeleted)
+                    .ToListAsync();
+
+                foreach (var question in questions)
+                {
+                    question.IsDeleted = true;
+                    _context.Questions.Update(question);
+                }
+                _commonService.ClearPillarCache();
+
+                await _context.SaveChangesAsync();
+
+                var message = questions.Count > 0
+                    ? $"Pillar deleted successfully. {questions.Count} associated question(s) have also been deleted."
+                    : "Pillar deleted successfully.";
+
+                return ResultResponseDto<bool>.Success(true, new[] { message });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in DeleteAsync", ex);
+                return ResultResponseDto<bool>.Failure(new[] { "Failed to delete pillar." });
+            }
+        }
+
+        public async Task<ResultResponseDto<List<PillarWithQuestionsDto>>> GetPillarsWithQuestions(GetProgramPillarHistoryRequestDto request)
+        {
+            try
+            {
+                // 1. Validate user
+                var user = await _context.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.UserID == request.UserID);
+
+                if (user == null)
+                    return ResultResponseDto<List<PillarWithQuestionsDto>>.Failure(new[] { "Invalid user" });
+
+                // 2. Role-based mapping filter
+                Expression<Func<StaffProgramMapping, bool>> predicate = user.Role switch
+                {
+                    UserRole.Analyst => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID && (x.AssignedByUserId == request.UserID || x.UserID == request.UserID),
+                    UserRole.Evaluator => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID && x.UserID == request.UserID,
+                    _ => x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID //default
+                };
+
+                var mappingIds = await _context.StaffProgramMappings
+                    .Where(predicate)
+                    .Select(x => x.StaffProgramMappingID)
+                    .ToListAsync();
+
+                // 3. Load assessments
+                var assessments = await _context.Assessments
+                    .Include(a => a.StaffProgramMapping)
+                    .Include(a => a.PillarAssessments)
+                        .ThenInclude(pa => pa.Responses)
+                    .Where(a => mappingIds.Contains(a.StaffProgramMappingID)
+                                && a.IsActive
+                                )
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                var pillars = await _context.Pillars
+                    .Where(p => p.IsActive && !p.IsDeleted)
+                    .Where(p => !request.PillarID.HasValue || p.PillarID == request.PillarID)
+                    .Include(p => p.Questions.Where(q => !q.IsDeleted))
+                        .ThenInclude(q => q.QuestionOptions)
+                    .OrderBy(p => p.DisplayOrder)
+                    .AsNoTracking()
+                    .ToListAsync();
+
+                // 5. Users dictionary
+                var userIds = assessments.Select(a => a.StaffProgramMapping.UserID).Distinct().ToList();
+
+                var usersDict = await _context.Users
+                    .Where(u => userIds.Contains(u.UserID))
+                    .ToDictionaryAsync(u => u.UserID, u => u.FullName);
+
+                // =========================================
+                // ? Pre-group responses (Performance Boost)
+                // =========================================
+                var responseLookup = assessments
+                    .SelectMany(a => a.PillarAssessments.Select(pa => new { a, pa }))
+                    .SelectMany(x => x.pa.Responses.Select(r => new
+                    {
+                        Response = r,
+                        x.pa.PillarID,
+                        UserID = x.a.StaffProgramMapping.UserID
+                    }))
+                    .GroupBy(x => (x.Response.QuestionID, x.PillarID, x.UserID))
+                    .ToDictionary(g => g.Key, g => g.First().Response);
+
+                // =========================================
+                // ? AI DATA FIXED
+                // =========================================
+                var aiRaw = await _context.AIEstimatedQuestionScores
+                    .Where(x => x.ClimateProgramID == request.ClimateProgramID
+                                && (!request.PillarID.HasValue || x.PillarID == request.PillarID))
+                    .ToListAsync();
+
+                var aiDict = aiRaw
+                    .GroupBy(x => new { x.PillarID, x.QuestionID })
+                    .ToDictionary(
+                        g => (g.Key.PillarID, g.Key.QuestionID),
+                        g => g.Select(x => new QuestionUserAnswerDto
+                        {
+                            UserID = int.MaxValue,
+                            FullName = "AI_Result",
+                            QuestionID = x.QuestionID,
+                            Score = x.AIScore.ToString(),
+                            Justification = x.EvidenceSummary,
+                            OptionText = ""
+                        }).FirstOrDefault()
+                    );
+
+                // =========================================
+                // 6. Build response
+                // =========================================
+                var result = pillars.Select(p => new PillarWithQuestionsDto
+                {
+                    PillarID = p.PillarID,
+                    PillarName = p.PillarName,
+                    DisplayOrder = p.DisplayOrder,
+                    TotalQuestions = p.Questions.Count(q => !q.IsDeleted),
+
+                    Questions = p.Questions
+                        .Where(q => !q.IsDeleted)
+                        .OrderBy(q => q.DisplayOrder)
+                        .Select(q =>
+                        {
+                            var userAnswers = new Dictionary<int, QuestionUserAnswerDto>();
+
+                            foreach (var uid in userIds)
+                            {
+                                responseLookup.TryGetValue((q.QuestionID, p.PillarID, uid), out var response);
+
+                                var option = q.QuestionOptions
+                                    .FirstOrDefault(o => o.OptionID == response?.QuestionOptionID);
+
+                                userAnswers[uid] = new QuestionUserAnswerDto
+                                {
+                                    UserID = uid,
+                                    FullName = usersDict.TryGetValue(uid, out var name) ? name : "",
+                                    QuestionID = q.QuestionID,
+                                    Score = option?.ScoreValue,
+                                    Justification = response?.Justification ?? "",
+                                    OptionText = option?.OptionText ?? ""
+                                };
+                            }
+
+                            // ? Inject AI answer
+                            if (aiDict.TryGetValue((p.PillarID, q.QuestionID), out var aiAnswer))
+                            {
+                                if (aiAnswer !=null)
+                                {
+                                    var option = q.QuestionOptions
+                                    .FirstOrDefault(o => o.ScoreValue == aiAnswer.Score);
+
+                                    aiAnswer.OptionText = option?.OptionText ?? "";
+                                    userAnswers[int.MaxValue] = aiAnswer;
+                                }
+                            }
+
+                            return new QuestionWithUserDto
+                            {
+                                QuestionID = q.QuestionID,
+                                QuestionText = q.QuestionText,
+                                DisplayOrder = q.DisplayOrder,
+                                Users = userAnswers
+                            };
+                        }).ToList()
+                }).ToList();
+                return ResultResponseDto<List<PillarWithQuestionsDto>>.Success(result);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in GetPillarsWithQuestions", ex);
+                return ResultResponseDto<List<PillarWithQuestionsDto>>.Failure(new[] { "There was an error, please try again later" });
+            }
+        }
+
+        public async Task<Tuple<string, byte[]>> ExportPillarsHistoryByUserId(GetProgramPillarHistoryRequestDto requestDto)
+        {
+            try
+            {
+                var response = await GetPillarsWithQuestions(requestDto);
+                var climateProgram = await _context.ClimatePrograms
+                    .FirstOrDefaultAsync(x => x.ClimateProgramID == requestDto.ClimateProgramID);
+
+                if (!response.Succeeded || response.Result == null)
+                {
+                    return new Tuple<string, byte[]>("", Array.Empty<byte>());
+                }
+
+                byte[] fileBytes;
+                string fileName;
+
+                if (requestDto.ExportType == Enums.ExportType.Pdf)
+                {
+                    // ? Use structured data directly (NO flattening)
+                    fileBytes = GeneratePdf(response.Result, climateProgram);
+
+                    fileName = $"ExportPillarsHistory_{requestDto.ClimateProgramID}_{requestDto.PillarID}.pdf";
+                }
+                else
+                {
+                    // ? Excel (existing)
+                    fileBytes = MakePillarSheet(response.Result, climateProgram);
+                    fileName = $"ExportPillarsHistory_{requestDto.ClimateProgramID}_{requestDto.PillarID}.xlsx";
+                }
+
+                return new Tuple<string, byte[]>(fileName, fileBytes);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occure in ExportPillarsHistoryByUserId", ex);
+                return new Tuple<string, byte[]>("", Array.Empty<byte>());
+            }
+        }
+        public byte[] GeneratePdf(List<PillarWithQuestionsDto> data, ClimateProgram climateProgram)
+        {
+            var logoPath = Path.Combine(
+                Directory.GetCurrentDirectory(),
+                "wwwroot/assets/images/vcp.png");
+
+            return Document.Create(container =>
+            {
+                container.Page(page =>
+                {
+                    page.Margin(20);
+
+                    page.Content().Column(col =>
+                    {
+                        int pillarIndex = 1;
+
+                        foreach (var pillar in data)
+                        {
+                            // ================= HEADER =================
+                            col.Item()
+                                .Background("#1f4b3f")
+                                .Padding(15)
+                                .Row(row =>
+                                {
+                                    row.RelativeItem().Column(left =>
+                                    {
+                                        left.Item().Text($"{pillarIndex}. {pillar.PillarName}")
+                                            .FontSize(18)
+                                            .Bold()
+                                            .FontColor("#ffffff");
+
+                                        left.Item().Text($"{climateProgram?.ProgramName}, {climateProgram.Location} | Program Year: {climateProgram.Year}")
+                                            .FontSize(10)
+                                            .FontColor("#cfe7df");
+
+                                        left.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
+                                            .FontSize(9)
+                                            .FontColor("#cfe7df");
+                                    });
+
+                                    // Right logo
+                                    row.ConstantItem(80)
+                                       .Background(ReportThemeColors.DarkBlue)
+                                        .AlignCenter()
+                                        .AlignMiddle()
+                                        .Padding(4)
+                                        .Image(logoPath)
+                                        .FitArea();
+
+                                });
+
+                            col.Item().PaddingBottom(10);
+
+                            int questionIndex = 1;
+
+                            foreach (var question in pillar.Questions)
+                            {
+                                string questionNumber = $"{pillarIndex}.{questionIndex}";
+
+                                // ================= QUESTION CARD =================
+                                col.Item()
+                                    .Background("#ffffff")
+                                    .Border(1)
+                                    .BorderColor("#e5e5e5")
+                                    .Padding(12)
+                                    .Column(qCol =>
+                                    {
+                                        // Question Title
+                                        qCol.Item().Text($"{questionNumber} {question.QuestionText}")
+                                            .FontSize(12)
+                                            .Bold();
+
+                                        qCol.Item().PaddingTop(10);
+
+                                        // ================= CLEAN TABLE =================
+                                        qCol.Item().Table(table =>
+                                        {
+                                            table.ColumnsDefinition(columns =>
+                                            {
+                                                columns.RelativeColumn(2); // Name
+                                                columns.RelativeColumn(1); // Score
+                                                columns.RelativeColumn(5); // Option
+                                            });
+
+                                            // HEADER
+                                            table.Header(header =>
+                                            {
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Name").SemiBold().FontSize(10);
+
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Score").SemiBold().FontSize(10);
+
+                                                header.Cell().PaddingBottom(5)
+                                                    .Text("Option").SemiBold().FontSize(10);
+                                            });
+
+                                            table.ColumnsDefinition(columns =>
+                                            {
+                                                columns.ConstantColumn(120); // NAME (fixed)
+                                                columns.ConstantColumn(80);  // SCORE (smaller & controlled)
+                                                columns.RelativeColumn();    // OPTION (takes remaining space)
+                                            });
+                                            // ROWS
+                                            foreach (var user in question.Users.Values
+                                                         .OrderBy(x => x.UserID == -1 ? 1 : 0))
+                                            {
+                                                bool isAI = user.UserID == -1;
+                                                string bgColor = isAI ? "#e6f4ef" : "#ffffff";
+
+                                                // NAME
+                                                var nameCell = table.Cell()
+                                                    .Padding(2)
+                                                    .Background(bgColor)
+                                                    .Text(isAI ? "AI" : user.FullName)
+                                                    .FontColor(isAI ? "#0a7d5e" : "#000");
+
+                                                if (isAI)
+                                                    nameCell.Bold();
+
+                                                // SCORE
+                                                table.Cell()
+                                                    .Padding(2)
+                                                    .Background(bgColor)
+                                                    .Text(user.Score?.ToString() ?? "")
+                                                    .WrapAnywhere();
+
+                                                // OPTION
+                                                table.Cell()
+                                                    .Padding(2)
+                                                    .Background(bgColor)
+                                                    .Text(user.OptionText ?? "")
+                                                    .WrapAnywhere();
+                                            }
+                                        });
+                                    });
+
+                                questionIndex++;
+                                col.Item().PaddingBottom(10);
+                            }
+
+                            pillarIndex++;
+                            col.Item().PaddingBottom(15);
+                        }
+                    });
+                });
+            }).GeneratePdf();
+        }
+
+        private byte[] MakePillarSheet(List<PillarWithQuestionsDto> pillars, Models.ClimateProgram? climateProgram)
+        {
+            using (var workbook = new XLWorkbook())
+            {
+                var name = climateProgram == null ? $"{pillars.Count}-Pillars-Result" : climateProgram?.ProgramName+"-"+ $"-{pillars.Count}-Pillars-Result";
+                var shortName = name.Length > 30 ? name.Substring(0, 30) : name;
+
+                var ws = workbook.Worksheets.Add(shortName);
+                ws.Columns().Width = 35;
+                ws.Column(1).Width = 6;  // S.NO.
+                ws.Column(2).Width = 100;  // Pillar/Question text
+
+                var protection = ws.Protect();
+                protection.AllowedElements =
+                   XLSheetProtectionElements.FormatColumns |
+                   XLSheetProtectionElements.SelectLockedCells |
+                   XLSheetProtectionElements.SelectUnlockedCells;
+
+                var names = pillars
+                    .SelectMany(p => p.Questions)
+                    .SelectMany(q => q.Users.Values)
+                    .GroupBy(u => u.UserID)
+                    .Select(g => g.First())
+                    .ToList();
+
+                int row = 1;
+                int pillarCounter = 1;
+
+                foreach (var pillar in pillars)
+                {
+                    int c = 1;
+
+                    // Header row
+                    ws.Cell(row, c++).Value = "S.NO.";
+                    ws.Cell(row, c++).Value = "PillarName";
+                    foreach (var user in names)
+                        ws.Cell(row, c++).Value = user.FullName;
+
+                    var headerRange = ws.Range(row, 1, row, names.Count + 2);
+                    headerRange.Style.Font.Bold = true;
+                    headerRange.Style.Fill.BackgroundColor = XLColor.DarkBlue;
+                    headerRange.Style.Font.FontColor = XLColor.White;
+                    headerRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+                    ++row;
+                    c = 1;
+
+                    // Pillar row
+                    ws.Cell(row, c++).Value = pillarCounter++; // pillar serial number
+                    ws.Cell(row, c++).Value = pillar.PillarName;
+                    ws.Cell(row, 2).Style.Font.Bold = true;
+
+                    foreach (var user in names)
+                    {
+                        var userData = pillar.Questions
+                            .SelectMany(x => x.Users)
+                            .Where(x => x.Key == user.UserID)
+                            .ToList(); // materialize once
+
+                        var count = userData.Count;
+
+                        //var filteredData = userData
+                        //    .Where(x => x.Value.Score!=null)
+                        //    .Select(x => (decimal)x.Value.Score.ToString());
+
+                        //decimal score = filteredData.Any()
+                        //  ? filteredData.Average()
+                        //  :0m;
+
+                        var richText = ws.Cell(row, c++).GetRichText();
+
+                        richText.AddText("Total Score:  ")
+                            .SetBold().SetFontColor(XLColor.DarkGray);
+
+                        richText.AddText($"{Math.Round(1.00,2)}\n")
+                            .SetFontColor(XLColor.Black);
+                    }
+
+                    row += 2;
+                    c = 1;
+
+                    // Question header row
+                    ws.Cell(row, c++).Value = "S.NO.";
+                    ws.Cell(row, c++).Value = "Questions";
+                    foreach (var user in names)
+                        ws.Cell(row, c++).Value = user.FullName;
+
+                    var headerQRange = ws.Range(row, 1, row, names.Count + 2);
+                    headerQRange.Style.Font.Bold = true;
+                    headerQRange.Style.Fill.BackgroundColor = XLColor.TealBlue;
+                    headerQRange.Style.Font.FontColor = XLColor.White;
+                    headerQRange.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+
+                    var q = pillar.Questions;
+                    int questionCounter = 1;
+
+                    for (var i = 0; i < q.Count; i++)
+                    {
+                        ++row;
+                        var question = q[i];
+                        var usersData = question.Users;
+
+                        c = 1;
+                        ws.Cell(row, c++).Value = $"{pillarCounter - 1}.{questionCounter++}";
+                        ws.Cell(row, 1).Style.Font.Bold = true;
+                        ws.Cell(row, c++).Value = question.QuestionText;
+
+
+                        foreach (var user in names)
+                        {
+                            usersData.TryGetValue(user.UserID, out var answerDto);
+                            answerDto ??= new();
+
+                            var richText = ws.Cell(row, c++).GetRichText();
+
+                            richText.AddText("OptionText: ")
+                               .SetBold().SetFontColor(XLColor.DarkRed);
+                            richText.AddText($"{answerDto.OptionText ?? "-"}\n")
+                                .SetFontColor(XLColor.Black);
+
+                            richText.AddText("Score: ")
+                                .SetBold().SetFontColor(XLColor.DarkBlue);
+                            richText.AddText($"{answerDto.Score}\n")
+                                .SetFontColor(XLColor.Black);
+
+                            richText.AddText("Comment: ")
+                                .SetBold().SetFontColor(XLColor.DarkGreen);
+                            richText.AddText($"{answerDto.Justification ?? "-"}")
+                                .SetFontColor(XLColor.Black);
+
+                            ws.Cell(row, c - 1).Style.Alignment.WrapText = true;
+                            ws.Row(row).Height = 60;
+                        }
+                    }
+
+                    row += 2;
+                }
+
+                using (var stream = new MemoryStream())
+                {
+                    workbook.SaveAs(stream);
+                    return stream.ToArray();
+                }
+            }
+        }
+
+        public async Task<PaginationResponse<PillarsHistroyResponseDto>> GetResponsesByUserId(GetPillarResponseHistoryRequestNewDto request, UserRole userRole)
+        {
+            try
+            {
+                // Role based filter
+                IQueryable<StaffProgramMapping> staffProgramMappings = _context.StaffProgramMappings
+                    .AsNoTracking()
+                    .Where(x => !x.IsDeleted && x.ClimateProgramID == request.ClimateProgramID);
+
+                staffProgramMappings = userRole switch
+                {
+                    UserRole.Analyst => staffProgramMappings.Where(x => x.AssignedByUserId == request.UserId),
+                    UserRole.Evaluator => staffProgramMappings.Where(x => x.UserID == request.UserId),
+                    _ => staffProgramMappings
+                };
+
+                // Main query (single DB round-trip)
+                var rawData = await (
+                    from ucm in staffProgramMappings
+                    join a in _context.Assessments on ucm.StaffProgramMappingID equals a.StaffProgramMappingID
+                    where a.IsActive && (a.AssessmentPhase == AssessmentPhase.Completed || a.AssessmentPhase == AssessmentPhase.EditRejected || a.AssessmentPhase == AssessmentPhase.EditRequested)
+                    from pa in a.PillarAssessments
+                    where !request.PillarID.HasValue || pa.PillarID == request.PillarID
+                    join p in _context.Pillars.Where(x => x.IsActive && !x.IsDeleted) on pa.PillarID equals p.PillarID
+                    select new
+                    {
+                        p.PillarID,
+                        p.PillarName,
+                        p.DisplayOrder,
+                        UserID = ucm.UserID,
+                        TotalQuestion = p.Questions.Count(x => !x.IsDeleted),
+                        Responses = pa.Responses.Select(r => new
+                        {
+                            r.Score,
+                            r.QuestionOptionID,
+                            Weight = r.Question.Weight,
+                            // Needed for N/A / Indeterminate exclusion — don't rely on Score being null
+                            OptionScoreValue = r.Question.QuestionOptions
+                                .Where(o => o.OptionID == r.QuestionOptionID)
+                                .Select(o => o.ScoreValue)
+                                .FirstOrDefault()
+                        })
+                    }
+                ).ToListAsync();
+
+                if (!rawData.Any())
+                    return new PaginationResponse<PillarsHistroyResponseDto>();
+
+                var userIds = rawData.Select(x => x.UserID).Distinct().ToList();
+
+                var usersDict = await _context.Users
+                    .Where(u => userIds.Contains(u.UserID))
+                    .ToDictionaryAsync(u => u.UserID, u => u.FullName);
+
+
+                // =========================
+                // 2. AI DATA
+                // =========================
+                var aiDataList = await _context.AIPillarScores
+                    .Where(x => x.ClimateProgramID == request.ClimateProgramID
+                        && (!request.PillarID.HasValue || x.PillarID == request.PillarID))
+                    .GroupBy(x => x.PillarID)
+                    .Select(g => new
+                    {
+                        PillarID = g.Key,
+                        Score = g.Sum(x => x.AIScore ?? 0),
+                        ScoreProgress = g.Average(x => x.AIProgress ?? 0),
+                        Count = _context.AIEstimatedQuestionScores.Where(x => x.PillarID == g.Key && x.ClimateProgramID == request.ClimateProgramID).Count()
+                    })
+                    .ToListAsync();
+
+                var aiData = aiDataList.ToDictionary(
+                    x => x.PillarID,
+                    x => new PillarsUserHistroyResponseDto
+                    {
+                        UserID = int.MaxValue,
+                        FullName = "AI_Result",
+                        Score =  Convert.ToDecimal(Math.Round(x.Score, 0)),
+                        ScoreProgress =  x.ScoreProgress,
+                        AnsQuestion = x.Count,
+                        AnsPillar = 1
+                    }
+                );
+
+                // =========================
+                // 3. ALL PILLARS (MAIN FIX)
+                // =========================
+                var pillars = await _context.Pillars
+                    .Where(p => p.IsActive && !p.IsDeleted && (!request.PillarID.HasValue || p.PillarID == request.PillarID))
+                    .Select(p => new
+                    {
+                        p.PillarID,
+                        p.PillarName,
+                        p.DisplayOrder,
+                        TotalQuestion = p.Questions.Count(x => !x.IsDeleted)
+                    })
+                    .ToListAsync();
+
+                // =========================
+                // 4. FINAL RESULT (FROM PILLARS)
+                // =========================
+                var result = pillars
+                    .Select(p =>
+                    {
+                        var pillarRawData = rawData
+                            .Where(x => x.PillarID == p.PillarID)
+                            .ToList();
+
+                        var users = pillarRawData
+                            .GroupBy(x => x.UserID)
+                            .Select(userGroup =>
+                            {
+                                var responses = userGroup
+                                    .SelectMany(x => x.Responses)
+                                    .Where(r => r.Score.HasValue)
+                                    .ToList();
+                                var criticalFailureCount = responses.Count(r =>
+                                     r.Weight == Constants.CriticalIndicatorWeight &&
+                                     r.Score <= Constants.LeastCriticalIndicatorValue);
+                                var criticalFailurePenalty = CommonStaticMethods.GetCriticalFailurePenalty(criticalFailureCount);
+
+                                // Step 1 & 2: Σ(Score × Weight)
+                                var weightedSum = responses.Sum(r => r.Score!.Value * r.Weight);
+
+                                // Step 3: Σ(Weight)
+                                var totalWeight = responses.Sum(r => r.Weight);
+
+                                // Step 4 & 5: Weighted avg (-4 to +4) -> converted to 0-100 scale
+                                var progress = totalWeight > 0
+                                    ? ((((decimal)weightedSum / (decimal)totalWeight) + 4m) / 8m) * 100m - criticalFailurePenalty
+                                    : 0m;
+
+                                return new PillarsUserHistroyResponseDto
+                                {
+                                    UserID = userGroup.Key,
+                                    FullName = usersDict.GetValueOrDefault(userGroup.Key, ""),
+                                    Score = progress,
+                                    ScoreProgress = progress,
+                                    TotalQuestion = p.TotalQuestion,
+                                    AnsQuestion = responses.Count,
+                                    AnsPillar = responses.Any() ? 1 : 0
+                                };
+                            })
+                            .ToList();
+
+                        if (aiData.TryGetValue(p.PillarID, out var aiPillar))
+                        {
+                            aiPillar.TotalQuestion = p.TotalQuestion;
+                            users.Insert(0, aiPillar);
+                        }
+                        else
+                        {
+                            users.Insert(0, new PillarsUserHistroyResponseDto
+                            {
+                                UserID = int.MaxValue,
+                                FullName = "AI_Result",
+                                Score = 0,
+                                ScoreProgress = 0,
+                                TotalQuestion = p.TotalQuestion,
+                                AnsQuestion = 0,
+                                AnsPillar = 0
+                            });
+                        }
+
+                        return new PillarsHistroyResponseDto
+                        {
+                            PillarID = p.PillarID,
+                            PillarName = p.PillarName,
+                            DisplayOrder = p.DisplayOrder,
+                            Users = users
+                        };
+                    })
+                    .OrderBy(x => x.DisplayOrder)
+                    .ToList();
+
+                // =========================
+                // 5. PAGINATION
+                // =========================
+                var count = 0;
+                var valid = 0;
+                var totalRecords = 0;
+
+                foreach (var r in result)
+                {
+                    totalRecords += r.Users.Count;
+                    if (count + r.Users.Count <= request.PageSize)
+                    {
+                        count += r.Users.Count;
+                        valid++;
+                    }
+                }
+                var filterResult = result.Skip((request.PageNumber - 1) * valid);
+
+                return new PaginationResponse<PillarsHistroyResponseDto>
+                {
+                    Data = filterResult.Take(valid),
+                    TotalRecords = totalRecords,
+                    PageNumber = request.PageNumber,
+                    PageSize = request.PageSize
+                };
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error occurred in GetPillarsHistoryByUserId", ex);
+                return new PaginationResponse<PillarsHistroyResponseDto>();
+            }
+        }
+    }
+}

@@ -1,0 +1,14 @@
+using System.ComponentModel.DataAnnotations;
+
+namespace HornScope.Dtos.UserDtos
+{
+    public class ContactUsRequestDto
+    {
+        public string Name { get; set; } 
+        public string Email { get; set; } 
+        public string City { get; set; } 
+        public string Program { get; set; } 
+        public string Subject { get; set; } 
+        public string Message { get; set; } 
+    }
+}

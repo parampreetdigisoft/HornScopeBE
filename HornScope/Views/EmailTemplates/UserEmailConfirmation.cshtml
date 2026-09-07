@@ -1,0 +1,197 @@
+@model API.Views.EmailModels.UserEmailConfirmationRequestDto
+@{
+    Layout = "";
+}
+
+<html lang="en">
+<head>
+    <title>Reset your password</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+    <style type="text/css">
+            /* CLIENT-SPECIFIC STYLES */
+            #outlook a {
+                padding: 0;
+            }
+            .ReadMsgBody {
+                width: 100%;
+            }
+
+            .ExternalClass {
+                width: 100%;
+            }
+                .ExternalClass, .ExternalClass p, .ExternalClass span, .ExternalClass font, .ExternalClass td, .ExternalClass div {
+                    line-height: 100%;
+                }
+            body, table, td, a {
+                -webkit-text-size-adjust: 100%;
+                -ms-text-size-adjust: 100%;
+            }
+            table, td {
+                mso-table-lspace: 0pt;
+                mso-table-rspace: 0pt;
+            }
+            img {
+                -ms-interpolation-mode: bicubic;
+            }
+
+            body {
+                margin: 0;
+                padding: 0;
+            }
+
+            img {
+                border: 0;
+                height: auto;
+                line-height: 100%;
+                outline: none;
+                text-decoration: none;
+            }
+
+            table {
+                border-collapse: collapse !important;
+            }
+
+            body {
+                height: 100% !important;
+                margin: 0;
+                padding: 0;
+                width: 100% !important;
+            }
+
+            .appleBody a {
+                color: #A8E063;
+                text-decoration: none;
+            }
+
+            .appleFooter a {
+                color: #A8E063;
+                text-decoration: none;
+            }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #040A1D; font-family: 'Poppins', Arial, sans-serif;">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#040A1D"
+           style="table-layout: fixed; background-color: #040A1D; background-image: linear-gradient(145deg, #040A1D 0%, #0A2240 42%, #061228 72%, #020816 100%);">
+        <tr>
+            <td bgcolor="#040A1D" width="10"></td>
+            <td height="64" colspan="" bgcolor="#040A1D"></td>
+            <td bgcolor="#040A1D" width="10"></td>
+        </tr>
+        <tr>
+            <td bgcolor="#040A1D" width="10"></td>
+            <td align="center" style="padding-bottom: 50px;">
+                <table border="0" cellpadding="0" cellspacing="0" width="700" bgcolor="#0B1633"
+                       style="background-color: #0B1633; border-radius: 16px; overflow: hidden; border: 1px solid #1a3a5c; box-shadow: 0 32px 64px rgba(0,0,0,0.45);" class="table">
+                    <!-- HEADER -->
+                    <tr>
+                        <td align="center" bgcolor="#0A2240" colspan="3"
+                            style="padding: 40px 55px 30px; background-color: #0A2240; background-image: linear-gradient(160deg, #061228 0%, #0A2240 42%, #1B5E3B 100%);">
+                            <a href="#" target="_blank" style="display: inline-block;">
+                                <img src="cid:vcp-logo" class="img-fliuid" alt="Veridian Climate Pulse"
+                                     style="width:auto;max-width:220px;height:auto;max-height:72px;display:block;margin:0 auto;" border="0" />
+                            </a>
+                            <h1 style="font-family: 'Poppins', Arial, sans-serif; color: #ffffff; font-size: 28px; margin-top: 24px; margin-bottom: 0; font-weight: 600;">Verify Email</h1>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td width="55" bgcolor="#0B1633"></td>
+                        <td bgcolor="#0B1633" style="background-color: #0B1633;">
+                            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                                <tr>
+                                    <td align="left" style="padding-top: 10px;">
+                                        <p style="color: #E8EEF8; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 0 0 10px;">Hi @Model.Name,</p>
+                                        <p style="color: #9AADC4; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 0 0 10px;">your password is , @Model.Password</p>
+                                        <p style="color: #9AADC4; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 0 0 10px;">To activate your VCP Account, Please verify your email address.</p>
+                                        <p style="color: #9AADC4; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 0 0 20px;">Your account will not be created untill your email address is confirmed.</p>
+                                        <p style="margin: 0;">
+                                            <a href="@Model.EmailConfirmationUrl"
+                                               style="background-color: #2E7D32; background-image: linear-gradient(135deg, #1B5E3B 0%, #2E7D32 48%, #4CAF50 100%); border-radius: 12px; font-family: 'Poppins', Arial, sans-serif; color: #ffffff; font-size: 14px; padding: 12px 24px; text-align: center; text-decoration: none; display: inline-block; font-weight: 600; box-shadow: 0 4px 14px rgba(46,125,50,0.32);">
+                                                Confirm Your Email
+                                            </a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="color: #9AADC4; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 30px 0 5px;">Sincerely,</p>
+                            <p style="color: #A8E063; font-family: 'Poppins', Arial, sans-serif; font-size: 16px; line-height: 26px; margin: 0 0 5px; font-weight: 600;">VCP team.</p>
+                        </td>
+                        <td width="55" bgcolor="#0B1633"></td>
+                    </tr>
+                    <tr>
+                        <td height="40" colspan="3" bgcolor="#0B1633"></td>
+                    </tr>
+                </table>
+            </td>
+            <td bgcolor="#040A1D" width="10"></td>
+        </tr>
+        <tr>
+            <td bgcolor="#040A1D" width="10"></td>
+            <td height="10" bgcolor="#040A1D"></td>
+            <td bgcolor="#040A1D" width="10"></td>
+        </tr>
+        <tr>
+            <td bgcolor="#040A1D" width="10"></td>
+            <td align="center">
+                <table border="0" cellpadding="0" cellspacing="0" width="700" class="table">
+                    <tbody>
+                        <tr>
+                            <td style="padding-bottom:25px;" valign="top" align="center">
+                                <table cellspacing="0" cellpadding="0" border="0" align="center">
+                                    <tbody>
+                                        <tr>
+                                            <td valign="top" align="center">
+                                                <a href="https://www.facebook.com/" target="_blank" style="text-decoration:none;">
+                                                    <img src="assets/images/facebook-icon.svg" alt="fb" style="display:block; font-family: Arial, sans-serif; font-size:14px; line-height:14px; color:#ffffff; max-width:26px;" width="26" border="0" height="26">
+                                                </a>
+                                            </td>
+                                            <td style="width:9px;" width="9">&nbsp;</td>
+                                            <td valign="top" align="center">
+                                                <a href="https://twitter.com/" target="_blank" style="text-decoration:none;">
+                                                    <img src="assets/images/twitter-icon.svg" alt="twitter" style="display:block;font-family:Arial, sans-serif; font-size:14px; line-height:14px; color:#ffffff; max-width:27px;" width="27" border="0" height="26" />
+                                                </a>
+                                            </td>
+                                            <td style="width:9px;" width="9">&nbsp;</td>
+                                            <td valign="top" align="center">
+                                                <a href="https://linkedin.com/" target="_blank" style="text-decoration:none;">
+                                                    <img src="assets/images/linkedin-icon.svg" alt="linkedin" style="display:block; font-family:Arial, sans-serif; font-size:14px; line-height:14px; color:#ffffff; max-width:26px;" width="26" border="0" height="26">
+                                                </a>
+                                            </td>
+                                            <td style="width:9px;" width="9">&nbsp;</td>
+                                            <td valign="top" align="center">
+                                                <a href="https://youtube.com/" target="_blank" style="text-decoration:none;">
+                                                    <img src="assets/images/youtube-icon.svg" alt="youtube" style="display:block; font-family:Arial, sans-serif; font-size:14px; line-height:14px; color:#ffffff; max-width:26px;" width="26" border="0" height="26">
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-family:'Poppins', Arial, sans-serif; font-size:12px; line-height:18px; color:#9AADC4;" valign="top" align="center">
+                                <a href="#" target="_blank" style="color:#A8E063; font-family:'Poppins', Arial, sans-serif; font-size:12px; text-decoration: none; margin: 0 8px;">Privacy Policy </a> |
+                                <a href="#" target="_blank" style="color:#A8E063;font-family:'Poppins', Arial, sans-serif; font-size:12px; text-decoration: none; margin: 0 8px;">Terms & Conditions </a> |
+                                <a href="#" target="_blank" style="color:#A8E063;font-family:'Poppins', Arial, sans-serif; font-size:12px; text-decoration: none; margin: 0 8px;">Help Centre</a>
+                                <p style="font-family:'Poppins', Arial, sans-serif; font-size:12px; line-height:18px; color:#9AADC4; max-width: 426px; margin: 24px auto;">Message sent to <a href="mailto:jhonsmith@gmail.com" style="font-family: 'Poppins', Arial, sans-serif; font-size: 12px; color: #A8E063; line-height: 20px; text-decoration: none;">jhonsmith@gmail.com</a>. If you don't want to receive this type of message, you can <a href="#" style="font-family: 'Poppins', Arial, sans-serif; font-size: 12px; color: #A8E063; line-height: 20px; text-decoration: underline;">unsubscribe</a> from this list.</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td style="font-family:'Poppins', Arial, sans-serif; font-size:12px; line-height:18px; color:#9AADC4; border-top: 1px solid #1a3a5c; padding-top: 17px;" valign="top" align="center">
+                                <p style="font-family:'Poppins', Arial, sans-serif; font-size:12px; line-height:18px; color: #9AADC4; margin: 0px; margin-bottom: 15px;">
+                                    ©2025 VCP.org<br>
+                                    1‌000 West Maude Avenue, Sunnyvale, CA 94085.
+                                </p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </td>
+            <td bgcolor="#040A1D" width="10"></td>
+        </tr>
+    </table>
+</body>
+</html>

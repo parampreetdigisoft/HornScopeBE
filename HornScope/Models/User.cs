@@ -1,0 +1,27 @@
+using HornScope.Enums;
+using System;
+
+namespace HornScope.Models
+{
+    public enum UserRole { Admin = 1, Analyst = 2, Evaluator = 3, ProgramUser = 4 }
+    public class User
+    {
+        public int UserID { get; set; }
+        public string FullName { get; set; }
+        public string Email { get; set; }
+        public string Phone { get; set; }
+        public string PasswordHash { get; set; }
+        public UserRole Role { get; set; }
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public int? CreatedBy { get; set; }
+        public bool IsDeleted { get; set; } = false;
+        public string? ResetToken { get; set; }
+        public DateTime ResetTokenDate { get; set; } = DateTime.UtcNow;
+        public bool IsEmailConfirmed { get; set; } = false;
+        public string? ProfileImagePath { get; set; }
+        public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+        public TieredAccessPlan? Tier { get; set; }
+        public bool Is2FAEnabled { get; set; } = false;
+        public string? TemporaryEmail { get; set; } = null;
+    }
+}

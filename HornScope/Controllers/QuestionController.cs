@@ -1,0 +1,163 @@
+
+using HornScope.Dtos.AssessmentDto;
+using HornScope.Dtos.QuestionDto;
+using HornScope.IServices;
+using HornScope.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
+
+namespace HornScope.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    [Authorize(Policy = "StaffOnly")]
+    public class QuestionController : ControllerBase
+    {
+        private readonly IQuestionService _questionService;
+        public QuestionController(IQuestionService questionService)
+        {
+            _questionService = questionService;
+        }
+        private int? GetUserIdFromClaims()
+        {
+            var userIdClaim = User.FindFirst("UserId")?.Value;
+            if (int.TryParse(userIdClaim, out int userId))
+                return userId;
+
+            return null;
+        }
+        private string? GetRoleFromClaims()
+        {
+            return User.FindFirst(ClaimTypes.Role)?.Value;
+        }
+
+        [HttpGet("pillars")]
+        [Authorize]
+        public async Task<IActionResult> GetPillars() => Ok(await _questionService.GetPillarsAsync());
+
+        [HttpGet("getQuestions")]
+        [Authorize]
+        public async Task<IActionResult> GetQuestions([FromQuery] GetQuestionRequestDto requestDto) => Ok(await _questionService.GetQuestionsAsync(requestDto));
+
+        [HttpPost("add")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddQuestion([FromBody] Question q)
+        {
+            var result = await _questionService.AddQuestionAsync(q);
+            return Ok(result);
+        }
+        [HttpPost("addUpdateQuestion")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddUpdateQuestion([FromBody] AddUpdateQuestionDto q)
+        {
+            var result = await _questionService.AddUpdateQuestion(q);
+            return Ok(result);
+        }
+
+        [HttpPost("addBulkQuestions")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> AddBulkQuestions([FromBody] AddBulkQuestionsDto q)
+        {
+            var result = await _questionService.AddBulkQuestion(q);
+            return Ok(result);
+        }
+
+        [HttpPut("edit/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> EditQuestion(int id, [FromBody] Question q)
+        {
+            var result = await _questionService.EditQuestionAsync(id, q);
+            if (result == null) return NotFound();
+            return Ok(result);
+        }
+
+        [HttpDelete("delete/{id}")]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteQuestion(int id)
+        {
+            var success = await _questionService.DeleteQuestionAsync(id);
+            if (!success) return BadRequest("You don't have Access");
+            return Ok();
+        }
+
+        [HttpGet("getQuestionsByProgramMappingId")]
+        [Authorize]
+        public async Task<IActionResult> GetQuestionsByProgramIDAsync([FromQuery] StaffProgramPillerRequestDto requestDto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var result = await _questionService.GetQuestionsByProgramIDAsync(requestDto, userId.GetValueOrDefault());
+            if (result == null) return NotFound();
+
+            return Ok(result);
+        }
+        
+        [HttpGet("ExportAssessment/{StaffProgramMappingID}")]
+        [Authorize]
+        public async Task<IActionResult> ExportAssessment(int staffProgramMappingID)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            var content = await _questionService.ExportAssessment(staffProgramMappingID, userId.GetValueOrDefault(), userRole);
+
+
+            return File(content.Item2 ?? new byte[1],
+               "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+               content.Item1);
+        }
+
+        [HttpGet("getQuestionsHistoryByPillar")]
+        [Authorize]
+        public async Task<IActionResult> GetQuestionsHistoryByPillar([FromQuery] GetProgramPillarHistoryRequestDto requestDto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            requestDto.UserID = userId.GetValueOrDefault();
+
+
+            var role = GetRoleFromClaims();
+            if (role == null)
+                return Unauthorized("You Don't have access.");
+
+            if (!Enum.TryParse<UserRole>(role, true, out var userRole))
+            {
+                return Unauthorized("You Don't have access.");
+            }
+
+            var content = await _questionService.GetQuestionsHistoryByPillar(requestDto, userRole);
+
+
+            return Ok(content);
+        }
+        [HttpGet("getQuestionsByProgramMappingIdForAnalyst")]
+        [Authorize]
+        public async Task<IActionResult> GetQuestionsByProgramMappingIdForAnalyst([FromQuery] StaffProgramPillerRequestDto requestDto)
+        {
+            var userId = GetUserIdFromClaims();
+            if (userId == null)
+                return Unauthorized("User ID not found in token.");
+
+            var result = await _questionService.GetQuestionsByProgramMappingIdForAnalyst(requestDto, userId.GetValueOrDefault());
+            if (result == null) return NotFound();
+
+            return Ok(result);
+        }
+    }
+}
