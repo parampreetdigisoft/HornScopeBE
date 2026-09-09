@@ -53,7 +53,7 @@ namespace HornScope.Dtos.AssessmentDto
         public int UserID { get; set; }
         public int? QuestionID { get; set; }
         public string FullName { get; set; }
-        public int? Score { get; set; }
+        public string? Score { get; set; }
         public string Justification { get; set; }
         public string OptionText { get; set; }
     }

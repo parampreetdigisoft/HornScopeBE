@@ -9,6 +9,7 @@ using HornScope.Dtos.AssessmentDto;
 using HornScope.Dtos.CommonDto;
 using HornScope.Dtos.CountryDto;
 using HornScope.Dtos.dashboard;
+using HornScope.Enums;
 using HornScope.IServices;
 using HornScope.Models;
 using Microsoft.EntityFrameworkCore;
@@ -346,7 +347,7 @@ namespace HornScope.Services
                     var responses = responsesLookup[b.AssessmentID].ToList();
 
                     var scoredResponses = responses
-                        .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                        .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                         .Select(r => new
                         {
                             r.PillarID,
@@ -543,17 +544,24 @@ namespace HornScope.Services
                             // 1. Exact full-text match against "N - Option text" or plain option text
                             foreach (var opt in qOptions)
                             {
-                                string prefix = opt.ScoreValue.HasValue ? $"{opt.ScoreValue} - " : "";
+                                string prefix = !string.IsNullOrEmpty(opt.ScoreValue) ? $"{opt.ScoreValue} - " : "";
                                 string fullText = (prefix + opt.OptionText.Trim()).Trim();
 
                                 if (fullText.Equals(answerText, StringComparison.OrdinalIgnoreCase) ||
                                     opt.OptionText.Trim().Equals(answerText, StringComparison.OrdinalIgnoreCase))
                                 {
                                     matchedOptionID = opt.OptionID;
-                                    score = opt.ScoreValue.HasValue ? (int?)opt.ScoreValue.Value : null;
+                                    var scoreValue = _context.QuestionOptions.Where(x => x.OptionID == opt.OptionID).Select(x => x.ScoreValue).FirstOrDefault();
+                                    if (!string.IsNullOrEmpty(scoreValue) && !scoreValue.Equals("N/A", StringComparison.OrdinalIgnoreCase) && !scoreValue.Equals("Indeterminate", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        if (int.TryParse(scoreValue, out int parsedScore))
+                                        {
+                                            score = parsedScore;
+                                        }
+                                    }
                                     break;
                                 }
-                            } 
+                            }
                         }
 
                         if (matchedOptionID > 0)
@@ -652,14 +660,14 @@ namespace HornScope.Services
                         p.PillarID,
                         p.PillarName,
                         UserID = pa != null && pa.Responses
-                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                                 .Count() > 0 ? pa.Assessment.UserCountryMapping.UserID : 0,
                         Score = pa != null
                             ? pa.Responses
-                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                                 .Sum(r => (int?)r.Score ?? 0)
                             : 0,
-                        ScoreCount = pa != null ? pa.Responses.Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four).Count() : 0,
+                        ScoreCount = pa != null ? pa.Responses.Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred).Count() : 0,
                         TotalQuestion = p.Questions.Count(x=>!x.IsDeleted),
                         AnsQuestion = pa != null ? pa.Responses.Count() : 0,
                         HasAnswer = pa != null
@@ -772,7 +780,7 @@ namespace HornScope.Services
                 // Calculate score (sum only valid scores <= Score1)
                 var score = assessment.PillarAssessments
                     .SelectMany(pa => pa.Responses)
-                    .Where(r => r.Score.HasValue && r.Score.Value <= ScoreValue.Four)
+                    .Where(r => r.Score.HasValue && r.Score.Value <= ScoreValue.Hundred)
                     .Sum(r => (int)r.Score!.Value);
 
 

@@ -14,6 +14,7 @@ using System.Text.Json;
 using QuestPDF.Fluent;
 using HornScope.Common.Interface;
 using HornScope.Common.Implementation;
+using HornScope.Enums;
 
 namespace HornScope.Services
 {
@@ -419,7 +420,7 @@ namespace HornScope.Services
                             UserID = int.MaxValue,
                             FullName = "AI_Result",
                             QuestionID = x.QuestionID,
-                            Score = (int?)x.AIScore,
+                            Score = x.AIScore.HasValue ? x.AIScore.Value.ToString() : null,
                             Justification = x.EvidenceSummary,
                             OptionText = ""
                         }).FirstOrDefault()
@@ -454,7 +455,7 @@ namespace HornScope.Services
                                     UserID = uid,
                                     FullName = usersDict.TryGetValue(uid, out var name) ? name : "",
                                     QuestionID = q.QuestionID,
-                                    Score = (int?)response?.Score,
+                                    Score = option?.ScoreValue,
                                     Justification = response?.Justification ?? "",
                                     OptionText = option?.OptionText ?? ""
                                 };
@@ -728,20 +729,20 @@ namespace HornScope.Services
 
                         var count = userData.Count;
 
-                        var filteredData = userData
-                            .Where(x => x.Value.Score!=null)
-                            .Select(x => (decimal)x.Value.Score.Value);
+                        //var filteredData = userData
+                        //    .Where(x => x.Value.Score!=null)
+                        //    .Select(x => (decimal)x.Value.Score.ToString());
 
-                        decimal score = filteredData.Any()
-                          ? filteredData.Average()
-                          :0m;
+                        //decimal score = filteredData.Any()
+                        //  ? filteredData.Average()
+                        //  :0m;
 
                         var richText = ws.Cell(row, c++).GetRichText();
 
-                        richText.AddText("Average Score:  ")
+                        richText.AddText("Total Score:  ")
                             .SetBold().SetFontColor(XLColor.DarkGray);
 
-                        richText.AddText($"{Math.Round(score,2)}\n")
+                        richText.AddText($"{Math.Round(1.00, 2)}\n")
                             .SetFontColor(XLColor.Black);
                     }
 
@@ -925,7 +926,7 @@ namespace HornScope.Services
                                 var responses = userGroup
                                     .SelectMany(x => x.Responses)
                                     .Where(r => r.Score.HasValue &&
-                                                (int)r.Score.Value <= (int)ScoreValue.Four)
+                                                (int)r.Score.Value <= (int)ScoreValue.Hundred)
                                     .ToList();
 
                                 var progress = responses.Any()

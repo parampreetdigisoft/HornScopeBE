@@ -7,7 +7,8 @@ namespace HornScope.Models
         public int OptionID { get; set; }
         public int QuestionID { get; set; }
         public string OptionText { get; set; }
-        public int? ScoreValue { get; set; }
+        public string ScoreValue { get; set; }
+        public string? Label { get; set; }
         public int? DisplayOrder { get; set; }
         [JsonIgnore]
         public Question? Question { get; set; }  

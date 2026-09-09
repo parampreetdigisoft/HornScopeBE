@@ -11,6 +11,7 @@ using HornScope.Dtos.QuestionDto;
 using HornScope.Dtos.AssessmentDto;
 using HornScope.Common.Implementation;
 using System.Linq.Expressions;
+using HornScope.Enums;
 
 namespace HornScope.Services
 {
@@ -50,17 +51,38 @@ namespace HornScope.Services
                     .Include(o => o.QuestionOptions)
                 where !q.IsDeleted
                    && (!request.PillarID.HasValue || q.PillarID == request.PillarID.Value)
-                select new GetQuestionResponse
+                select new
                 {
-                    QuestionID = q.QuestionID,
-                    QuestionText = q.QuestionText,
-                    PillarID = q.PillarID,
+                    q.QuestionID,
+                    q.QuestionText,
+                    q.PillarID,
+                    q.Weight,
                     PillarName = q.Pillar.PillarName,
-                    DisplayOrder = q.DisplayOrder,
+                    q.DisplayOrder,
                     QuestionOptions = q.QuestionOptions.ToList()
                 };
 
-                var response = await query.ApplyPaginationAsync(request);
+                // Get paginated data
+                var pagedData = await query.ApplyPaginationAsync(request);
+
+                // Map to response DTO and calculate WeightID from Weight
+                var response = new PaginationResponse<GetQuestionResponse>
+                {
+                    Data = pagedData.Data.Select(q => new GetQuestionResponse
+                    {
+                        QuestionID = q.QuestionID,
+                        QuestionText = q.QuestionText,
+                        PillarID = q.PillarID,
+                        Weight = q.Weight,
+                        WeightID = QuestionWeightTierExtensions.GetWeightIdFromWeight(q.Weight),
+                        PillarName = q.PillarName,
+                        DisplayOrder = q.DisplayOrder,
+                        QuestionOptions = q.QuestionOptions
+                    }).ToList(),
+                    TotalRecords = pagedData.TotalRecords,
+                    PageNumber = pagedData.PageNumber,
+                    PageSize = pagedData.PageSize
+                };
 
                 return response;
             }
@@ -133,8 +155,8 @@ namespace HornScope.Services
                 .ToListAsync();
 
                 var totalQuestions = pillarQuestions.Count;
-                var question =  _context.Questions
-                    .Include(x=>x.QuestionOptions)
+                var question = _context.Questions
+                    .Include(x => x.QuestionOptions)
                     .FirstOrDefault(x => x.QuestionID == q.QuestionID) ?? new Question();
                 if (question.QuestionID > 0 && !pillarQuestions.Select(x => x.QuestionID).Contains(q.QuestionID))
                 {
@@ -145,6 +167,10 @@ namespace HornScope.Services
                 question.IsDeleted = false;
                 question.QuestionText = q.QuestionText;
                 question.PillarID = q.PillarID;
+
+                // Get Weight value 
+                var tier = (QuestionWeightTier)q.WeightID;
+                question.Weight = tier.GetWeight();
 
                 // Sync options (Add / Update / Delete)
                 var incomingOptions = q.QuestionOptions ?? new List<QuestionOption>();
@@ -159,36 +185,20 @@ namespace HornScope.Services
                         option = new QuestionOption
                         {
                             OptionText = o.OptionText,
-                            DisplayOrder = (o.ScoreValue ?? -1) + 1,
+                            DisplayOrder = GetDisplayOrder(o),
                             ScoreValue = o.ScoreValue,
-                            Question = question
+                            Question = question,
+                            Label = o.Label
                         };
                         question.QuestionOptions.Add(option);
                     }
                     else // update existing
                     {
                         option.OptionText = o.OptionText;
-                        option.DisplayOrder = (o.ScoreValue ?? -1) + 1;
+                        option.DisplayOrder = GetDisplayOrder(o);
                         option.ScoreValue = o.ScoreValue;
+                        option.Label = o.Label;
                     }
-                }
-                // Add default N/A and Unknown only for new question
-                if (question.QuestionID == 0)
-                {
-                    question.DisplayOrder = totalQuestions + 1;
-
-                    question.QuestionOptions.Add(new QuestionOption
-                    {
-                        DisplayOrder = 6,
-                        OptionText = "N/A",
-                        ScoreValue = null
-                    });
-                    question.QuestionOptions.Add(new QuestionOption
-                    {
-                        DisplayOrder = 7,
-                        OptionText = "Unknown",
-                        ScoreValue = null
-                    });
                 }
 
                 var optionIdsFromDto = incomingOptions.Select(x => x.OptionID).ToHashSet();
@@ -217,64 +227,64 @@ namespace HornScope.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
+
+        private int GetDisplayOrder(QuestionOption option)
+        {
+            if (!string.IsNullOrEmpty(option.ScoreValue))
+            {
+                var displayOrder = ScoreValueExtensions.GetDisplayOrderByScore(option.ScoreValue);
+                if (displayOrder.HasValue)
+                    return displayOrder.Value;
+            }
+
+            // If not found, return max value + 1
+            return ScoreValueExtensions.GetMaxDisplayOrder() + 1;
+        }
+
         public async Task<ResultResponseDto<string>> AddBulkQuestion(AddBulkQuestionsDto payload)
         {
             try
             {
                 var newQuestions = new List<Question>();
+                var pillarIds = payload.Questions.Select(x => x.PillarID).Distinct().ToList();
+                var pillarQuestions = await _context.Questions
+                    .Where(x => pillarIds.Contains(x.PillarID) && !x.IsDeleted)
+                    .ToListAsync();
 
-                var pillarQuestionsList = await _context.Questions
-                        .Where(x => payload.Questions.Select(q=>q.PillarID).Contains(x.PillarID) && !x.IsDeleted)
-                        .ToListAsync();
-
-                var i = 1;
+                // Create a dictionary to track the max display order per pillar
+                var pillarQuestionCounts = pillarQuestions
+                    .GroupBy(q => q.PillarID)
+                    .ToDictionary(g => g.Key, g => g.Count());
 
                 foreach (var q in payload.Questions)
                 {
-                    var pillarQuestions = pillarQuestionsList
-                        .Where(x => x.PillarID == q.PillarID && !x.IsDeleted)
-                        .ToList();
                     if (pillarQuestions.Any(x => x.QuestionText == q.QuestionText && x.PillarID == q.PillarID))
                     {
                         continue;
                     }
-
-                    var displayOrder = pillarQuestions.Count + i++;
 
                     var question = new Question
                     {
                         IsDeleted = false,
                         QuestionText = q.QuestionText,
                         PillarID = q.PillarID,
-                        DisplayOrder = displayOrder,
+                        DisplayOrder = pillarQuestionCounts[q.PillarID]++,
                         QuestionOptions = new List<QuestionOption>()
                     };
-
+                    var tier = (QuestionWeightTier)q.WeightID;
+                    question.Weight = tier.GetWeight();
                     // Add provided options
                     foreach (var o in q.QuestionOptions)
                     {
                         var option = new QuestionOption
                         {
                             OptionText = o.OptionText,
-                            DisplayOrder = (o.ScoreValue ?? -1) + 1,
-                            ScoreValue = o.ScoreValue
+                            DisplayOrder = GetDisplayOrder(o),
+                            ScoreValue = o.ScoreValue,
+                            Label = o.Label,
                         };
                         question.QuestionOptions.Add(option);
                     }
-
-                    // Add default options (N/A & Unknown)
-                    question.QuestionOptions.Add(new QuestionOption
-                    {
-                        DisplayOrder = 6,
-                        OptionText = "N/A",
-                        ScoreValue = null
-                    });
-                    question.QuestionOptions.Add(new QuestionOption
-                    {
-                        DisplayOrder = 7,
-                        OptionText = "Unknown",
-                        ScoreValue = null
-                    });
 
                     newQuestions.Add(question);
                 }
@@ -294,6 +304,7 @@ namespace HornScope.Services
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
+
         public async Task<ResultResponseDto<GetPillarQuestionByCountryResponse>> GetQuestionsByCountryIdAsync(CountryPillerRequestDto request, int userId)
         {
             try
@@ -384,7 +395,8 @@ namespace HornScope.Services
                                 OptionText = x.OptionText,
                                 ScoreValue = x.ScoreValue,
                                 Justification = submittedQuestion.Justification,
-                                Source = submittedQuestion.Source
+                                Source = submittedQuestion.Source,
+                                Label = x.Label
                             }).ToList(),
                         };
                     }).ToList();
@@ -604,7 +616,7 @@ namespace HornScope.Services
 
                     var optionTexts = options.Select(opt =>
                     {
-                        string prefix = opt.ScoreValue.HasValue ? $"{opt.ScoreValue} - " : "";
+                        string prefix = !string.IsNullOrEmpty(opt.ScoreValue) ? $"{opt.ScoreValue} - " : "";
                         return (prefix + opt.OptionText.Trim()).Trim();
                     }).ToList();
 
@@ -632,7 +644,7 @@ namespace HornScope.Services
                         var sel = options.FirstOrDefault(x => x.OptionID == ans.QuestionOptionID);
                         if (sel != null)
                         {
-                            string prefix = sel.ScoreValue.HasValue ? $"{sel.ScoreValue} - " : "";
+                            string prefix = !string.IsNullOrEmpty(sel.ScoreValue) ? $"{sel.ScoreValue} - " : "";
                             currentAnswer = (prefix + sel.OptionText.Trim()).Trim();
                         }
                     }
@@ -995,7 +1007,7 @@ namespace HornScope.Services
                         // ? ADD AI RESULT ROW
                         if (aiDict.TryGetValue(q.QuestionID, out var ai))
                         {
-                            var option = q.QuestionOptions.FirstOrDefault(x => x.ScoreValue == ai.Score);
+                            var option = q.QuestionOptions.FirstOrDefault(x => x.ScoreValue == ai.Score.ToString());
 
 
                             userInfos.Insert(0, new QuestionsByUserInfo
@@ -1146,7 +1158,8 @@ namespace HornScope.Services
                                 OptionText = x.OptionText,
                                 ScoreValue = x.ScoreValue,
                                 Justification = submitted.QuestionOptionID == x.OptionID ? submitted.Justification : string.Empty,
-                                Source = submitted.QuestionOptionID == x.OptionID ? submitted.Source : string.Empty
+                                Source = submitted.QuestionOptionID == x.OptionID ? submitted.Source : string.Empty,
+                                Label = x.Label
                             }).ToList()
                         };
                     }).ToList();
@@ -1221,7 +1234,7 @@ namespace HornScope.Services
 
                     foreach (var entry in relatedEntries)
                     {
-                        var option = question.QuestionOptions.FirstOrDefault(x => x.OptionID == entry.OptionID || x.ScoreValue == entry.ScoreValue);
+                        var option = question.QuestionOptions.FirstOrDefault(x => x.OptionID == entry.OptionID || x.ScoreValue == entry.ScoreValue.ToString());
                         question.History.Add(new HistoryQuestionAnswerRawDto
                         {
                             UserID = entry.UserID,

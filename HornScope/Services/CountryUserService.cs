@@ -324,7 +324,7 @@ namespace HornScope.Services
                         var allResponses = g.SelectMany(x => x.Responses).Where(r => aspIds.Contains(r.PillarAssessmentID)).ToList();
 
                         var scoreList = allResponses
-                            .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                            .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                             .Select(r => (int?)r.Score ?? 0);
 
                         int userCityMappingCount = g.Count();
@@ -438,7 +438,7 @@ namespace HornScope.Services
                 var allResponses = assessmentsData
                     .SelectMany(a => a.Pillars)
                     .SelectMany(pa => pa.Responses)
-                    .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                    .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                     .ToList();
 
                 // Compute Country level stats
@@ -454,7 +454,7 @@ namespace HornScope.Services
                 var groupedResponses = assessmentsData
                     .SelectMany(a => a.Pillars)
                     .GroupBy(p => p.PillarID)
-                    .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Responses).Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four).ToList());
+                    .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Responses).Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred).ToList());
 
                 var naUnknownGroup = assessmentsData
                     .SelectMany(a => a.Pillars)
@@ -591,7 +591,7 @@ namespace HornScope.Services
                     .ToList();
 
                 var validResponses = allResponses
-                    .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Four)
+                    .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
                     .ToList();
 
                 // 5. Generate question-level metrics

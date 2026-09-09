@@ -17,6 +17,7 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using HornScope.Enums;
 
 namespace HornScope.Services
 {
@@ -1845,7 +1846,7 @@ namespace HornScope.Services
 
                         int? score = response.AIScore != null ? (int?)Math.Round(response.AIScore.Value, 0) : null;
 
-                        var option = qustion.QuestionOptions.FirstOrDefault(x => x.ScoreValue == score);
+                        var option = qustion.QuestionOptions.FirstOrDefault(x => x.ScoreValue == score.ToString());
                         if (option == null)
                             continue;
 
