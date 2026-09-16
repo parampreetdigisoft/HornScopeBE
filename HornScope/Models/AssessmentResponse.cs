@@ -9,7 +9,7 @@ namespace HornScope.Models
         public int PillarAssessmentID { get; set; }
         public int QuestionID { get; set; }
         public int QuestionOptionID { get; set; }
-        public ScoreValue? Score { get; set; }
+        public int? Score { get; set; }
         public string Justification { get; set; } 
         public string? Source { get; set; } 
         public PillarAssessment PillarAssessment { get; set; } 

@@ -1,6 +1,6 @@
 ﻿namespace HornScope.Dtos.PublicDto
 {
-    public class OverallAfricaMarketResponse
+    public class OverallHornscopeResponse
     {
         public decimal OverallScore { get; set; }
     }

@@ -17,7 +17,7 @@ namespace HornScope.Common.Implementation
 {
     public class EmailService : IEmailService
     {
-        public const string LogoContentId = "ami-logo";
+        public const string LogoContentId = "hs-logo";
 
         private readonly Mailsetting _smtpSettings;
         private readonly IRazorViewEngine _razorViewEngine;
@@ -69,7 +69,7 @@ namespace HornScope.Common.Implementation
                 var webRoot = string.IsNullOrWhiteSpace(_env.WebRootPath)
                     ? Path.Combine(_env.ContentRootPath, "wwwroot")
                     : _env.WebRootPath;
-                var logoPath = Path.Combine(webRoot, "assets", "images", "Logo-market.png");
+                var logoPath = Path.Combine(webRoot, "assets", "images", "hornscope-logo.png");
 
                 if (File.Exists(logoPath))
                 {

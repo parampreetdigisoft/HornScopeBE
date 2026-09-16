@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Linq;
 using System.Linq.Expressions;
+using static HornScope.Common.Implementation.CommonStaticMethods;
 
 namespace HornScope.Services
 {
@@ -145,6 +146,12 @@ namespace HornScope.Services
                     _context.Assessments.Add(assessment);
                 }
 
+                if (assessment.AssessmentPhase == AssessmentPhase.Completed)
+                {
+                    return ResultResponseDto<string>.Failure(new[] { "Need approval to edit this pillar" });
+                }
+
+
                 if (request.PillarID > 0)
                 {
                     var pillarAssessment = assessment.PillarAssessments
@@ -165,10 +172,10 @@ namespace HornScope.Services
 
                     if (!request.IsAutoSave) // removed if entire assessement is update for all responses
                     {
-                        var lastPillar = (await _commonService.GetPillars())
-                            .OrderByDescending(x => x.DisplayOrder)
-                            .FirstOrDefault();
-                        assessment.AssessmentPhase = lastPillar?.PillarID == request.PillarID ? AssessmentPhase.Completed : AssessmentPhase.InProgress;
+                        //var lastPillar = (await _commonService.GetPillars())
+                        //    .OrderByDescending(x => x.DisplayOrder)
+                        //    .FirstOrDefault();
+                        //assessment.AssessmentPhase = lastPillar?.PillarID == request.PillarID ? AssessmentPhase.Completed : AssessmentPhase.InProgress;
 
                         var requestResponseIds = request.Responses
                             .Where(r => r.QuestionID > 0)
@@ -189,6 +196,22 @@ namespace HornScope.Services
                         var existing = existingResponses
                             .FirstOrDefault(r => r.ResponseID == response.ResponseID || r.QuestionID == response.QuestionID);
 
+                        var scoreValue = _context.QuestionOptions
+                            .Where(x => x.OptionID == response.QuestionOptionID)
+                            .Select(x => x.ScoreValue)
+                            .FirstOrDefault();
+
+                        int? calculatedScore = null;
+                        if (!string.IsNullOrEmpty(scoreValue) &&
+                            !scoreValue.Equals("N/A", StringComparison.OrdinalIgnoreCase) &&
+                            !scoreValue.Equals("Indeterminate", StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (int.TryParse(scoreValue, out int parsedScore))
+                            {
+                                calculatedScore = parsedScore;
+                            }
+                        }
+
                         if (existing == null && !string.IsNullOrEmpty(response.Justification))
                         {
                             // Add new
@@ -198,17 +221,19 @@ namespace HornScope.Services
                                 QuestionOptionID = response.QuestionOptionID,
                                 Justification = response.Justification,
                                 Source = response.Source,
-                                Score = response.Score
+                                UpdatedAt = now,
+                                Score =  calculatedScore
                             });
                         }
-                        else
+                        else if (existing !=null)
                         {
                             // Update existing
                             existing.QuestionID = response.QuestionID;
                             existing.QuestionOptionID = response.QuestionOptionID;
                             existing.Justification = response.Justification;
-                            existing.Score = response.Score;
+                            existing.Score =  calculatedScore;
                             existing.Source = response.Source;
+                            existing.UpdatedAt = now;
                         }
                     }
                     if (request.IsFinalized)
@@ -330,6 +355,7 @@ namespace HornScope.Services
                             CountryID = r.PillarAssessment.Assessment.UserCountryMapping.CountryID,
                             r.QuestionOptionID,
                             r.QuestionID,
+                            Weight = r.Question.Weight,
                             Option = r.Question.QuestionOptions
                             .Where(o => o.OptionID == r.QuestionOptionID)
                             .Select(o => new
@@ -347,40 +373,35 @@ namespace HornScope.Services
                     var responses = responsesLookup[b.AssessmentID].ToList();
 
                     var scoredResponses = responses
-                        .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
+                        .Where(r => r.Score.HasValue)
                         .Select(r => new
                         {
                             r.PillarID,
-                            Score = (int)r.Score!.Value
+                            r.CountryID,
+                            Score = (int)r.Score!.Value,
+                            Weight = r.Weight
                         })
                         .ToList();
 
                     var totalNA = responses.Count(r =>
-                        !r.Score.HasValue &&
-                        r.Option != null &&
-                        (r.Option.OptionText == "N/A" || r.Option.OptionText == "NA"));
+                        !string.IsNullOrEmpty(r.Option?.ScoreValue) &&
+                        (r.Option.ScoreValue == "N/A" || r.Option.ScoreValue == "NA"));
 
                     var totalUnknown = responses.Count(r =>
-                        !r.Score.HasValue &&
-                        r.Option != null &&
-                        r.Option.OptionText == "Unknown");
+                        !string.IsNullOrEmpty(r.Option?.ScoreValue) &&
+                        r.Option.ScoreValue == "Indeterminate");
 
-                    // Per-pillar score: (Σ scores * 100) / (count * 4), using only 0-4 scored responses
                     var pillarScores = scoredResponses
-                        .GroupBy(r => r.PillarID)
-                        .Select(g =>
+                    .GroupBy(r => new { r.PillarID, r.CountryID })
+                    .Select(g => PillarScoreCalculator.CalculatePillarScore(
+                        g.Select(r => new PillarScoreCalculator.ScoredResponse
                         {
-                            var count = g.Count();
-                            return count > 0
-                                ? (g.Sum(r => (decimal)r.Score) * 100m) / (count * 4m)
-                                : 0m;
-                        })
-                        .ToList();
+                            Score = r.Score,
+                            Weight = r.Weight
+                        })))
+                    .ToList();
 
-                    // Overall Score = SUM(PillarScores) / TotalPillars
-                    var overallScore = pillarCount > 0
-                        ? Math.Round(pillarScores.Sum() / pillarCount, 2)
-                        : 0m;
+                    var overallScore = PillarScoreCalculator.CalculateTotalScore(pillarScores, pillarCount);
 
                     return new GetCountryAssessmentResponseDto
                     {
@@ -505,7 +526,7 @@ namespace HornScope.Services
                     int pillarID = ws.Cell(11, 12).GetValue<int>();
 
                     if (userCountryMappingID == 0 || pillarID == 0)
-                        continue; // empty or corrupt sheet � skip
+                        continue; // empty or corrupt sheet - skip
 
                     // Validate that the file belongs to the uploading user
                     if (!_context.UserCountryMappings.Any(x =>
@@ -652,44 +673,54 @@ namespace HornScope.Services
 
                 // 2. Fetch country-wise pillar/question details in one go
                 var countryPillarQuery =
-                    from p in _context.Pillars.Where(x=>!x.IsDeleted)
+                    from p in _context.Pillars.Where(x => !x.IsDeleted)
                     join pa in pillarAssessments on p.PillarID equals pa.PillarID into paGroup
                     from pa in paGroup.DefaultIfEmpty()
                     select new
                     {
                         p.PillarID,
                         p.PillarName,
-                        UserID = pa != null && pa.Responses
-                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
-                                .Count() > 0 ? pa.Assessment.UserCountryMapping.UserID : 0,
-                        Score = pa != null
+                        UserID = pa != null ? pa.Assessment.UserCountryMapping.UserID : 0,
+
+                        // Per-response scored items for deduction-aware scoring
+                        Responses = pa != null
                             ? pa.Responses
-                                .Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred)
-                                .Sum(r => (int?)r.Score ?? 0)
-                            : 0,
-                        ScoreCount = pa != null ? pa.Responses.Where(r => r.Score.HasValue && (int)r.Score.Value <= (int)ScoreValue.Hundred).Count() : 0,
-                        TotalQuestion = p.Questions.Count(x=>!x.IsDeleted),
+                                .Where(r => r.Score.HasValue)
+                                .Select(r => new PillarScoreCalculator.ScoredResponse
+                                {
+                                    Score = (int)r.Score!.Value,
+                                    Weight = r.Question.Weight
+                                })
+                                .ToList()
+                            : new List<PillarScoreCalculator.ScoredResponse>(),
+
+                        ScoreCount = pa != null ? pa.Responses.Where(r => r.Score.HasValue).Count() : 0,
+                        TotalQuestion = p.Questions.Count(x => !x.IsDeleted),
                         AnsQuestion = pa != null ? pa.Responses.Count() : 0,
                         HasAnswer = pa != null
                     };
-                var list = await countryPillarQuery.Distinct().ToListAsync();
-                var countryPillars = (list)
+
+                var list = await countryPillarQuery.ToListAsync();
+
+                var countryPillars = list
                     .GroupBy(x => new { x.PillarID, x.PillarName })
                     .Select(g =>
                     {
-                        var totalAnsScoreOfPillar = g.Sum(x => x.Score);
-                        var ScoreCount = g.Sum(x => x.ScoreCount);
-                        var ansUserCount = g.Where(x => x.UserID > 0).Distinct().Count();
+                        var scoredResponses = g
+                            .SelectMany(x => x.Responses)
+                            .ToList();
+
+                        var ansUserCount = g.Where(x => x.UserID > 0).Select(x => x.UserID).Distinct().Count();
                         var totalQuestionsInPillar = g.Max(x => x.TotalQuestion) * ansUserCount;
 
-                        decimal progress = ScoreCount != 0 && ansUserCount > 0 ? Convert.ToDecimal(totalAnsScoreOfPillar) / ScoreCount : 0m;
+                        var pillarAvgRaw = PillarScoreCalculator.CalculatePillarScore(scoredResponses);
 
                         return new CountryPillarQuestionHistoryResponseDto
                         {
                             PillarID = g.Key.PillarID,
                             PillarName = g.Key.PillarName,
-                            Score = totalAnsScoreOfPillar,
-                            ScoreProgress = progress,
+                            Score = pillarAvgRaw,
+                            ScoreProgress = pillarAvgRaw,
                             AnsPillar = g.Sum(x => x.HasAnswer ? 1 : 0),
                             TotalQuestion = totalQuestionsInPillar,
                             AnsQuestion = g.Sum(x => x.AnsQuestion)
@@ -697,28 +728,10 @@ namespace HornScope.Services
                     })
                     .ToList();
 
-                //// 3. Get assessment count in one query
-                //var assessmentCount = await _context.Assessments
-                //    .CountAsync(x => ucmIds.Contains(x.userCountryMappingID) && x.IsActive);
-
-                //// 4. Total pillars and questions (static across country)
-                //var pillarStats = await _context.Pillars
-                //    .Select(p => new { QuestionsCount = p.Questions.Count(x=>!x.IsDeleted) })
-                //    .ToListAsync();
-                //int totalPillars = pillarStats.Count;
-                //int totalQuestions = pillarStats.Sum(p => p.QuestionsCount);
-
-                // 5. Final payload
                 var payload = new GetCountryQuestionHistoryResponseDto
                 {
                     CountryID = countryID,
-                    //TotalAssessment = assessmentCount,
-                    //Score = countryPillars.Sum(x => x.Score),
                     ScoreProgress = countryPillars.Average(x => x.ScoreProgress),
-                    //TotalPillar = totalPillars * ucmIds.Count,
-                    //TotalAnsPillar = countryPillars.Sum(x => x.AnsPillar),
-                    //TotalQuestion = totalQuestions * ucmIds.Count,
-                    //AnsQuestion = countryPillars.Sum(x => x.AnsQuestion),
                     Pillars = countryPillars
                 };
 
@@ -780,7 +793,7 @@ namespace HornScope.Services
                 // Calculate score (sum only valid scores <= Score1)
                 var score = assessment.PillarAssessments
                     .SelectMany(pa => pa.Responses)
-                    .Where(r => r.Score.HasValue && r.Score.Value <= ScoreValue.Hundred)
+                    .Where(r => r.Score.HasValue)
                     .Sum(r => (int)r.Score!.Value);
 
 
@@ -852,7 +865,7 @@ namespace HornScope.Services
                                               x.UserID == r.TransferToUserID);
 
                 if (countryAssigned == null)
-                    return ResultResponseDto<string>.Failure(new[] { "This assessment can�t be imported because the selected user hasn�t been assigned to this country yet." });
+                    return ResultResponseDto<string>.Failure(new[] { "This assessment can't be imported because the selected user hasn't been assigned to this country yet." });
 
                 // Load existing assessment for that user/country/year (with pillars/responses)
                 var existingAssessment = await _context.Assessments

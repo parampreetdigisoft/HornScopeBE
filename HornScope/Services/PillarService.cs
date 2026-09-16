@@ -366,9 +366,7 @@ namespace HornScope.Services
                     .Where(a => mappingIds.Contains(a.UserCountryMappingID)
                                 && a.IsActive
                                 && a.UpdatedAt.Year == year
-                                && (a.AssessmentPhase == AssessmentPhase.Completed
-                                    || a.AssessmentPhase == AssessmentPhase.EditRejected
-                                    || a.AssessmentPhase == AssessmentPhase.EditRequested))
+                                )
                     .AsNoTracking()
                     .ToListAsync();
 

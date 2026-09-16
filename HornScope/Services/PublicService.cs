@@ -557,19 +557,19 @@ namespace HornScope.Services
             }
         }
 
-        public async Task<ResultResponseDto<OverallAfricaMarketResponse>> GetOverAllAfricaMarketScore()
+        public async Task<ResultResponseDto<OverallHornscopeResponse>> GetOverAllHornscopeScore()
         {
-            const string cacheKey = "OverAllAfricaMarketScore";
+            const string cacheKey = "OverAllHornscopeScore";
 
             try
             {
-                if (_cache.TryGetValue(cacheKey, out OverallAfricaMarketResponse cachedResult))
+                if (_cache.TryGetValue(cacheKey, out OverallHornscopeResponse cachedResult))
                 {
-                    return ResultResponseDto<OverallAfricaMarketResponse>.Success(
+                    return ResultResponseDto<OverallHornscopeResponse>.Success(
                         cachedResult,
                         new List<string>
                         {
-                            "Overall Africa market score fetched successfully from cache."
+                            "Overall Hornscope score fetched successfully from cache."
                         }
                     );
                 }
@@ -580,11 +580,11 @@ namespace HornScope.Services
                     .AsNoTracking()
                     .Where(x => x.Country.IsActive && !x.Country.IsDeleted && x.Year == year)
                     .GroupBy(x => 1)
-                    .Select(g => new OverallAfricaMarketResponse
+                    .Select(g => new OverallHornscopeResponse
                     {
                         OverallScore = Math.Round(g.Average(x => x.AIProgress) ?? 0,2)
                     })
-                    .FirstOrDefaultAsync() ?? new OverallAfricaMarketResponse();
+                    .FirstOrDefaultAsync() ?? new OverallHornscopeResponse();
 
                 _cache.Set(
                     cacheKey,
@@ -596,22 +596,22 @@ namespace HornScope.Services
                     }
                 );
 
-                return ResultResponseDto<OverallAfricaMarketResponse>.Success(
+                return ResultResponseDto<OverallHornscopeResponse>.Success(
                     result,
                     new List<string>
                     {
-                        "Overall Africa market score fetched successfully."
+                        "Overall Hornscope score fetched successfully."
                     }
                 );
             }
             catch (Exception ex)
             {
                 await _appLogger.LogAsync(
-                    "An error occurred while processing the GetOverAllAfricaMarketScore request.",
+                    "An error occurred while processing the GetOverAllHornscopeScore request.",
                     ex
                 );
 
-                return ResultResponseDto<OverallAfricaMarketResponse>.Failure(
+                return ResultResponseDto<OverallHornscopeResponse>.Failure(
                     new[]
                     {
                         "An error occurred while processing your request. Please try again later."

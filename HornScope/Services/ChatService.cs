@@ -78,7 +78,7 @@ namespace HornScope.Services
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from HS Aevum." }
                     );
                 }
 
@@ -114,7 +114,7 @@ namespace HornScope.Services
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from HS Aevum." }
                     );
                 }
 
@@ -164,7 +164,7 @@ namespace HornScope.Services
                 if (resutl == null || resutl.Success != true)
                 {
                     return ResultResponseDto<ChatResponseDto>.Failure(
-                        new[] { resutl?.Message ?? "Failed to query request from AMI Aevum." }
+                        new[] { resutl?.Message ?? "Failed to query request from HS Aevum." }
                     );
                 }
 
@@ -272,7 +272,7 @@ namespace HornScope.Services
                         new[]
                         {
                             result?.Message ??
-                            "Failed to fetch Country executive slides from AMI Aevum."
+                            "Failed to fetch Country executive slides from HS Aevum."
                         }
                     );
                 }

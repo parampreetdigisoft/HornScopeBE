@@ -100,7 +100,7 @@ namespace HornScope.Services
 
                 foreach (var c in result.Data)
                 {                 
-                    c.CountryScoreSummery = CommonService.CountryScoreSummery(c.AIProgress, c.CountryName, pillarCount, totalValidKpis);
+                    c.CountryScoreSummery = CommonService.CountryScoreSummery(c.AIProgress, pillarCount, totalValidKpis, c.CountryName);
                 }
 
                 if (userRole != UserRole.CountryUser)
@@ -125,7 +125,7 @@ namespace HornScope.Services
                     foreach (var c in result.Data)
                     {
                         var pillars = countries.Where(x => x.CountryID == c.CountryID);
-                        var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / (decimal)pillarCount, 2);
+                        var countryScore = Math.Round(pillars.Sum(x => x.ScoreProgress) / (decimal)pillarCount, 1);
                         c.EvaluatorScore = countryScore;
                         c.Discrepancy = Math.Abs(countryScore - (c.AIProgress ?? 0));
                         c.AICompletionRate = answeredQuestions.FirstOrDefault(x=>x.CountryID == c.CountryID)?.CompletionRate;                         
@@ -1079,7 +1079,7 @@ namespace HornScope.Services
                         score = countryDetails.EvaluatorScore;
                     }
                 }
-                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, score, countryDetails.CountryName, pillarCount, totalValidKpis);
+                countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, countryDetails.ImmediateSituationSummary, score, pillarCount, totalValidKpis, countryDetails.CountryName);
 
             }
             return countryDetails ?? new AiCountrySummeryDto();
@@ -1523,7 +1523,7 @@ namespace HornScope.Services
             foreach (var countryDetails in countriesDetails)
             {
                 countryDetails.EvidenceSummary = CommonService.InitailLineOfExecutiveSummery(countryDetails.EvidenceSummary, 
-                    countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, countryDetails.CountryName, pillarCount,totalValidKpis);
+                    countryDetails.ImmediateSituationSummary, countryDetails.AIProgress, pillarCount, totalValidKpis, countryDetails.CountryName);
 
                 if (userRole != UserRole.CountryUser)
                 {
@@ -1859,14 +1859,14 @@ namespace HornScope.Services
                                 QuestionOptionID = option.OptionID,
                                 Justification = response.EvidenceSummary,
                                 Source = response.SourceDataExtract + "SourceURL : " + response.SourceURL,
-                                Score = (ScoreValue?)score
+                                Score = (int?)score
                             });
                         }
                         else
                         {
                             existingResponse.QuestionOptionID = option.OptionID;
                             existingResponse.Justification = response.EvidenceSummary;
-                            existingResponse.Score = (ScoreValue?)score;
+                            existingResponse.Score = (int?)score;
                             existingResponse.Source = response.SourceDataExtract + " SourceURL : " + response.SourceURL;
                         }
                     }

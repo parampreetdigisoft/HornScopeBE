@@ -104,14 +104,14 @@ namespace HornScope.Services
                     var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
-                    var sub = "Password Update Link – Africa Market Intelligence Platform";
+                    var sub = "Password Update Link - HornScope Platform";
                     var model = new EmailInvitationSendRequestDto
                     {
                         ResetPasswordUrl = passwordResetLink,
                         Title = sub,
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = url,
-                        MsgText= "A request was made to update the password for your Africa Market Intelligence (AMI) account. To proceed, please use the secure link below:",
+                        MsgText= "A request was made to update the password for your HornScope (HS) account. To proceed, please use the secure link below:",
                         IsShowBtnText=true,
                         IsLoginBtn=false,
                         BtnText= "Update Password",
@@ -295,7 +295,7 @@ namespace HornScope.Services
                     roleName = "Country User";
                 }
 
-                string sub = $"{roleName} Access Granted – Africa Market Intelligence Platform";
+                string sub = $"{roleName} Access Granted – HornScope Platform";
                 var url = _appSettings.ApplicationUrl; 
                 string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
@@ -529,15 +529,15 @@ namespace HornScope.Services
                 {
                     isMailSent = true;
                     var addedNames = string.Join(", ", countryDetails.Where(c => countriesToAdd.Contains(c.CountryID)).Select(c => c.CountryName));
-                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested country assignment ({addedNames}) for your AMI account.";
+                    msgText = $"You are receiving this email because {invitedUser?.FullName} recently requested country assignment ({addedNames}) for your HS account.";
                 }
 
                 if (countriesToDelete.Count > 0)
                 {
                     var removedNames = string.Join(", ", countryDetails.Where(c => countriesToDelete.Contains(c.CountryID)).Select(c => c.CountryName));
                     msgText = isMailSent
-                        ? msgText + $" Additionally, you no longer have access to the countries ({removedNames}) for your AMI account."
-                        : $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following countries ({removedNames}) for your AMI account.";
+                        ? msgText + $" Additionally, you no longer have access to the countries ({removedNames}) for your HS account."
+                        : $"You are receiving this email because {invitedUser?.FullName} recently removed your access to the following countries ({removedNames}) for your HS account.";
                     isMailSent = true;
                 }
 
@@ -546,7 +546,7 @@ namespace HornScope.Services
                     var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                     var token = hash.Replace("+", " ");
                     string roleName = inviteUser.Role == UserRole.CountryUser ? "Country User" : inviteUser.Role.ToString();
-                    string sub = $"{roleName} Access Granted – Africa Market Intelligence Platform";
+                    string sub = $"{roleName} Access Granted – HornScope Platform";
                     var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                     string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
@@ -786,7 +786,7 @@ namespace HornScope.Services
                          .Select(c => c.CountryName));
                         var invitedUser = _context.Users.FirstOrDefault(x => x.UserID == inviteUser.InvitedUserID);
 
-                        string sub = $"{inviteUser.Role.ToString()} Access Granted – Africa Market Intelligence Platform";
+                        string sub = $"{inviteUser.Role.ToString()} Access Granted – HornScope Platform";
                         var model = new EmailInvitationSendRequestDto
                         {
                             ResetPasswordUrl = resetLink,
@@ -864,7 +864,7 @@ namespace HornScope.Services
                             Title = "Request to update assessment",
                             ApiUrl = _appSettings.ApiUrl,
                             ApplicationUrl = _appSettings.ApplicationUrl,
-                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update assessment of {country?.CountryName} from their Africa Market Intelligence account.",
+                            MsgText = $"You are receiving this email because user {user?.FullName} recently requested to update assessment of {country?.CountryName} from their HornScope account.",
                             BtnText = "Give Access",
                             Mail = _appSettings.AdminMail
                         };
@@ -1087,7 +1087,7 @@ namespace HornScope.Services
                     IsLoginBtn = false,
                     IsShowBtnText = false,
                     Mail = _appSettings.AdminMail,
-                    DescriptionAboutBtnText = "You are receiving this email because a login attempt was made to your AMI account. " +
+                    DescriptionAboutBtnText = "You are receiving this email because a login attempt was made to your HS account. " +
                                "If this was you, please use the above OTP to complete your sign-in. " +
                                "If you did not request this login, please secure your account immediately by resetting your password."
                 };
@@ -1209,7 +1209,7 @@ namespace HornScope.Services
                         Title = "Verify Your Email",
                         ApiUrl = _appSettings.ApiUrl,
                         ApplicationUrl = _appSettings.PublicApplicationUrl,
-                        MsgText = "A request was made to update the Email for your Africa Market Intelligence (AMI) account. Please verify your email or reset your password.",
+                        MsgText = "A request was made to update the Email for your HornScope (HS) account. Please verify your email or reset your password.",
                         Mail = _appSettings.AdminMail,
                         BtnText = "Verify",
                         DescriptionAboutBtnText = "Please verify your email address by clicking the button above."

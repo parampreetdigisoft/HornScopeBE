@@ -3,58 +3,61 @@ using SkiaSharp;
 namespace HornScope.Common.Implementation
 {
     /// <summary>
-    /// Brand palette aligned with AMI web CSS variables
-    /// (gold / bronze / cream / charcoal from ami-dashboard-theme).
+    /// Brand palette aligned with HornScope web CSS variables
+    /// (navy + gold from hornscope-theme.css).
     /// </summary>
     internal static class ReportThemeColors
     {
-        public static string LogoPath =>
-            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", "images", "Logo-market-large.png");
+        public const string BrandName = "HornScope";
+        public const string BrandTagline = "Strategic Intelligence for the Horn of Africa and East Africa";
 
-        public const string Primary = "#C9A24A";
-        public const string Secondary = "#E7C878";
-        public const string HoverPrimary = "#8A5A2B";
-        public const string AccentGreen = "#B7A25A";
+        public static string LogoPath =>
+            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", "images", "hornscope-logo.png");
+
+        public const string Primary = "#C5A05A";
+        public const string Secondary = "#D4B86A";
+        public const string HoverPrimary = "#8B6B32";
+        public const string AccentGreen = "#5A9B8A";
         public const string White = "#FFFFFF";
         public const string Black = "#000000";
-        public const string Text = "#1A1510";
-        public const string Border = "#E6DDD0";
-        public const string Background = "#F2EBE1";
-        public const string LightText = "#6B6358";
-        public const string LightBg = "#C9A24A";
-        public const string DarkBg = "#0A0906";
-        public const string GreenText = "#1A1510";
+        public const string Text = "#002147";
+        public const string Border = "#D5DEE8";
+        public const string Background = "#F4F7FA";
+        public const string LightText = "#8FA3B5";
+        public const string LightBg = "#C5A05A";
+        public const string DarkBg = "#002147";
+        public const string GreenText = "#002147";
 
         // OpenXML hex (no leading #)
-        public const string PrimaryHex = "C9A24A";
-        public const string SecondaryHex = "E7C878";
-        public const string AccentGreenHex = "B7A25A";
-        public const string TextHex = "1A1510";
-        public const string BorderHex = "E6DDD0";
-        public const string BackgroundHex = "F2EBE1";
-        public const string LightTextHex = "6B6358";
-        public const string LightBgHex = "C9A24A";
-        public const string DarkBgHex = "0A0906";
+        public const string PrimaryHex = "C5A05A";
+        public const string SecondaryHex = "D4B86A";
+        public const string AccentGreenHex = "5A9B8A";
+        public const string TextHex = "002147";
+        public const string BorderHex = "D5DEE8";
+        public const string BackgroundHex = "F4F7FA";
+        public const string LightTextHex = "8FA3B5";
+        public const string LightBgHex = "C5A05A";
+        public const string DarkBgHex = "002147";
         public const string WhiteHex = "FFFFFF";
-        public const string PdfDarkGreenHex = "1A1510";
-        public const string SurfaceGreenMintHex = "F7F1E6";
-        public const string SurfaceGreenRowHex = "F7F1E6";
-        public const string SuccessGreenBgHex = "F5EFE0";
-        public const string SuccessGreenSoftHex = "E7C878";
-        public const string HeaderSubtitleHex = "EFE7D6";
-        public const string CreamHex = "EFE7D6";
+        public const string PdfDarkGreenHex = "002147";
+        public const string SurfaceGreenMintHex = "F4F7FA";
+        public const string SurfaceGreenRowHex = "E8EEF4";
+        public const string SuccessGreenBgHex = "E8F0ED";
+        public const string SuccessGreenSoftHex = "D4B86A";
+        public const string HeaderSubtitleHex = "E8EEF4";
+        public const string CreamHex = "E8EEF4";
 
-        public const string HeaderSubtitle = "#EFE7D6";
-        public const string HeaderMeta = "#C9A24A";
-        public const string SurfaceAlt = "#F7F1E6";
-        public const string AccentLine = "#C9A24A";
+        public const string HeaderSubtitle = "#E8EEF4";
+        public const string HeaderMeta = "#C5A05A";
+        public const string SurfaceAlt = "#E8EEF4";
+        public const string AccentLine = "#C5A05A";
 
         // PDF core palette (names kept for call-site compatibility)
-        public const string PdfDarkGreen = "#1A1510";
-        public const string PdfMediumGreen = "#8A5A2B";
-        public const string PdfTealGreen = "#C9A24A";
-        public const string NavyBlue = Primary;
-        public const string PageBg = "#FAF6EF";
+        public const string PdfDarkGreen = "#002147";
+        public const string PdfMediumGreen = "#0C2238";
+        public const string PdfTealGreen = "#C5A05A";
+        public const string NavyBlue = "#002147";
+        public const string PageBg = "#F4F7FA";
         public const string OverlayBlackAlpha = "#00000022";
 
         // PDF status / performance
@@ -158,8 +161,8 @@ namespace HornScope.Common.Implementation
         public const string BootstrapInfo = "#C9C7BF";
 
         // PDF header text accents
-        public const string HeaderTextPale = "#EFE7D6";
-        public const string HeaderTextMuted = "#C9C7BF";
+        public const string HeaderTextPale = "#E8EEF4";
+        public const string HeaderTextMuted = "#8FA3B5";
 
         // PDF pillar section accents
         public const string AccentExecutiveSummary = "#1A1510";

@@ -8,6 +8,7 @@ namespace HornScope.Models
         public string Purpose { get; set; } = string.Empty;       
         public string? CalText5 { get; set; }
         public bool IsDeleted { get; set; } = false;
+        public string? FamilyGroup { get; set; }
         public ICollection<AnalyticalLayerResult> AnalyticalLayerResults { get; set; } = new List<AnalyticalLayerResult>();
         public ICollection<FiveLevelInterpretation> FiveLevelInterpretations { get; set; } = new List<FiveLevelInterpretation>();
     }

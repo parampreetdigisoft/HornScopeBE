@@ -12,9 +12,8 @@ namespace HornScope.Services
 {
     public class SignalDashboardService : ISignalDashboardService
     {
-        private const int MarketStressTestModeId = 1;
-        private const int EarlyWarningModeId = 2;
-        private const int ResilienceModeId = 3;
+        private const int RelationalDiagnosticsModeId = 1;
+        private const int CompositeDiagnosticsModeId = 2;
 
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
@@ -27,14 +26,11 @@ namespace HornScope.Services
             _commonService = commonService;
         }
 
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetPeaceStressTestDashboard(int countryID, int userId, UserRole userRole, int year)
-            => GetDashboardMode(MarketStressTestModeId, countryID, userId, userRole, "Market stress test dashboard generated successfully.", year);
+        public Task<ResultResponseDto<DashboardModeResponseDto>> GetRelationalDiagnosticsDashboard(int countryID, int userId, string familyGroup, UserRole userRole, int year)
+            => GetDashboardMode(RelationalDiagnosticsModeId, countryID, userId, userRole, "Relational diagnostics dashboard generated successfully.", familyGroup, year);
 
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetEarlyWarningDashboard(int countryID, int userId, UserRole userRole, int year)
-            => GetDashboardMode(EarlyWarningModeId, countryID, userId, userRole, "Early warning dashboard generated successfully.", year);
-
-        public Task<ResultResponseDto<DashboardModeResponseDto>> GetResilienceScorecard(int countryID, int userId, UserRole userRole, int year)
-            => GetDashboardMode(ResilienceModeId, countryID, userId, userRole, "Resilience scorecard generated successfully.", year);
+        public Task<ResultResponseDto<DashboardModeResponseDto>> GetCompositeDiagnosticsDashboard(int countryID, int userId, UserRole userRole, int year)
+            => GetDashboardMode(CompositeDiagnosticsModeId, countryID, userId, userRole, "Composite diagnostics dashboard generated successfully.", null, year);
 
         private async Task<ResultResponseDto<DashboardModeResponseDto>> GetDashboardMode(
             int dashboardModeId,
@@ -42,6 +38,7 @@ namespace HornScope.Services
             int userId,
             UserRole userRole,
             string successMessage,
+            string? familyGroup,
             int year)
         {
             try
@@ -60,56 +57,49 @@ namespace HornScope.Services
                     return ResultResponseDto<DashboardModeResponseDto>.Failure(new[] { "Dashboard configuration not found." });
                 }
 
-                var mappings = await LoadActiveMappings(dashboardModeId);
-                if (!mappings.Any())
+                var layers = await LoadLayers(familyGroup);
+                if (!layers.Any())
                 {
                     return ResultResponseDto<DashboardModeResponseDto>.Failure(new[] { "Dashboard KPI mappings not found." });
                 }
 
-                var layerIds = mappings.Select(x => x.LayerID).Distinct().ToList();
-                var layers = await LoadLayers(layerIds);
+                var layerIds = layers.Keys.ToList();
                 var kpiResults = await LoadLayerResultsByYear(countryID, year, layerIds);
-                var amiScores = await LoadCountryAIAMIScore(countryID, userRole, year);
-                var amiManualScores = await LoadCountryAMIManualScores(userId, countryID, userRole, year);
-                var primaryMappings = OrderMappings(mappings.Where(x => x.PriorityLevel == 1));
-                var secondaryMappings = OrderMappings(mappings.Where(x => x.PriorityLevel != 1));
-                var primarySignals = BuildSignalCards(primaryMappings, kpiResults, layers, amiScores.Score);
-                var amiLayer = layers.Values.FirstOrDefault(x => x.LayerCode.Equals("AMI", StringComparison.OrdinalIgnoreCase));
+                var HSScores = await LoadCountryAIHSScore(countryID, userRole, year);
+                var HSManualScores = await LoadCountryHSManualScores(userId, countryID, userRole, year);
+                var orderedLayers = layers.Values.OrderBy(x => x.LayerID).ToList();
+                var allSignals = BuildSignalCards(orderedLayers, kpiResults, HSScores.Score);
+                var HSLayer = layers.Values.FirstOrDefault(x => x.LayerCode.Equals("HS", StringComparison.OrdinalIgnoreCase));
 
-                var amiAIInterpretation = amiLayer != null
-                    ? MatchInterpretationByValue(amiLayer, amiScores.Score ?? 0m)
+                var HSAIInterpretation = HSLayer != null
+                    ? MatchInterpretationByValue(HSLayer, HSScores.Score ?? 0m)
                     : null;
-                var amiManualInterpretation = amiLayer != null
-                    ? MatchInterpretationByValue(amiLayer, amiManualScores.Score ?? 0m)
+                var HSManualInterpretation = HSLayer != null
+                    ? MatchInterpretationByValue(HSLayer, HSManualScores.Score ?? 0m)
                     : null;
-                var amiAICondition = CommonStaticMethods.GetConditionByScore(amiScores.Score ?? 0m);
-                var amiManualCondition = CommonStaticMethods.GetConditionByScore(amiManualScores.Score ?? 0m);
+                var HSAICondition = CommonStaticMethods.GetConditionByScore(HSScores.Score ?? 0m);
+                var HSManualCondition = CommonStaticMethods.GetConditionByScore(HSManualScores.Score ?? 0m);
 
-                primarySignals.Insert(0, new SignalCardDto
+                allSignals.Insert(0, new SignalCardDto
                 {
                     LayerID = 0,
-                    LayerCode = "AMI",
+                    LayerCode = "HS",
                     LayerName = "Country Score",
                     Description = "Represents the country's overall resilience score based on the latest assessment.",
                     AiDescriptor = "Overall assessment of the country's current resilience and performance.",
                     ManualDescriptor = "Overall assessment of the country's current resilience and performance.",
                     StrategicAction = "Review the score category and prioritize actions to strengthen resilience and improve overall performance.",
-                    Code = "AMI Score",
+                    Code = "HS Score",
                     Name = "Country Score",
-                    AIValue = amiScores.Score ?? 0m,
-                    AiUpdatedAt = amiScores.AiUpdateAt,
-                    ManualValue = amiManualScores.Score ?? -1,
-                    ManualUpdatedAt = amiManualScores.ManualUpdateAt,
-                    AIInterpretationValue =  amiAIInterpretation?.Condition,
-                    ManualInterpretationValue =  amiManualInterpretation?.Condition,
-                    AICondition = amiAICondition,
-                    ManualCondition = amiManualCondition,
+                    AIValue = HSScores.Score ?? 0m,
+                    AiUpdatedAt = HSScores.AiUpdateAt,
+                    ManualValue = HSManualScores.Score ?? -1,
+                    ManualUpdatedAt = HSManualScores.ManualUpdateAt,
+                    AIInterpretationValue =  HSAIInterpretation?.Condition,
+                    ManualInterpretationValue =  HSManualInterpretation?.Condition,
+                    AICondition = HSAICondition,
+                    ManualCondition = HSManualCondition,
                 });
-
-                var secondarySignals = BuildSignalCards(secondaryMappings, kpiResults, layers, amiScores.Score);
-
-
-                var allSignals = primarySignals.Concat(secondarySignals).ToList();
 
                 return ResultResponseDto<DashboardModeResponseDto>.Success(
                     new DashboardModeResponseDto
@@ -119,20 +109,17 @@ namespace HornScope.Services
                         ModeName = dashboardMode.ModeName ?? string.Empty,
                         Description = dashboardMode.Description,
                         Year = year,
-                        Ami = amiScores.Score ?? 0m,
-                        AICountryScore = amiScores.Score ?? 0m,
-                        ManualCountryScore = amiManualScores.Score ?? 0m,
-                        ManualValue = amiManualScores.Score ?? 0m,
-                        AmiDirectionalMovement = amiScores.Delta,
-                        AmiCondition = amiAICondition,
-                        ManualCondition = amiManualCondition,
-                        AmiDescriptor = amiAIInterpretation?.Descriptor ?? string.Empty,
-                        ManualDescriptor = amiManualInterpretation?.Descriptor ?? string.Empty,
-                        AmiStrategicAction = amiAIInterpretation?.Descriptor ?? string.Empty,
-                        PrimarySignals = primarySignals,
-                        SecondarySignals = secondarySignals,
+                        HS = HSScores.Score ?? 0m,
+                        AICountryScore = HSScores.Score ?? 0m,
+                        ManualCountryScore = HSManualScores.Score ?? 0m,
+                        ManualValue = HSManualScores.Score ?? 0m,
+                        HSDirectionalMovement = HSScores.Delta,
+                        HSCondition = HSAICondition,
+                        ManualCondition = HSManualCondition,
+                        HSDescriptor = HSAIInterpretation?.Descriptor ?? string.Empty,
+                        ManualDescriptor = HSManualInterpretation?.Descriptor ?? string.Empty,
+                        HSStrategicAction = HSAIInterpretation?.Descriptor ?? string.Empty,
                         Signals = allSignals,
-                        //Narratives = narratives
                     },
                     new[] { successMessage });
             }
@@ -150,31 +137,15 @@ namespace HornScope.Services
                 .AnyAsync(x => x.UserID == userId && x.CountryID == countryID && x.IsActive);
         }
 
-        private async Task<List<DashboardModeKPIMapping>> LoadActiveMappings(int dashboardModeId)
+        private async Task<Dictionary<int, AnalyticalLayer>> LoadLayers(string? familyGroup)
         {
-            return await _context.DashboardModeKPIMappings
-                .AsNoTracking()
-                .Where(x => x.DashboardModeID == dashboardModeId && x.IsActive && !x.IsDeleted)
-                .ToListAsync();
-        }
-
-        private async Task<Dictionary<int, AnalyticalLayer>> LoadLayers(IEnumerable<int> layerIds)
-        {
-            var ids = layerIds.Distinct().ToList();
             var layers = await _context.AnalyticalLayers
                 .AsNoTracking()
                 .Include(x => x.FiveLevelInterpretations)
-                .Where(x => !x.IsDeleted && ids.Contains(x.LayerID))
+                .Where(x => !x.IsDeleted && x.FamilyGroup == familyGroup)
                 .ToListAsync();
 
             return layers.ToDictionary(x => x.LayerID);
-        }
-
-        private static List<DashboardModeKPIMapping> OrderMappings(IEnumerable<DashboardModeKPIMapping> mappings)
-        {
-            return mappings
-                .OrderBy(x => x.DisplayOrder ?? int.MaxValue)
-                .ToList();
         }
 
         private async Task<Dictionary<int, LayerScoreResult>> LoadLayerResultsByYear(int countryID, int year, IEnumerable<int> layerIds)
@@ -235,7 +206,7 @@ namespace HornScope.Services
                     });
         }
 
-        private async Task<CountryAMIScores> LoadCountryAIAMIScore(int countryID, UserRole userRole, int year)
+        private async Task<CountryHSScores> LoadCountryAIHSScore(int countryID, UserRole userRole, int year)
         {
             var query = _context.AICountryScores
                 .AsNoTracking()
@@ -256,7 +227,7 @@ namespace HornScope.Services
             var previous = scores.FirstOrDefault(x => x.Year == year - 1)?.AIProgress;
             var currentYearScore = scores.FirstOrDefault(x => x.Year == year);
 
-            return new CountryAMIScores
+            return new CountryHSScores
             {
                 Score = current ?? 0m,
                 Previous = previous,
@@ -265,7 +236,7 @@ namespace HornScope.Services
             };
         }
 
-        private async Task<CountryAMIScores> LoadCountryAMIManualScores(
+        private async Task<CountryHSScores> LoadCountryHSManualScores(
             int userID,
             int countryID,
             UserRole userRole,
@@ -291,7 +262,7 @@ namespace HornScope.Services
                 .Select(ar => (DateTime?)ar.UpdatedAt)
                 .FirstOrDefaultAsync();
 
-            return new CountryAMIScores
+            return new CountryHSScores
             {
                 Score = averageScoreProgress,
                 ManualUpdateAt = latestManualUpdate
@@ -299,28 +270,22 @@ namespace HornScope.Services
         }
 
         private List<SignalCardDto> BuildSignalCards(
-           IEnumerable<DashboardModeKPIMapping> mappings,
+           IEnumerable<AnalyticalLayer> layersToBuild,
            IReadOnlyDictionary<int, LayerScoreResult> kpiResults,
-           IReadOnlyDictionary<int, AnalyticalLayer> layers,
-           decimal? AMIOverride = null)
+           decimal? HSOverride = null)
         {
             var cards = new List<SignalCardDto>();
-            foreach (var mapping in mappings)
+            foreach (var layer in layersToBuild)
             {
-                if (!layers.TryGetValue(mapping.LayerID, out var layer))
-                {
-                    continue;
-                }
-
-                kpiResults.TryGetValue(mapping.LayerID, out var kpiResult);
+                kpiResults.TryGetValue(layer.LayerID, out var kpiResult);
 
                 var value = kpiResult?.AIValue ?? 0m;
                 var manualValue = kpiResult?.ManualValue ?? 0m;
 
-                if (AMIOverride.HasValue &&
-                    layer.LayerCode.Equals("AMI", StringComparison.OrdinalIgnoreCase))
+                if (HSOverride.HasValue &&
+                    layer.LayerCode.Equals("HS", StringComparison.OrdinalIgnoreCase))
                 {
-                    value = AMIOverride.Value;
+                    value = HSOverride.Value;
                 }
 
                 var aiInterpretation = ResolveInterpretation(layer, kpiResult?.AIInterpretationId);
@@ -350,7 +315,7 @@ namespace HornScope.Services
                     AIInterpretationValue = aiInterpretation?.Condition,
                     ManualInterpretationValue = manualInterpretation?.Condition,
                     IsAlert = isAlert,
-                    DisplayOrder = mapping.DisplayOrder
+                    DisplayOrder = layer.LayerID
                 });
             }
 
@@ -410,7 +375,7 @@ namespace HornScope.Services
             return (new DateTime(year, 1, 1), new DateTime(year + 1, 1, 1));
         }
 
-        private sealed class CountryAMIScores
+        private sealed class CountryHSScores
         {
             public decimal? Score { get; init; }
             public decimal? Previous { get; init; }

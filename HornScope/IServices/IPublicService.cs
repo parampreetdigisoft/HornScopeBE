@@ -14,7 +14,7 @@ namespace HornScope.IServices
         Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues();
         Task<bool> RefreshEmergingTrendsCacheAsync(int countryCount, CancellationToken cancellationToken = default);
         Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
-        Task<ResultResponseDto<OverallAfricaMarketResponse>> GetOverAllAfricaMarketScore();
+        Task<ResultResponseDto<OverallHornscopeResponse>> GetOverAllHornscopeScore();
 
     }
 }

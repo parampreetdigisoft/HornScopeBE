@@ -91,7 +91,7 @@ namespace HornScope
             {
                 c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
                 {
-                    Title = "Africa Market Intelligence Api",
+                    Title = "HornScope Api",
                     Version = "v1"
                 });
 
@@ -185,7 +185,7 @@ namespace HornScope
             // Enable middleware to serve Swagger UI (HTML, JS, CSS, etc.)
             app.UseSwaggerUI(c =>
             {
-                c.SwaggerEndpoint("/swagger/v1/swagger.json", "Africa Market Intelligence Api");
+                c.SwaggerEndpoint("/swagger/v1/swagger.json", "HornScope Api");
                 c.RoutePrefix = string.Empty; // Swagger UI at root URL (e.g. https://localhost:5001/)
             });           
 

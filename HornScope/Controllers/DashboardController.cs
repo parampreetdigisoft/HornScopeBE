@@ -52,6 +52,7 @@ namespace HornScope.Controllers
 
             return (userId, userRole, null);
         }
+
         private bool HasDashboardAccess(UserRole userRole, string? tierName)
         {
             if (userRole == UserRole.Admin || userRole == UserRole.Analyst || userRole == UserRole.Evaluator)
@@ -65,37 +66,26 @@ namespace HornScope.Controllers
                    tierName == TieredAccessPlan.Basic.ToString();
         }
 
-        [HttpGet("getPeaceStressTestDashboard")]
-        public async Task<IActionResult> GetPeaceStressTestDashboard([FromQuery] int countryID, int year)
+        [HttpGet("GetRelationalDiagnosticsDashboard")]
+        public async Task<IActionResult> GetRelationalDiagnosticsDashboard([FromQuery] int countryID, int year, string familyGroup)
         {
             var (userId, userRole, error) = ValidateRequest();
             if (error != null)
                 return error;
 
-            var result = await _signalDashboardService.GetPeaceStressTestDashboard(countryID, userId!.Value, userRole, year);
+            var result = await _signalDashboardService.GetRelationalDiagnosticsDashboard(countryID, userId!.Value, familyGroup, userRole, year);
             return Ok(result);
         }
 
-        [HttpGet("getEarlyWarningDashboard")]
-        public async Task<IActionResult> GetEarlyWarningDashboard([FromQuery] int countryID, int year)
+        [HttpGet("GetCompositeDiagnosticsDashboard")]
+        public async Task<IActionResult> GetCompositeDiagnosticsDashboard([FromQuery] int countryID, int year)
         {
             var (userId, userRole, error) = ValidateRequest();
             if (error != null)
                 return error;
 
-            var result = await _signalDashboardService.GetEarlyWarningDashboard(countryID, userId!.Value, userRole, year);
+            var result = await _signalDashboardService.GetCompositeDiagnosticsDashboard(countryID, userId!.Value, userRole, year);
             return Ok(result);
         }
-
-        [HttpGet("getResilienceScorecard")]
-        public async Task<IActionResult> GetResilienceScorecard([FromQuery] int countryID, int year)
-        {
-            var (userId, userRole, error) = ValidateRequest();
-            if (error != null)
-                return error;
-
-            var result = await _signalDashboardService.GetResilienceScorecard(countryID, userId!.Value, userRole, year);
-            return Ok(result);
-        }        
     }
 }

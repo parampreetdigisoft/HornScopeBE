@@ -341,9 +341,9 @@ namespace HornScope.Services
                         request.PillarID = assessment.PillarAssessments.First().PillarID;
                     }
 
-                    // Get next unanswered pillar
+                    // Get next unanswered pillar (only include non-deleted questions)
                     var selectPillar = await _context.Pillars
-                        .Include(p => p.Questions)
+                        .Include(p => p.Questions.Where(q => !q.IsDeleted))
                             .ThenInclude(q => q.QuestionOptions)
                         .Where(p => !request.PillarID.HasValue ? !answeredPillarIds.Contains(p.PillarID) : p.PillarID == request.PillarID)
                         .OrderBy(p => p.DisplayOrder)
@@ -428,41 +428,42 @@ namespace HornScope.Services
         {
             try
             {
-
-                var fileName = (from m in _context.UserCountryMappings.Where(us=>us.UserID == userId)
+                var fileName = (from m in _context.UserCountryMappings.Where(us => us.UserID == userId)
                                 join c in _context.Countries on m.CountryID equals c.CountryID
-                                join u in _context.Users.Where(x=>x.UserID == userId && !x.IsDeleted) on m.UserID equals u.UserID  
-                                where m.UserCountryMappingID == userCountryMappingID 
+                                join u in _context.Users.Where(x => x.UserID == userId && !x.IsDeleted) on m.UserID equals u.UserID
+                                join assignedByUser in _context.Users.Where(x => !x.IsDeleted) on m.AssignedByUserId equals assignedByUser.UserID into assignedUsers
+                                from assignedByUser in assignedUsers.DefaultIfEmpty()
+                                where m.UserCountryMappingID == userCountryMappingID
                                 select new
                                 {
                                     CountryName = c.CountryName,
-                                    FullName = u.FullName
+                                    FullName = u.FullName,
+                                    Role = u.Role,
+                                    AssignedByUsername = assignedByUser != null ? assignedByUser.FullName : null,
+                                    AssignedByRole = assignedByUser.Role
                                 }).FirstOrDefault();
 
+             
                 var sheetName = fileName?.CountryName + "_" + fileName?.FullName;
 
 
                 var year = DateTime.Now.Year;
 
 
-                var assessment = await _context.Assessments
+                var pillarAssessments = _context.Assessments
                     .Include(x => x.PillarAssessments)
                     .ThenInclude(x => x.Responses)
-                    .Where(a => a.UserCountryMappingID == userCountryMappingID && a.IsActive && a.UpdatedAt.Year == year).FirstOrDefaultAsync();
+                    .Where(a => a.UserCountryMappingID == userCountryMappingID && a.IsActive)
+                    .SelectMany(x => x.PillarAssessments).ToList();
 
-                var isAssessmentCompeleted = AssessmentPhase.Completed == assessment?.AssessmentPhase;
-
-                var pillarAssessments = (isAssessmentCompeleted ?
-                    assessment?.PillarAssessments?.Where(x => x.PillarID == ROSEWPillarID).ToList()
-                    : assessment?.PillarAssessments?.ToList()) ?? new List<PillarAssessment>();
-                    
                 // Get next unanswered pillar
                 var nextPillars = await _context.Pillars
                     .Include(p => p.Questions.Where(x => !x.IsDeleted))
-                        .ThenInclude(q => q.QuestionOptions)
-                    .Where(x => x.IsActive && !x.IsDeleted && (!isAssessmentCompeleted || x.PillarID == ROSEWPillarID ))
+                    .ThenInclude(q => q.QuestionOptions)
+                    .Where(x => x.IsActive && !x.IsDeleted)
                     .OrderBy(p => p.DisplayOrder)
                     .ToListAsync();
+
 
                 var byteArray = MakePillarSheetClientReadable_Updated(nextPillars, pillarAssessments, userCountryMappingID, fileName);
 
@@ -477,23 +478,23 @@ namespace HornScope.Services
         private const int FIRST_Q_ROW = 9;
         private const int ROWS_PER_Q = 4;
 
-        private static readonly XLColor ColHeaderBlue = XLColor.FromArgb(0, 109, 119);
-        private static readonly XLColor ColAccentBlue = XLColor.FromArgb(76, 175, 80);
-        private static readonly XLColor ColLightBlue = XLColor.FromArgb(126, 200, 207);
-        private static readonly XLColor ColRowAlt = XLColor.FromArgb(245, 248, 247);
-        private static readonly XLColor ColEditableYellow = XLColor.FromArgb(168, 224, 99);
-        private static readonly XLColor ColSeparator = XLColor.FromArgb(228, 228, 228);
-        private static readonly XLColor ColInputBorder = XLColor.FromArgb(228, 228, 228);
-        private static readonly XLColor ColGrayText = XLColor.FromArgb(74, 95, 98);
-        private static readonly XLColor ColDescBg = XLColor.FromArgb(245, 248, 247);
-        private static readonly XLColor ColDescBorder = XLColor.FromArgb(0, 90, 98);
-        private static readonly XLColor ColTotalBg = XLColor.FromArgb(126, 200, 207);
+        private static readonly XLColor ColHeaderBlue = XLColor.FromArgb(0, 33, 71);
+        private static readonly XLColor ColAccentBlue = XLColor.FromArgb(197, 160, 90);
+        private static readonly XLColor ColLightBlue = XLColor.FromArgb(232, 238, 244);
+        private static readonly XLColor ColRowAlt = XLColor.FromArgb(244, 247, 250);
+        private static readonly XLColor ColEditableYellow = XLColor.FromArgb(245, 236, 210);
+        private static readonly XLColor ColSeparator = XLColor.FromArgb(213, 222, 232);
+        private static readonly XLColor ColInputBorder = XLColor.FromArgb(197, 160, 90);
+        private static readonly XLColor ColGrayText = XLColor.FromArgb(12, 34, 56);
+        private static readonly XLColor ColDescBg = XLColor.FromArgb(244, 247, 250);
+        private static readonly XLColor ColDescBorder = XLColor.FromArgb(197, 160, 90);
+        private static readonly XLColor ColTotalBg = XLColor.FromArgb(212, 184, 106);
 
         private byte[] MakePillarSheetClientReadable_Updated(
              List<Pillar> pillars,
              List<PillarAssessment> pillarAssessments,
              int userCountryMappingID,
-             dynamic? countryUser)
+             dynamic? file)
         {
             using var workbook = new XLWorkbook();
 
@@ -517,33 +518,43 @@ namespace HornScope.Services
                 ws.Column(4).Width = 52;  // Response (dropdown / text)
 
                 // -- Row 1 : Title -------------------------------------
-                var title = ws.Range("A1:D1").Merge();
-                title.Value = "Africa Market Intelligence � Country Assessment";
+                var title = ws.Range("A1:C1").Merge();
+                title.Value = "HornScope - Country Assessment";
                 title.Style.Font.Bold = true;
                 title.Style.Font.FontSize = 13;
-                title.Style.Font.FontColor = XLColor.White;
+                title.Style.Font.FontColor = XLColor.FromArgb(232, 238, 244);
                 title.Style.Fill.BackgroundColor = ColHeaderBlue;
                 title.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                 title.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
-                ws.Row(1).Height = 26;
+                ws.Cell(1, 4).Style.Fill.BackgroundColor = ColHeaderBlue;
+                ws.Row(1).Height = 42;
+
+                if (File.Exists(ReportThemeColors.LogoPath))
+                {
+                    var logo = ws.AddPicture(ReportThemeColors.LogoPath)
+                        .MoveTo(ws.Cell(1, 4), 8, 3);
+                    logo.Width = 38;
+                    logo.Height = 38;
+                }
 
                 // -- Row 2 : Domain name -------------------------------
                 var pillarTitle = ws.Range("A2:D2").Merge();
                 pillarTitle.Value = $"Pillar: {pillar.PillarName}";
                 pillarTitle.Style.Font.Bold = true;
                 pillarTitle.Style.Font.FontSize = 11;
-                pillarTitle.Style.Font.FontColor = XLColor.White;
+                pillarTitle.Style.Font.FontColor = XLColor.FromArgb(6, 21, 37);
                 pillarTitle.Style.Fill.BackgroundColor = ColAccentBlue;
                 pillarTitle.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
                 ws.Row(2).Height = 20;
 
                 // -- Rows 3-4 : Meta -----------------------------------
                 ws.Cell(3, 1).Value = "Country:";
-                ws.Cell(3, 2).Value = countryUser?.CountryName?.ToString() ?? "";
+                ws.Cell(3, 2).Value = file?.CountryName?.ToString() ?? "";
                 ws.Cell(3, 3).Value = "Year:";
                 ws.Cell(3, 4).Value = DateTime.Now.Year;
-                ws.Cell(4, 1).Value = "Evaluator:";
-                ws.Cell(4, 2).Value = countryUser?.FullName?.ToString() ?? "";
+                ws.Cell(3, 4).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+                ws.Cell(4, 1).Value = "AssignedBy:";
+                ws.Cell(4, 2).Value = $"{file?.AssignedByUsername ?? ""} ({file?.AssignedByRole ?? ""})";
 
                 foreach (int r in new[] { 3, 4 })
                 {
@@ -567,7 +578,7 @@ namespace HornScope.Services
                 desc.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
                 desc.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                 desc.Style.Border.OutsideBorderColor = ColDescBorder;
-                ws.Row(6).Height = 120;
+                ws.Row(6).Height = 72;
 
                 // -- Row 7 : thin gap ----------------------------------
                 ws.Row(7).Height = 4;
@@ -610,9 +621,8 @@ namespace HornScope.Services
 
                     // -- Build option texts (score desc first, then N/A / Unknown) --
                     var options = (q.QuestionOptions ?? new List<QuestionOption>())
-                                  .OrderByDescending(x => x.ScoreValue)
-                                  .ThenBy(x => x.OptionText)
-                                  .ToList();
+                                 .OrderBy(x => x.DisplayOrder)
+                                 .ToList();
 
                     var optionTexts = options.Select(opt =>
                     {
@@ -656,7 +666,7 @@ namespace HornScope.Services
                     ws.Cell(ansRow, 1).Value = sno++;
                     ws.Cell(ansRow, 1).Style.Font.Bold = true;
                     ws.Cell(ansRow, 1).Style.Font.FontColor = XLColor.White;
-                    ws.Cell(ansRow, 1).Style.Fill.BackgroundColor = ColAccentBlue;
+                    ws.Cell(ansRow, 1).Style.Fill.BackgroundColor = ColHeaderBlue;
                     ws.Cell(ansRow, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
                     ws.Cell(ansRow, 1).Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
@@ -685,13 +695,13 @@ namespace HornScope.Services
                     ansCell.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
                     ansCell.Style.Border.OutsideBorderColor = ColAccentBlue;
 
-                    // DATA VALIDATION � list via Named Range (cross-sheet refs don't work in ClosedXML dv.Value)
+                    // DATA VALIDATION - list via Named Range (cross-sheet refs don't work in ClosedXML dv.Value)
                     if (optionTexts.Any())
                     {
                         var dv = ansCell.GetDataValidation();
                         dv.Clear();
                         dv.AllowedValues = XLAllowedValues.List;
-                        // Reference the Named Range we created above � this IS supported by ClosedXML
+                        // Reference the Named Range we created above - this IS supported by ClosedXML
                         // and produces a real clickable dropdown arrow in Excel / LibreOffice.
                         dv.Value = namedRangeKey;
                         dv.IgnoreBlanks = true;
@@ -740,7 +750,7 @@ namespace HornScope.Services
                     ws.Cell(commentRow, 4).Style.Border.OutsideBorderColor = ColInputBorder;
                     ws.Row(commentRow).Height = 40;
 
-                    // -- Source row (row+2) � also carries hidden IDs --
+                    // -- Source row (row+2) - also carries hidden IDs --
                     int sourceRow = ansRow + 2;
 
                     ws.Cell(sourceRow, 1).Style.Fill.BackgroundColor = qBg;
@@ -761,7 +771,7 @@ namespace HornScope.Services
                     ws.Cell(sourceRow, 4).Style.Border.OutsideBorderColor = ColInputBorder;
                     ws.Row(sourceRow).Height = 25;
 
-                    // Hidden IDs (cols K�O = 11�15)
+                    // Hidden IDs (cols K-O = 11-15)
                     ws.Cell(sourceRow, 11).Value = userCountryMappingID;
                     ws.Cell(sourceRow, 12).Value = pillar.PillarID;
                     ws.Cell(sourceRow, 13).Value = q.QuestionID;
@@ -823,7 +833,7 @@ namespace HornScope.Services
                 row++;
 
                 // Answered / Total count row
-                ws.Cell(row, 3).Value = "Answered";
+                ws.Cell(row, 3).Value = "Valid Answered";
                 ws.Cell(row, 3).Style.Font.Bold = true;
                 ws.Cell(row, 3).Style.Font.FontColor = ColGrayText;
                 ws.Cell(row, 3).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
@@ -1096,13 +1106,13 @@ namespace HornScope.Services
                 if (assessment != null && answeredPillarIds.Count == pillarCount && !request.PillarID.HasValue)
                     request.PillarID = assessment.PillarAssessments.First().PillarID;
 
-                // Get the target pillar (next unanswered or specific)
+                // Get the target pillar (next unanswered or specific) and include only non-deleted questions
                 var selectPillar = await _context.Pillars
-                    .Include(p => p.Questions)
-                        .ThenInclude(q => q.QuestionOptions)
+                    .Include(p => p.Questions.Where(q => !q.IsDeleted))
+                    .ThenInclude(q => q.QuestionOptions)
                     .Where(p => !request.PillarID.HasValue
                         ? !answeredPillarIds.Contains(p.PillarID)
-                        : p.PillarID == request.PillarID)
+                        : p.PillarID == request.PillarID && !p.IsDeleted)
                     .OrderBy(p => p.DisplayOrder)
                     .FirstOrDefaultAsync();
 

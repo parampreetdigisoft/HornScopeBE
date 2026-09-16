@@ -166,9 +166,8 @@ namespace HornScope.Common.Implementation
                 // A4 page size + narrow margins + page numbers in footer
                 var body = mainPart.Document.Body!;
                 body.AppendChild(new SectionProperties(
-                    new PageSize  { Width = PageWidthDxa, Height = PageHeightDxa },
-                    new PageMargin { Top = MarginDxa, Right = MarginDxa,
-                                     Bottom = MarginDxa, Left = MarginDxa }));
+                    new PageSize { Width = PageWidthDxa, Height = PageHeightDxa },
+                    CreatePageMargin()));
 
                 mainPart.Document.Save();
             }
@@ -723,7 +722,6 @@ namespace HornScope.Common.Implementation
                 AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, ReportThemeColors.AccentInstitutionalCapacity.TrimStart('#'));
 
                 AppendContentSection(body, "Equity Assessment", data.EquityAssessment, ReportThemeColors.AccentGaps.TrimStart('#'));
-                AppendContentSection(body, "Conflict Risk Outlook", data.ConflictRiskOutlook, ReportThemeColors.AccentConflictRisk.TrimStart('#'));
 
                 AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, ReportThemeColors.AccentStrategicPolicy.TrimStart('#'));
                 AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, ReportThemeColors.AccentDataTransparency.TrimStart('#'));
@@ -980,9 +978,9 @@ namespace HornScope.Common.Implementation
         /// (which replaces the manual PageBreak() call between sections).
         /// </summary>
         private void AppendCountryHeader(
-     MainDocumentPart mainPart,
-     AiCountrySummeryDto data,
-     string? sectionTitle = null)
+            MainDocumentPart mainPart,
+            AiCountrySummeryDto data,
+            string? sectionTitle = null)
         {
             var body = mainPart.Document.Body!;
 
@@ -996,123 +994,116 @@ namespace HornScope.Common.Implementation
             var header = new Header();
 
             string title = string.IsNullOrEmpty(sectionTitle) ? data.CountryName : sectionTitle;
+            string subtitle = $"{data.CountryName}, {data.Continent} | Data Year: {data.Year}";
+            string generated = $"Generated: {DateTime.Now:MMM dd, yyyy}";
 
-            string logoPath = ReportThemeColors.LogoPath;
+            const int pngWidth = 1460;
+            const int pngHeight = 240;
+            long heightEmu = ContentWidthEmu * pngHeight / pngWidth;
 
-            int logoColW = 2000;
-            int leftColW = ContentDxa - logoColW;
+            byte[] banner = RenderPng(
+                (canvas, size) => PaintCountryHeaderBanner(canvas, size, title!, subtitle, generated, ReportThemeColors.LogoPath),
+                pngWidth,
+                pngHeight);
 
-            const long logoWidthEmu = 1_209_600L;
-            const long logoHeightEmu = 780_000L;
-
-            // ✅ MAIN TABLE
-            var layoutTable = new Table(
-                new TableProperties(
-                    new TableWidth { Width = "5000", Type = TableWidthUnitValues.Pct },
-                    new TableLayout { Type = TableLayoutValues.Fixed },
-                    new TableCellSpacing() { Width = "0", Type = TableWidthUnitValues.Dxa }
-                )
-            );
-
-            var mainRow = new TableRow(
-                new TableRowProperties(
-                    new TableRowHeight
-                    {
-                        Val = 1100,
-                        HeightType = HeightRuleValues.AtLeast
-                    }
-                )
-            );
-
-            // ✅ LEFT CELL
-            var leftCell = new TableCell(
-                new TableCellProperties(
-                    new TableCellWidth { Width = leftColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Fill = ReportThemeColors.DarkBgHex },
-                    new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
-                    new TableCellMargin(
-                        new TopMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
-                        new BottomMargin { Width = "200", Type = TableWidthUnitValues.Dxa },
-                        new LeftMargin { Width = "250", Type = TableWidthUnitValues.Dxa },
-                        new RightMargin { Width = "150", Type = TableWidthUnitValues.Dxa }
-                    )
-                )
-            );
-
-            leftCell.Append(
-                HeaderParagraph(title, "42", ReportThemeColors.HeaderSubtitleHex, true, "40"),
-                HeaderParagraph($"{data.CountryName}, {data.Continent} | Data Year: {data.Year}", "20", ReportThemeColors.SecondaryHex, false, "20"),
-                HeaderParagraph($"Generated: {DateTime.Now:MMM dd, yyyy}", "16", ReportThemeColors.GraySilver.TrimStart('#'), false, "0")
-            );
-
-            mainRow.Append(leftCell);
-
-            // ✅ RIGHT CELL (BLUE BACKGROUND)
-            var rightCell = new TableCell(
-                new TableCellProperties(
-                    new TableCellWidth { Width = logoColW.ToString(), Type = TableWidthUnitValues.Dxa },
-                    new Shading { Fill = ReportThemeColors.DarkBgHex },
-                    new TableCellVerticalAlignment { Val = TableVerticalAlignmentValues.Center },
-                    new TableCellMargin(
-                        new TopMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new BottomMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new LeftMargin { Width = "80", Type = TableWidthUnitValues.Dxa },
-                        new RightMargin { Width = "120", Type = TableWidthUnitValues.Dxa }
-                    )
-                )
-            );
-
-            if (File.Exists(logoPath))
-            {
-                var logoPara = EmbedImageInPart(
-                    headerPart,
-                    File.ReadAllBytes(logoPath),
-                    logoWidthEmu,
-                    logoHeightEmu
-                );
-
-                logoPara.ParagraphProperties = new ParagraphProperties(
-                    new Justification { Val = JustificationValues.Right },
-                    new SpacingBetweenLines
-                    {
-                        Before = "0",
-                        After = "0",
-                        Line = "240",
-                        LineRule = LineSpacingRuleValues.Auto
-                    }
-                );
-
-                rightCell.Append(logoPara);
-            }
-            else
-            {
-                rightCell.Append(new Paragraph());
-            }
-
-            mainRow.Append(rightCell);
-
-            layoutTable.Append(mainRow);
-
-            var divider = new Paragraph(
-                new ParagraphProperties(
-                    new ParagraphBorders(
-                        new BottomBorder
-                        {
-                            Val = BorderValues.Single,
-                            Size = 12,
-                            Color = ReportThemeColors.PrimaryHex
-                        }
-                    )
-                )
-            );
-
-            header.Append(layoutTable, divider);
-
+            header.Append(EmbedImageInPart(headerPart, banner, ContentWidthEmu, heightEmu));
             headerPart.Header = header;
             header.Save();
 
             _pendingHeaderRelId = mainPart.GetIdOfPart(headerPart);
         }
+
+        private static void PaintCountryHeaderBanner(
+            SKCanvas canvas,
+            QPDF.Size size,
+            string title,
+            string subtitle,
+            string generated,
+            string logoPath)
+        {
+            float w = (float)size.Width;
+            float h = (float)size.Height;
+            float accentH = Math.Max(6f, h * 0.045f);
+            float navyH = h - accentH;
+            float pad = h * 0.12f;
+
+            canvas.Clear(SKColors.White);
+            using (var navy = new SKPaint { Color = SKColor.Parse(ReportThemeColors.DarkBg), IsAntialias = true })
+                canvas.DrawRect(0, 0, w, navyH, navy);
+            using (var gold = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Primary), IsAntialias = true })
+                canvas.DrawRect(0, navyH, w, h, gold);
+
+            float logoBox = navyH - pad * 2f;
+            float logoLeft = w - pad - logoBox;
+
+            using (var white = new SKPaint { Color = SKColors.White, IsAntialias = true })
+                canvas.DrawRoundRect(new SKRoundRect(new SKRect(logoLeft, pad, w - pad, navyH - pad), 8), white);
+
+            if (File.Exists(logoPath))
+            {
+                using var logo = SKBitmap.Decode(logoPath);
+                if (logo != null)
+                {
+                    float inset = logoBox * 0.08f;
+                    var dest = new SKRect(logoLeft + inset, pad + inset, w - pad - inset, navyH - pad - inset);
+                    canvas.DrawBitmap(logo, dest);
+                }
+            }
+
+            float textRight = logoLeft - pad;
+            using var titlePaint = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.HeaderSubtitle),
+                TextSize = navyH * 0.28f,
+                IsAntialias = true,
+                FakeBoldText = true,
+                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            };
+            using var subPaint = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.Secondary),
+                TextSize = navyH * 0.13f,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial")
+            };
+            using var metaPaint = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.HeaderTextMuted),
+                TextSize = navyH * 0.11f,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial")
+            };
+
+            float textX = pad * 1.15f;
+            float maxTextW = logoLeft - pad - textX;
+            float titleY = pad + titlePaint.TextSize * 0.95f;
+            canvas.DrawText(FitHeaderText(title, titlePaint, maxTextW), textX, titleY, titlePaint);
+            canvas.DrawText(FitHeaderText(subtitle, subPaint, maxTextW), textX, titleY + subPaint.TextSize + 10, subPaint);
+            canvas.DrawText(generated, textX, titleY + subPaint.TextSize + metaPaint.TextSize + 22, metaPaint);
+        }
+
+        private static string FitHeaderText(string text, SKPaint paint, float maxWidth)
+        {
+            if (string.IsNullOrEmpty(text) || paint.MeasureText(text) <= maxWidth) return text ?? string.Empty;
+            const string ellipsis = "…";
+            for (int i = text.Length - 1; i > 4; i--)
+            {
+                var candidate = text[..i].TrimEnd() + ellipsis;
+                if (paint.MeasureText(candidate) <= maxWidth) return candidate;
+            }
+            return ellipsis;
+        }
+
+        private static PageMargin CreatePageMargin() =>
+            new()
+            {
+                Top = 2100,
+                Right = MarginDxa,
+                Bottom = MarginDxa,
+                Left = MarginDxa,
+                Header = 180,
+                Footer = 240
+            };
 
         /// <summary>
         /// Builds a SectionProperties with header references and a next-page break.
@@ -1121,29 +1112,12 @@ namespace HornScope.Common.Implementation
         {
             var sp = new SectionProperties();
             sp.AppendChild(new SectionType { Val = SectionMarkValues.NextPage });
+            sp.AppendChild(new PageSize { Width = PageWidthDxa, Height = PageHeightDxa });
+            sp.AppendChild(CreatePageMargin());
             sp.AppendChild(new HeaderReference { Type = HeaderFooterValues.Default, Id = headerRelId });
             sp.AppendChild(new HeaderReference { Type = HeaderFooterValues.First, Id = headerRelId });
             sp.AppendChild(new HeaderReference { Type = HeaderFooterValues.Even, Id = headerRelId });
             return sp;
-        }
-        // ── Helper: single-line paragraph for the header ─────────────────────────────
-        private static Paragraph HeaderParagraph(
-            string text,
-            string fontSize,
-            string color,
-            bool bold,
-            string spacingAfter)
-        {
-            var rp = new RunProperties(
-                new Color { Val = color },
-                new FontSize { Val = fontSize },
-                new RunFonts { Ascii = "Arial", HighAnsi = "Arial" });
-            if (bold) rp.PrependChild(new Bold());
-
-            return new Paragraph(
-                new ParagraphProperties(
-                    new SpacingBetweenLines { Before = "0", After = spacingAfter }),
-                new Run(rp, new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
         }
 
 

@@ -223,9 +223,16 @@ namespace HornScope.Common.Implementation
         /// <summary>Standard numeric footer for country pages.</summary>
         static void PageFooter(PageDescriptor page)
         {
-            page.Footer().AlignCenter().Text(x =>
+            page.Footer().AlignCenter().Column(col =>
             {
-                x.CurrentPageNumber(); x.Span(" / "); x.TotalPages();
+                col.Item().AlignCenter().Text(x =>
+                {
+                    x.CurrentPageNumber(); x.Span(" / "); x.TotalPages();
+                });
+                col.Item().AlignCenter()
+                    .Text($"{ReportThemeColors.BrandName}  ·  {ReportThemeColors.BrandTagline}")
+                    .FontSize(7)
+                    .FontColor(ReportThemeColors.LightText);
             });
         }        
         void AddGlobalDashboardPage(
@@ -1627,12 +1634,17 @@ namespace HornScope.Common.Implementation
                             .FontColor(ReportThemeColors.HeaderTextMuted);
                     });
 
-                    row.ConstantItem(88)
-                        .AlignRight()
-                        .AlignMiddle()
-                        .Height(62)
-                        .Image(logoPath)
-                        .FitArea();
+                    if (File.Exists(logoPath))
+                    {
+                        row.ConstantItem(108)
+                            .AlignRight()
+                            .AlignMiddle()
+                            .Background(ReportThemeColors.White)
+                            .Padding(3)
+                            .Height(70)
+                            .Image(logoPath)
+                            .FitArea();
+                    }
                 });
 
                 column.Item().Height(2).Background(ReportThemeColors.Primary);
@@ -1665,12 +1677,17 @@ namespace HornScope.Common.Implementation
                             .FontColor(ReportThemeColors.HeaderTextMuted);
                     });
 
-                    row.ConstantItem(90)
-                        .AlignRight()
-                        .AlignMiddle()
-                        .Height(64)
-                        .Image(logoPath)
-                        .FitArea();
+                    if (File.Exists(logoPath))
+                    {
+                        row.ConstantItem(108)
+                            .AlignRight()
+                            .AlignMiddle()
+                            .Background(ReportThemeColors.White)
+                            .Padding(3)
+                            .Height(70)
+                            .Image(logoPath)
+                            .FitArea();
+                    }
                 });
 
                 column.Item().Height(2).Background(ReportThemeColors.Primary);
@@ -1689,7 +1706,9 @@ namespace HornScope.Common.Implementation
                         text.Span(" of "); text.TotalPages();
                     });
                     col.Item().PaddingTop(5).AlignCenter()
-                        .Text("Africa Market Intelligence").FontSize(8).FontColor(ReportThemeColors.Gray500);
+                        .Text($"{ReportThemeColors.BrandName}  ·  {ReportThemeColors.BrandTagline}")
+                        .FontSize(7)
+                        .FontColor(ReportThemeColors.LightText);
                 });
             });
         }

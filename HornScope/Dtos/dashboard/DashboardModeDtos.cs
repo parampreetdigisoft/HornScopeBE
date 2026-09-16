@@ -8,19 +8,17 @@ namespace HornScope.Dtos.dashboard
         public string ModeName { get; set; } = string.Empty;
         public string? Description { get; set; }
         public int Year { get; set; }
-        public decimal Ami { get; set; }
+        public decimal HS { get; set; }
         public decimal AICountryScore { get; set; }
         public decimal ManualCountryScore { get; set; }
         public decimal ManualValue { get; set; }
-        public decimal AmiDirectionalMovement { get; set; }
-        public string AmiCondition { get; set; } = string.Empty;
+        public decimal HSDirectionalMovement { get; set; }
+        public string HSCondition { get; set; } = string.Empty;
         public string ManualCondition { get; set; } = string.Empty;
-        public string AmiDescriptor { get; set; } = string.Empty;
+        public string HSDescriptor { get; set; } = string.Empty;
         public string ManualDescriptor { get; set; } = string.Empty;
-        public string AmiStrategicAction { get; set; } = string.Empty;
+        public string HSStrategicAction { get; set; } = string.Empty;
         public List<SignalCardDto> Signals { get; set; } = new();
-        public List<SignalCardDto> PrimarySignals { get; set; } = new();
-        public List<SignalCardDto> SecondarySignals { get; set; } = new();
     }
 
     public class DashboardQuestionScoreDto

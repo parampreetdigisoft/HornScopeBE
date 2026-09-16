@@ -13,7 +13,7 @@ namespace HornScope.Dtos.AssessmentDto
         public string QuestionText { get; set; }
         public string QuestionOptionText { get; set; }
         public string Justification { get; set; }
-        public ScoreValue? Score { get; set; }
+        public int? Score { get; set; }
         public string Source { get; set; }
     }
 }
