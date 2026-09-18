@@ -17,9 +17,9 @@ namespace HornScope.Controllers
         }
 
         [HttpGet("getAllCountries")]
-        public async Task<IActionResult> getAllCountries()
+        public async Task<IActionResult> GetAllCountries()
         {
-            var response = await _publicService.getAllCountries();
+            var response = await _publicService.GetAllCountries();
             return Ok(response);
         }
 

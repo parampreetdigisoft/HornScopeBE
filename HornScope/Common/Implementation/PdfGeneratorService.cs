@@ -1794,53 +1794,39 @@ namespace HornScope.Common.Implementation
                     //    .FontSize(16).Bold();
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), ReportThemeColors.AccentTemporalScope));
+                        PillarContentSection(c, "Temporal Reliability", SanitizeText(data.TemporalReliability), ReportThemeColors.AccentTemporalScope));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), ReportThemeColors.AccentDistortionScreening));
+                        PillarContentSection(c, "Reliability Assessment", SanitizeText(data.ReliabilityAssessment), ReportThemeColors.DeepTeal));
 
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), ReportThemeColors.AccentRelationalIntegrity));
 
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Political Shock", SanitizeText(data.PoliticalShock), ReportThemeColors.AccentPoliticalShock));
+                        PillarContentSection(c, "Geopolitical Shock", SanitizeText(data.GeopoliticalShock), ReportThemeColors.AccentPoliticalShock));
 
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Economic Shock", SanitizeText(data.EconomicShock), ReportThemeColors.AccentEconomicShock));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Narrative Shock", SanitizeText(data.NarrativeShock), ReportThemeColors.AccentNarrativeShock));
-                    //column.Item().PageBreak();
-
-                    //column.Item().PaddingTop(8).Element(c =>
-                    //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.OverallStressResilience), ReportThemeColors.AccentStressResilience));
-
-                    column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), ReportThemeColors.AccentStressAdjustment));
+                        PillarContentSection(c, "Finance Shock", SanitizeText(data.FinanceShock), ReportThemeColors.AccentNarrativeShock));
 
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.AccentInequalityAdj));
+                        PillarContentSection(c, "Scenario Analysis", SanitizeText(data.ScenarioAnalysis), ReportThemeColors.AccentStressAdjustment));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.AccentOpacityRisk));
+                        PillarContentSection(c, "Data Integrity Index", SanitizeText(data.DataIntegrityIndex), ReportThemeColors.AccentNonCompensation));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), ReportThemeColors.AccentNonCompensation));
+                        PillarContentSection(c, "Data Opacity Risk", SanitizeText(data.DataOpacityRisk), ReportThemeColors.AccentOpacityRisk));
 
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Cross-Domain System Dynamics", SanitizeText(data.CrossPillarPatterns), ReportThemeColors.AccentCrossPillar));
 
                     column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Institutional Capacity Assessment", SanitizeText(data.InstitutionalCapacity), ReportThemeColors.DeepTeal));
-
-                    column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Equity Assessment", SanitizeText(data.EquityAssessment), ReportThemeColors.AccentGaps));
-
-                    //column.Item().PageBreak();
-                    column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Conflict Risk Outlook", SanitizeText(data.ConflictRiskOutlook), ReportThemeColors.AccentConflictRisk));
+                        PillarContentSection(c, "Early Warning Assessment", SanitizeText(data.EarlyWarningAssessment), ReportThemeColors.AccentGaps));
 
                     // =====================================================
                     // STRATEGIC OUTPUT
@@ -1896,68 +1882,28 @@ namespace HornScope.Common.Implementation
                 //column.Item().PageBreak();
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Temporal Scope", SanitizeText(data.TemporalScope), ReportThemeColors.AccentTemporalScopeAlt));
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Distortion Screening", SanitizeText(data.DistortionScreening), ReportThemeColors.AccentDistortionScreeningAlt));
+                    PillarContentSection(c, "Temporal Reliability", SanitizeText(data.TemporalReliability), ReportThemeColors.AccentTemporalScopeAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Relational Integrity", SanitizeText(data.RelationalIntegrity), ReportThemeColors.AccentRelationalIntegrityAlt));
 
-                // =====================================================
-                // STRESS TESTS
-                // =====================================================
-                //column.Item().PageBreak();
-
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Political Shock", SanitizeText(data.StressPoliticalShock), ReportThemeColors.AccentPoliticalShockAlt));
+                    PillarContentSection(c, "Geopolitical Shock", SanitizeText(data.StressGeopoliticalShock), ReportThemeColors.AccentPoliticalShockAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Economic Shock", SanitizeText(data.StressEconomicShock), ReportThemeColors.AccentEconomicShockAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Narrative Shock", SanitizeText(data.StressNarrativeShock), ReportThemeColors.AccentNarrativeShockAlt));
-
-                //column.Item().PageBreak();
-
-                //column.Item().PaddingTop(8).Element(c =>
-                //    PillarContentSection(c, "Overall Stress Resilience", SanitizeText(data.StressOverallResilience), ReportThemeColors.AccentStressResilienceAlt));
+                    PillarContentSection(c, "Finance Shock", SanitizeText(data.StressFinanceShock), ReportThemeColors.AccentNarrativeShockAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Stress Score Adjustment", SanitizeText(data.StressScoreAdjustment), ReportThemeColors.AccentStressAdjustmentAlt));
-
-                // =====================================================
-                // GOVERNANCE ADJUSTMENTS
-                // =====================================================
-                //column.Item().PageBreak();
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Inequality Adjustment", SanitizeText(data.InequalityAdjustment), ReportThemeColors.AccentInequalityAdjAlt));
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Opacity Risk", SanitizeText(data.OpacityRisk), ReportThemeColors.AccentOpacityRiskAlt));
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Non Compensation Note", SanitizeText(data.NonCompensationNote), ReportThemeColors.AccentNonCompensationAlt));
-
-                // =====================================================
-                // ALERTS & EQUITY
-                // =====================================================
-                //column.Item().PageBreak();
+                    PillarContentSection(c, "Data Opacity Risk", SanitizeText(data.DataOpacityRisk), ReportThemeColors.AccentOpacityRiskAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Red Flags", SanitizeText(data.RedFlag), ReportThemeColors.DangerRedFlag, ReportThemeColors.DangerRedFlagAlt));
 
                 column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Geographic Equity Note", SanitizeText(data.GeographicEquityNote), ReportThemeColors.DeepTeal));
-
-                // =====================================================
-                // SYSTEM / INSTITUTIONAL ANALYSIS
-                // =====================================================
-                //column.Item().PageBreak();
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Institutional Assessment", SanitizeText(data.InstitutionalAssessment), ReportThemeColors.AccentStrategicPolicy));
+                    PillarContentSection(c, "Reliability Assessment", SanitizeText(data.ReliabilityAssessment), ReportThemeColors.AccentStrategicPolicy));
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Analytical Foundations and Data Integration", SanitizeText(data.DataGapAnalysis), ReportThemeColors.AccentDataGap));

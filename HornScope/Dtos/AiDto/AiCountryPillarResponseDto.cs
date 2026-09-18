@@ -13,7 +13,7 @@ namespace HornScope.Dtos.AiDto
 
         public int CountryID { get; set; }
         public string? Continent { get; set; }
-        public string? CountryName { get; set; }        
+        public string? CountryName { get; set; }
 
         public int PillarID { get; set; }
         public string? PillarName { get; set; }
@@ -36,24 +36,18 @@ namespace HornScope.Dtos.AiDto
         public string? OperationalEvidence { get; set; }
         public string? OutcomeEvidence { get; set; }
         public string? PerceptionEvidence { get; set; }
-        public string? TemporalScope { get; set; }
-        public string? DistortionScreening { get; set; }
+        public string? TemporalReliability { get; set; }
         public string? RelationalIntegrity { get; set; }
 
-        public string? StressPoliticalShock { get; set; }
+        public string? StressGeopoliticalShock { get; set; }
         public string? StressEconomicShock { get; set; }
-        public string? StressNarrativeShock { get; set; }
-        public string? StressOverallResilience { get; set; }
-        public string? StressScoreAdjustment { get; set; }
+        public string? StressFinanceShock { get; set; }
 
-        public string? InequalityAdjustment { get; set; }
-        public string? OpacityRisk { get; set; }
-        public string? NonCompensationNote { get; set; }
-        public string? GeographicEquityNote { get; set; }
-        public string? InstitutionalAssessment { get; set; }
+        public string? DataOpacityRisk { get; set; }
+        public string? ReliabilityAssessment { get; set; }
         public string? DataGapAnalysis { get; set; }
 
-        public string? RedFlag { get; set; }   // renamed from RedFlags ? RedFlag (matches DB)
+        public string? RedFlag { get; set; }
 
         public decimal? AICompletionRate { get; set; }
 

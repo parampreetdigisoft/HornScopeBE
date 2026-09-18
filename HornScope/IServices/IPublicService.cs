@@ -7,7 +7,7 @@ namespace HornScope.IServices
 {
     public interface IPublicService
     {
-        Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries();
+        Task<ResultResponseDto<List<PartnerCountryResponseDto>>> GetAllCountries();
         Task<ResultResponseDto<List<PillarResponseDto>>> GetAllPillarAsync();
         Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();

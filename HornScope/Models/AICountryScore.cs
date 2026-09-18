@@ -8,7 +8,6 @@ namespace HornScope.Models
         public int CountryScoreID { get; set; }        
         public int CountryID { get; set; }        
         public int Year { get; set; }        
-        //public decimal? AIScore { get; set; }       
         public decimal? AIProgress { get; set; }
         public decimal? EvaluatorScore { get; set; }
         public decimal? Discrepancy { get; set; }     
@@ -18,21 +17,17 @@ namespace HornScope.Models
         public string OperationalEvidence { get; set; }
         public string OutcomeEvidence { get; set; }
         public string PerceptionEvidence { get; set; }
-        public string TemporalScope { get; set; }
-        public string DistortionScreening { get; set; }
-        public string PoliticalShock { get; set; }
+        public string ReliabilityAssessment { get; set; }
+        public string TemporalReliability { get; set; }
+        public string GeopoliticalShock { get; set; }
         public string EconomicShock { get; set; }
-        public string NarrativeShock { get; set; }      
-        public string OverallStressResilience { get; set; }
-        public string StressScoreAdjustment { get; set; }
-        public string InequalityAdjustment { get; set; }
-        public string OpacityRisk { get; set; }
-        public string NonCompensationNote { get; set; }
+        public string FinanceShock { get; set; }
+        public string DataIntegrityIndex { get; set; }
+        public string DataOpacityRisk { get; set; }
+        public string ScenarioAnalysis { get; set; }
         public string CrossPillarPatterns { get; set; }
         public string RelationalIntegrity { get; set; }
-        public string InstitutionalCapacity { get; set; }
-        public string EquityAssessment { get; set; }
-        public string ConflictRiskOutlook { get; set; }
+        public string EarlyWarningAssessment { get; set; }
         public string StrategicRecommendation { get; set; }
         public string DataTransparencyNote { get; set; }
         public string PrimarySource { get; set; }        
@@ -41,7 +36,7 @@ namespace HornScope.Models
         public int? VerifiedBy { get; set; }
         public Country Country { get; set; }      
 
-        public string? ImmediateSituationSummary { get; set; } // Generates structured summaries (daily, weekly, or on-demand)
+        public string? ImmediateSituationSummary { get; set; }
         public string? KeyDevelopments { get; set; }
         public string? CriticalRisks { get; set; }
         public string? Gaps { get; set; }

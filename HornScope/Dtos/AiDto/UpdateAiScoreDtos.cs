@@ -18,21 +18,18 @@ namespace HornScope.Dtos.AiDto
         public string? OperationalEvidence { get; set; }
         public string? OutcomeEvidence { get; set; }
         public string? PerceptionEvidence { get; set; }
-        public string? TemporalScope { get; set; }
-        public string? DistortionScreening { get; set; }
-        public string? PoliticalShock { get; set; }
+        public string? ReliabilityAssessment { get; set; }
+        public string? TemporalReliability { get; set; }
+        public string? GeopoliticalShock { get; set; }
         public string? EconomicShock { get; set; }
-        public string? NarrativeShock { get; set; }
-        public string? StressScoreAdjustment { get; set; }
-        public string? InequalityAdjustment { get; set; }
-        public string? OpacityRisk { get; set; }
-        public string? NonCompensationNote { get; set; }
+        public string? FinanceShock { get; set; }
+        public string? DataIntegrityIndex { get; set; }
+        public string? DataOpacityRisk { get; set; }
+        public string? ScenarioAnalysis { get; set; }
         public string? RelationalIntegrity { get; set; }
-        public string? InstitutionalCapacity { get; set; }
         public string? PrimarySource { get; set; }
         public string? CrossPillarPatterns { get; set; }
-        public string? EquityAssessment { get; set; }
-        public string? ConflictRiskOutlook { get; set; }
+        public string? EarlyWarningAssessment { get; set; }
         public string? StrategicRecommendation { get; set; }
         public string? DataTransparencyNote { get; set; }
     }
@@ -48,18 +45,13 @@ namespace HornScope.Dtos.AiDto
         public string? OperationalEvidence { get; set; }
         public string? OutcomeEvidence { get; set; }
         public string? PerceptionEvidence { get; set; }
-        public string? TemporalScope { get; set; }
-        public string? DistortionScreening { get; set; }
+        public string? TemporalReliability { get; set; }
         public string? RelationalIntegrity { get; set; }
-        public string? StressPoliticalShock { get; set; }
+        public string? StressGeopoliticalShock { get; set; }
         public string? StressEconomicShock { get; set; }
-        public string? StressNarrativeShock { get; set; }
-        public string? StressScoreAdjustment { get; set; }
-        public string? InequalityAdjustment { get; set; }
-        public string? OpacityRisk { get; set; }
-        public string? NonCompensationNote { get; set; }
-        public string? GeographicEquityNote { get; set; }
-        public string? InstitutionalAssessment { get; set; }
+        public string? StressFinanceShock { get; set; }
+        public string? DataOpacityRisk { get; set; }
+        public string? ReliabilityAssessment { get; set; }
         public string? DataGapAnalysis { get; set; }
         public string? RedFlag { get; set; }
         public List<UpdateAIDataSourceCitationDto>? DataSourceCitations { get; set; }
@@ -91,15 +83,12 @@ namespace HornScope.Dtos.AiDto
         public string? OperationalEvidence { get; set; }
         public string? OutcomeEvidence { get; set; }
         public string? PerceptionEvidence { get; set; }
-        public string? TemporalScope { get; set; }
-        public string? DistortionScreening { get; set; }
+        public string? TemporalReliability { get; set; }
         public string? RelationalDependencies { get; set; }
-        public string? StressPoliticalShock { get; set; }
+        public string? StressGeopoliticalShock { get; set; }
         public string? StressEconomicShock { get; set; }
-        public string? StressNarrativeShock { get; set; }
-        public string? StressOverallResilienceShock { get; set; }
-        public string? InequalityAdjustment { get; set; }
-        public string? OpacityRisk { get; set; }
+        public string? StressFinanceShock { get; set; }
+        public string? DataOpacityRisk { get; set; }
         public string? RedFlag { get; set; }
         public string? SourceType { get; set; }
         public string? SourceName { get; set; }

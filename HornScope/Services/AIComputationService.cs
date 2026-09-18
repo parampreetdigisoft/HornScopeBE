@@ -1,12 +1,10 @@
 using AssessmentPlatform.Dtos.AiDto;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using HornScope.Backgroundjob;
 using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
-using HornScope.Common.Models.settings;
 using HornScope.Data;
 using HornScope.Dtos.AiDto;
 using HornScope.Dtos.CommonDto;
@@ -17,7 +15,6 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using HornScope.Enums;
 
 namespace HornScope.Services
 {
@@ -248,24 +245,20 @@ namespace HornScope.Services
                     OutcomeEvidence = score != null ? score.OutcomeEvidence : null,
                     PerceptionEvidence = score != null ? score.PerceptionEvidence : null,
 
-                    TemporalScope = score != null ? score.TemporalScope : null,
-                    DistortionScreening = score != null ? score.DistortionScreening : null,
+                    ReliabilityAssessment = score != null ? score.ReliabilityAssessment : null,
+                    TemporalReliability = score != null ? score.TemporalReliability : null,
 
-                    PoliticalShock = score != null ? score.PoliticalShock : null,
+                    GeopoliticalShock = score != null ? score.GeopoliticalShock : null,
                     EconomicShock = score != null ? score.EconomicShock : null,
-                    NarrativeShock = score != null ? score.NarrativeShock : null,
+                    FinanceShock = score != null ? score.FinanceShock : null,
 
-                    OverallStressResilience = score != null ? score.OverallStressResilience : null,
-                    StressScoreAdjustment = score != null ? score.StressScoreAdjustment : null,
-                    InequalityAdjustment = score != null ? score.InequalityAdjustment : null,
-                    OpacityRisk = score != null ? score.OpacityRisk : null,
-                    NonCompensationNote = score != null ? score.NonCompensationNote : null,
+                    DataIntegrityIndex = score != null ? score.DataIntegrityIndex : null,
+                    DataOpacityRisk = score != null ? score.DataOpacityRisk : null,
+                    ScenarioAnalysis = score != null ? score.ScenarioAnalysis : null,
 
                     CrossPillarPatterns = score != null ? score.CrossPillarPatterns : null,
                     RelationalIntegrity = score != null ? score.RelationalIntegrity : null,
-                    InstitutionalCapacity = score != null ? score.InstitutionalCapacity : null,
-                    EquityAssessment = score != null ? score.EquityAssessment : null,
-                    ConflictRiskOutlook = score != null ? score.ConflictRiskOutlook : null,
+                    EarlyWarningAssessment = score != null ? score.EarlyWarningAssessment : null,
 
                     StrategicRecommendation = score != null ? score.StrategicRecommendation : null,
                     DataTransparencyNote = score != null ? score.DataTransparencyNote : null,
@@ -352,19 +345,13 @@ namespace HornScope.Services
                         r.OperationalEvidence = x.score.OperationalEvidence;
                         r.OutcomeEvidence = x.score.OutcomeEvidence;
                         r.PerceptionEvidence = x.score.PerceptionEvidence;
-                        r.TemporalScope = x.score.TemporalScope;
-                        r.DistortionScreening = x.score.DistortionScreening;
+                        r.TemporalReliability = x.score.TemporalReliability;
                         r.RelationalIntegrity = x.score.RelationalIntegrity;
-                        r.StressPoliticalShock = x.score.StressPoliticalShock;
+                        r.StressGeopoliticalShock = x.score.StressGeopoliticalShock;
                         r.StressEconomicShock = x.score.StressEconomicShock;
-                        r.StressNarrativeShock = x.score.StressNarrativeShock;
-                        r.StressOverallResilience = x.score.StressOverallResilience;
-                        r.StressScoreAdjustment = x.score.StressScoreAdjustment;
-                        r.InequalityAdjustment = x.score.InequalityAdjustment;
-                        r.OpacityRisk = x.score.OpacityRisk;
-                        r.NonCompensationNote = x.score.NonCompensationNote;
-                        r.GeographicEquityNote = x.score.GeographicEquityNote;
-                        r.InstitutionalAssessment = x.score.InstitutionalAssessment;
+                        r.StressFinanceShock = x.score.StressFinanceShock;
+                        r.DataOpacityRisk = x.score.DataOpacityRisk;
+                        r.ReliabilityAssessment = x.score.ReliabilityAssessment;
                         r.DataGapAnalysis = x.score.DataGapAnalysis;
                         r.RedFlag = x.score.RedFlag;
                         r.DataSourceCitations = x.score.DataSourceCitations;
@@ -475,16 +462,12 @@ namespace HornScope.Services
                         OperationalEvidence = x == null ? string.Empty : x.OperationalEvidence,
                         OutcomeEvidence = x == null ? string.Empty : x.OutcomeEvidence,
                         PerceptionEvidence = x == null ? string.Empty : x.PerceptionEvidence,
-                        TemporalScope = x == null ? string.Empty : x.TemporalScope,
-                        DistortionScreening = x == null ? string.Empty : x.DistortionScreening,
+                        TemporalReliability = x == null ? string.Empty : x.TemporalReliability,
                         RelationalDependencies = x == null ? string.Empty : x.RelationalDependencies,
-                        // Stress Tests
-                        StressPoliticalShock = x == null ? string.Empty : x.StressPoliticalShock,
+                        StressGeopoliticalShock = x == null ? string.Empty : x.StressGeopoliticalShock,
                         StressEconomicShock = x == null ? string.Empty : x.StressEconomicShock,
-                        StressNarrativeShock = x == null ? string.Empty : x.StressNarrativeShock,
-                        StressOverallResilienceShock = x == null ? string.Empty : x.StressOverallResilienceShock,
-                        InequalityAdjustment = x == null ? string.Empty : x.InequalityAdjustment,   // ? renamed
-                        OpacityRisk = x == null ? string.Empty : x.OpacityRisk,
+                        StressFinanceShock = x == null ? string.Empty : x.StressFinanceShock,
+                        DataOpacityRisk = x == null ? string.Empty : x.DataOpacityRisk,
                         RedFlag = x == null ? string.Empty : x.RedFlag,   // ? renamed
                         // Source Metadata
                         SourceType = x == null ? string.Empty : x.SourceType,
@@ -1654,19 +1637,13 @@ namespace HornScope.Services
                                 r.OperationalEvidence = x.score.OperationalEvidence;
                                 r.OutcomeEvidence = x.score.OutcomeEvidence;
                                 r.PerceptionEvidence = x.score.PerceptionEvidence;
-                                r.TemporalScope = x.score.TemporalScope;
-                                r.DistortionScreening = x.score.DistortionScreening;
+                                r.TemporalReliability = x.score.TemporalReliability;
                                 r.RelationalIntegrity = x.score.RelationalIntegrity;
-                                r.StressPoliticalShock = x.score.StressPoliticalShock;
+                                r.StressGeopoliticalShock = x.score.StressGeopoliticalShock;
                                 r.StressEconomicShock = x.score.StressEconomicShock;
-                                r.StressNarrativeShock = x.score.StressNarrativeShock;
-                                r.StressOverallResilience = x.score.StressOverallResilience;
-                                r.StressScoreAdjustment = x.score.StressScoreAdjustment;
-                                r.InequalityAdjustment = x.score.InequalityAdjustment;
-                                r.OpacityRisk = x.score.OpacityRisk;
-                                r.NonCompensationNote = x.score.NonCompensationNote;
-                                r.GeographicEquityNote = x.score.GeographicEquityNote;
-                                r.InstitutionalAssessment = x.score.InstitutionalAssessment;
+                                r.StressFinanceShock = x.score.StressFinanceShock;
+                                r.DataOpacityRisk = x.score.DataOpacityRisk;
+                                r.ReliabilityAssessment = x.score.ReliabilityAssessment;
                                 r.DataGapAnalysis = x.score.DataGapAnalysis;
                                 r.RedFlag = x.score.RedFlag;
                                 r.DataSourceCitations = x.score.DataSourceCitations;

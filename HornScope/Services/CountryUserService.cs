@@ -1074,8 +1074,7 @@ namespace HornScope.Services
                         r.AIProgress = x.score.AIProgress;
                         r.EvidenceSummary = x.score.EvidenceSummary;
                         r.RedFlag = x.score.RedFlag;
-                        r.GeographicEquityNote = x.score.GeographicEquityNote;
-                        r.InstitutionalAssessment = x.score.InstitutionalAssessment;
+                        r.ReliabilityAssessment = x.score.ReliabilityAssessment;
                         r.DataGapAnalysis = x.score.DataGapAnalysis;
                         r.DataSourceCitations = x.score.DataSourceCitations;
                         r.UpdatedAt = x.score.UpdatedAt;

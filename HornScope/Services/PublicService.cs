@@ -38,7 +38,7 @@ namespace HornScope.Services
             _aIAnalyzeService = aIAnalyzeService;
             _configuration = configuration;
         }
-        public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> getAllCountries()
+        public async Task<ResultResponseDto<List<PartnerCountryResponseDto>>> GetAllCountries()
         {
             try
             {

@@ -704,24 +704,21 @@ namespace HornScope.Common.Implementation
                 AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.AccentOutcomeEvidence.TrimStart('#'));
                 AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.AccentPerceptionEvidence.TrimStart('#'));
 
-                AppendContentSection(body, "Temporal Scope", data.TemporalScope, ReportThemeColors.AccentTemporalScope.TrimStart('#'));
-                AppendContentSection(body, "Distortion Screening", data.DistortionScreening, ReportThemeColors.AccentDistortionScreening.TrimStart('#'));
+                AppendContentSection(body, "Reliability Assessment", data.ReliabilityAssessment, ReportThemeColors.AccentInstitutionalCapacity.TrimStart('#'));
+                AppendContentSection(body, "Temporal Reliability", data.TemporalReliability, ReportThemeColors.AccentTemporalScope.TrimStart('#'));
                 AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, ReportThemeColors.AccentRelationalIntegrity.TrimStart('#'));
 
-                AppendContentSection(body, "Political Shock", data.PoliticalShock, ReportThemeColors.AccentPoliticalShock.TrimStart('#'));
+                AppendContentSection(body, "Geopolitical Shock", data.GeopoliticalShock, ReportThemeColors.AccentPoliticalShock.TrimStart('#'));
                 AppendContentSection(body, "Economic Shock", data.EconomicShock, ReportThemeColors.AccentEconomicShock.TrimStart('#'));
-                AppendContentSection(body, "Narrative Shock", data.NarrativeShock, ReportThemeColors.AccentNarrativeShock.TrimStart('#'));
+                AppendContentSection(body, "Finance Shock", data.FinanceShock, ReportThemeColors.AccentNarrativeShock.TrimStart('#'));
 
-                AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, ReportThemeColors.AccentStressAdjustment.TrimStart('#'));
+                AppendContentSection(body, "Scenario Analysis", data.ScenarioAnalysis, ReportThemeColors.AccentStressAdjustment.TrimStart('#'));
 
-                AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, ReportThemeColors.AccentInequalityAdj.TrimStart('#'));
-                AppendContentSection(body, "Opacity Risk", data.OpacityRisk, ReportThemeColors.AccentOpacityRisk.TrimStart('#'));
-                AppendContentSection(body, "Non Compensation Note", data.NonCompensationNote, ReportThemeColors.AccentNonCompensation.TrimStart('#'));
+                AppendContentSection(body, "Data Integrity Index", data.DataIntegrityIndex, ReportThemeColors.AccentNonCompensation.TrimStart('#'));
+                AppendContentSection(body, "Data Opacity Risk", data.DataOpacityRisk, ReportThemeColors.AccentOpacityRisk.TrimStart('#'));
 
                 AppendContentSection(body, "Cross-Domain System Dynamics", data.CrossPillarPatterns, ReportThemeColors.AccentCrossPillar.TrimStart('#'));
-                AppendContentSection(body, "Institutional Capacity Assessment", data.InstitutionalCapacity, ReportThemeColors.AccentInstitutionalCapacity.TrimStart('#'));
-
-                AppendContentSection(body, "Equity Assessment", data.EquityAssessment, ReportThemeColors.AccentGaps.TrimStart('#'));
+                AppendContentSection(body, "Early Warning Assessment", data.EarlyWarningAssessment, ReportThemeColors.AccentGaps.TrimStart('#'));
 
                 AppendContentSection(body, "Strategic Policy Priorities", data.StrategicRecommendation, ReportThemeColors.AccentStrategicPolicy.TrimStart('#'));
                 AppendContentSection(body, "Why This Assessment Matters", data.DataTransparencyNote, ReportThemeColors.AccentDataTransparency.TrimStart('#'));
@@ -826,24 +823,17 @@ namespace HornScope.Common.Implementation
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.AccentGaps.TrimStart('#'));
             AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.AccentPerceptionEvidenceAlt.TrimStart('#'));
 
-            AppendContentSection(body, "Temporal Scope", data.TemporalScope, ReportThemeColors.AccentTemporalScopeAlt.TrimStart('#'));
-            AppendContentSection(body, "Distortion Screening", data.DistortionScreening, ReportThemeColors.AccentDistortionScreeningAlt.TrimStart('#'));
+            AppendContentSection(body, "Temporal Reliability", data.TemporalReliability, ReportThemeColors.AccentTemporalScopeAlt.TrimStart('#'));
             AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, ReportThemeColors.AccentRelationalIntegrityAlt.TrimStart('#'));
 
-            AppendContentSection(body, "Stress Political Shock", data.StressPoliticalShock, ReportThemeColors.AccentPoliticalShockAlt.TrimStart('#'));
-            AppendContentSection(body, "Stress Economic Shock", data.StressEconomicShock, ReportThemeColors.AccentEconomicShockAlt.TrimStart('#'));
-            AppendContentSection(body, "Stress Narrative Shock", data.StressNarrativeShock, ReportThemeColors.AccentNarrativeShockAlt.TrimStart('#'));
+            AppendContentSection(body, "Geopolitical Shock", data.StressGeopoliticalShock, ReportThemeColors.AccentPoliticalShockAlt.TrimStart('#'));
+            AppendContentSection(body, "Economic Shock", data.StressEconomicShock, ReportThemeColors.AccentEconomicShockAlt.TrimStart('#'));
+            AppendContentSection(body, "Finance Shock", data.StressFinanceShock, ReportThemeColors.AccentNarrativeShockAlt.TrimStart('#'));
 
-            AppendContentSection(body, "Stress Score Adjustment", data.StressScoreAdjustment, ReportThemeColors.AccentStressAdjustmentAlt.TrimStart('#'));
-
-            AppendContentSection(body, "Inequality Adjustment", data.InequalityAdjustment, ReportThemeColors.AccentInequalityAdjAlt.TrimStart('#'));
-            AppendContentSection(body, "Opacity Risk", data.OpacityRisk, ReportThemeColors.AccentOpacityRiskAlt.TrimStart('#'));
-            AppendContentSection(body, "Non-Compensation Note", data.NonCompensationNote, ReportThemeColors.AccentNonCompensationAlt.TrimStart('#'));
+            AppendContentSection(body, "Data Opacity Risk", data.DataOpacityRisk, ReportThemeColors.AccentOpacityRiskAlt.TrimStart('#'));
 
             AppendContentSection(body, "Red Flags", data.RedFlag, ReportThemeColors.DangerRedFlag.TrimStart('#'), ReportThemeColors.DangerRedFlagAlt.TrimStart('#'));
-            AppendContentSection(body, "Geographic Equity Note", data.GeographicEquityNote, ReportThemeColors.AccentInstitutionalCapacity.TrimStart('#'));
-
-            AppendContentSection(body, "Institutional Assessment", data.InstitutionalAssessment, ReportThemeColors.AccentStrategicPolicy.TrimStart('#'));
+            AppendContentSection(body, "Reliability Assessment", data.ReliabilityAssessment, ReportThemeColors.AccentStrategicPolicy.TrimStart('#'));
 
             AppendContentSection(
                 body,
