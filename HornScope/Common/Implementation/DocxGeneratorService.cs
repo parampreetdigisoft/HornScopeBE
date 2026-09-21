@@ -905,9 +905,9 @@ namespace HornScope.Common.Implementation
                 int localOffset = offset;
                 var barPng = RenderPng(
                     (c, s) => PaintKpiBarChart(c, s, group, localOffset),
-                    700, 155);
+                    700, 210);
 
-                body.AppendChild(CreateFullWidthImage(mainPart, barPng, 155));
+                body.AppendChild(CreateFullWidthImage(mainPart, barPng, 210));
                 body.AppendChild(Gap(80));
                 if (!isAllCountries)
                 {

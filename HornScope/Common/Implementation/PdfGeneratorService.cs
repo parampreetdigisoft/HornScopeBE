@@ -797,7 +797,7 @@ namespace HornScope.Common.Implementation
 
         /// <summary>
         /// Gradient area sparkline for up to 107 KPIs, sorted descending.
-        /// Includes dashed 70 % threshold line.
+        /// Axis spans -100 to 100 so negative scores plot below the zero line.
         /// </summary>
         static void PaintKpiSparkline(SKCanvas canvas, Size size, List<KpiChartItem> kpis)
         {
@@ -806,11 +806,15 @@ namespace HornScope.Common.Implementation
             if (n < 2) return;
 
             const float lp = 28f, bp = 12f, tp = 4f;
+            const float domainMax = 100f, domainMin = -100f;
+            const float domainRange = domainMax - domainMin;
+
             float w = size.Width - lp;
             float h = size.Height - bp - tp;
             float sx = w / (n - 1);
 
-            // Grid lines
+            float MapY(double value) => tp + h * (domainMax - (float)value) / domainRange;
+
             using var gp = new SKPaint { Color = SKColor.Parse(ReportThemeColors.SurfaceGreenLight), StrokeWidth = 0.7f };
             using var gl = new SKPaint
             {
@@ -819,20 +823,22 @@ namespace HornScope.Common.Implementation
                 TextAlign = SKTextAlign.Right,
                 IsAntialias = true
             };
-            foreach (float m in new[] { 25f, 50f, 75f, 100f })
+
+            foreach (float m in new[] { 100f, 60f, 30f, 0f, -30f, -60f, -100f })
             {
-                float y = tp + h - m / 100f * h;
+                float y = MapY(m);
                 canvas.DrawLine(lp, y, size.Width, y, gp);
                 canvas.DrawText($"{(int)m}", lp - 3, y + 3, gl);
             }
 
-            // Gradient fill under line
+            float yZero = MapY(0);
+
             var fPath = new SKPath();
-            fPath.MoveTo(lp, tp + h);
-            fPath.LineTo(lp, tp + h - (float)(data[0].Value ) / 100f * h);
+            fPath.MoveTo(lp, yZero);
+            fPath.LineTo(lp, MapY((float)data[0].Value));
             for (int i = 1; i < n; i++)
-                fPath.LineTo(lp + i * sx, tp + h - (float)(data[i].Value) / 100f * h);
-            fPath.LineTo(lp + (n - 1) * sx, tp + h);
+                fPath.LineTo(lp + i * sx, MapY((float)data[i].Value));
+            fPath.LineTo(lp + (n - 1) * sx, yZero);
             fPath.Close();
 
             using var shader = SKShader.CreateLinearGradient(
@@ -843,12 +849,11 @@ namespace HornScope.Common.Implementation
             using var fp = new SKPaint { Shader = shader, Style = SKPaintStyle.Fill };
             canvas.DrawPath(fPath, fp);
 
-            // Line
             var lPath = new SKPath();
             for (int i = 0; i < n; i++)
             {
                 float x = lp + i * sx;
-                float y = tp + h - (float)(data[i].Value) / 100f * h;
+                float y = MapY((float)data[i].Value);
                 if (i == 0) lPath.MoveTo(x, y); else lPath.LineTo(x, y);
             }
             using var lPaint = new SKPaint
@@ -860,8 +865,7 @@ namespace HornScope.Common.Implementation
             };
             canvas.DrawPath(lPath, lPaint);
 
-            // Dashed 70 % threshold
-            float y70 = tp + h - 0.70f * h;
+            float y70 = MapY(70f);
             using var thPaint = new SKPaint
             {
                 Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(140),
@@ -970,7 +974,7 @@ namespace HornScope.Common.Implementation
                 .Column(col =>
                 {
                     // bar chart . numbers printed below each bar
-                    col.Item().Height(148).Element(x => DrawKpiBarChart(x, group, offset, isAllCountries));
+                    col.Item().Height(200).Element(x => DrawKpiBarChart(x, group, offset, isAllCountries));
 
                     if (!isAllCountries)
                     {
@@ -986,125 +990,13 @@ namespace HornScope.Common.Implementation
 
         // -----------------------------------------------------------------------------
         //  BAR CHART  .  sequential index numbers below each bar (not cryptic codes)
+        //  Axis spans -100 to 100; bars grow up or down from the zero baseline.
         // -----------------------------------------------------------------------------
         void DrawKpiBarChart(IContainer container, List<KpiChartItem> data, int offset, bool isAllCountries = false)
         {
             container
                 .Background(ReportThemeColors.White)
-                .Canvas((canvas, size) =>
-                {
-                    if (!data.Any()) return;
-
-                    const float lp = 8f;   // left pad
-                    const float rp = 8f;   // right pad
-                    const float tp = 22f;  // top pad  (value labels)
-                    const float bp = 26f;  // bottom pad (index labels)
-
-                    float chartW = size.Width - lp - rp;
-                    float chartH = size.Height - tp - bp;
-                    int n = data.Count;
-                    float barW = chartW / n;
-                    float innerW = barW * 0.62f;
-                    float barGap = (barW - innerW) / 2f;
-
-                    // -- background grid lines -------------------------------------
-                    using var gridPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.SurfaceGreenPale),
-                        StrokeWidth = 0.6f,
-                        IsAntialias = false
-                    };
-                    using var gridLblPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.BlueGrayLight),
-                        TextSize = 7f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Left
-                    };
-
-                    foreach (float pct in new[] { 25f, 50f, 75f, 100f })
-                    {
-                        float gy = tp + chartH - pct / 100f * chartH;
-                        canvas.DrawLine(lp, gy, lp + chartW, gy, gridPaint);
-                        canvas.DrawText($"{(int)pct}", lp + 2, gy - 2, gridLblPaint);
-                    }
-
-                    // -- dashed 70 % performance threshold ------------------------
-                    float y70 = tp + chartH - 0.70f * chartH;
-                    using var threshPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.SuccessGreen).WithAlpha(100),
-                        StrokeWidth = 0.9f,
-                        PathEffect = SKPathEffect.CreateDash(new[] { 4f, 3f }, 0),
-                        IsAntialias = true
-                    };
-                    canvas.DrawLine(lp, y70, lp + chartW, y70, threshPaint);
-
-                    // -- paint reused across bars ----------------------------------
-                    using var valLblPaint = new SKPaint
-                    { TextSize = 6.5f, IsAntialias = true, TextAlign = SKTextAlign.Center };
-                    using var numLblPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.BlueGrayDark),
-                        TextSize = 6.5f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center
-                    };
-
-                    // -- bars ------------------------------------------------------
-                    for (int i = 0; i < n; i++)
-                    {
-                        float v = (float)(data[i].Value);
-                        var shortName = data[i].ShortName;
-                        float bx = lp + i * barW + barGap;
-                        float bh = v / 100f * chartH;
-                        float by = tp + chartH - bh;
-                        SKColor color = GetColor(v);
-                        SKColor textcolor = v > 85 ? SKColor.Parse(ReportThemeColors.White) : SKColor.Parse(ReportThemeColors.Black);
-
-
-                        // ghost (full-height tinted background)
-                        using var ghostPaint = new SKPaint
-                        { Color = color.WithAlpha(35), IsAntialias = true };
-                        canvas.DrawRoundRect(
-                            new SKRoundRect(new SKRect(bx, tp, bx + innerW, tp + chartH), 2, 2),
-                            ghostPaint);
-
-                        // filled bar with linear gradient
-                        using var shader = SKShader.CreateLinearGradient(
-                            new SKPoint(0, by), new SKPoint(0, tp + chartH),
-                            new[] { color, color.WithAlpha(180) },
-                            null, SKShaderTileMode.Clamp);
-                        using var barPaint = new SKPaint { Shader = shader, IsAntialias = true };
-                        canvas.DrawRoundRect(
-                            new SKRoundRect(new SKRect(bx, by, bx + innerW, tp + chartH), 2, 2),
-                            barPaint);
-
-                        // top cap accent line
-                        using var capPaint = new SKPaint
-                        {
-                            Color = color,
-                            StrokeWidth = 2.5f,
-                            StrokeCap = SKStrokeCap.Round,
-                            IsAntialias = true
-                        };
-                        canvas.DrawLine(bx + 1, by, bx + innerW - 1, by, capPaint);
-
-                        // value label above bar
-                        float vly = by - 3f;
-                        if (vly < tp + 8f) vly = by + 10f;
-                        valLblPaint.Color = textcolor;
-                        canvas.DrawText($"{v:F1}%", bx + innerW / 2f, vly, valLblPaint);
-
-                        // -- sequential index number below bar (e.g. "1", "2", .) --
-                        // Users cross-reference this with the legend table below.
-                        canvas.DrawText(
-                            $"{offset + i + 1}. " + shortName,
-                            bx + innerW / 2f,
-                            size.Height - 6f,
-                            numLblPaint);
-                    }
-                });
+                .Canvas((canvas, size) => DrawKpiBarChartCanvas(canvas, size, data, offset));
         }
 
         // -----------------------------------------------------------------------------

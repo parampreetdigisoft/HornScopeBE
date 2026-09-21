@@ -11,10 +11,11 @@ namespace HornScope.IServices
         Task<ResultResponseDto<List<PillarResponseDto>>> GetAllPillarAsync();
         Task<CountryCityResponse> GetCountriesAndCountries_WithStaleSupport();
         Task<ResultResponseDto<List<PromotedPillarsResponseDto>>> GetPromotedCountries();
-        Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues();
+        Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount);
         Task<bool> RefreshEmergingTrendsCacheAsync(int countryCount, CancellationToken cancellationToken = default);
         Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
         Task<ResultResponseDto<OverallHornscopeResponse>> GetOverAllHornscopeScore();
+        bool HydrateEmergingTrendsCacheFromDisk(int countryCount);
 
     }
 }

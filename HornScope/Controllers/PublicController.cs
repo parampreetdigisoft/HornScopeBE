@@ -81,10 +81,11 @@ namespace HornScope.Controllers
             return Ok(data);
         }
 
+
         [HttpGet("emergingTrendsAndIssues")]
-        public async Task<IActionResult> GetEmergingTrendsAndIssues()
+        public async Task<IActionResult> GetEmergingTrendsAndIssues([FromQuery] int countryCount = 8)
         {
-            return Ok(await _publicService.GetEmergingTrendsAndIssues());
+            return Ok(await _publicService.GetEmergingTrendsAndIssues(countryCount));
         }
 
         [HttpGet("pillarLiveSignals")]
