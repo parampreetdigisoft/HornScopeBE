@@ -50,7 +50,6 @@ namespace HornScope.Data
         public DbSet<DashboardMode> DashboardModes { get; set; } = default!;
         public DbSet<DashboardModeKPIMapping> DashboardModeKPIMappings { get; set; } = default!;
         public DbSet<GetDashboardModeResult> GetDashboardModeResults { get; set; } = default!;
-        public DbSet<DashboardInterpretation> DashboardInterpretations { get; set; } = default!;
         public DbSet<AIEditPermission> AIEditPermissions { get; set; } = default!;
         public DbSet<AIEditSession> AIEditSessions { get; set; } = default!;
         public DbSet<AIEditChangeLog> AIEditChangeLogs { get; set; } = default!;

@@ -60,7 +60,7 @@ namespace HornScope.Services
                     {
                         UserID = u.UserID,
                         FullName = u.FullName,
-                        Email = u.Email,
+                        Email = u.TemporaryEmail ?? u.Email,
                         Phone = u.Phone,
                         Role = u.Role.ToString(),
                         CreatedBy = uc != null ? uc.AssignedByUserId : null,

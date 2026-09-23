@@ -60,12 +60,12 @@ namespace HornScope
                     builder.WithOrigins(
                         "http://localhost:4200",
                         "https://localhost:4200",
-                        "http://HornScope.ai",
-                        "https://HornScope.ai",
-                        "http://admin.HornScope.ai",
-                        "https://admin.HornScope.ai",
-                        "http://www.HornScope.ai",
-                        "https://www.HornScope.ai"
+                        "http://hornscope.net",
+                        "https://hornscope.net",
+                        "http://admin.hornscope.net",
+                        "https://admin.hornscope.net",
+                        "http://www.hornscope.net",
+                        "https://www.hornscope.net"
                         )
                         .AllowAnyHeader()
                         .AllowAnyMethod()

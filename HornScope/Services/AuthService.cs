@@ -180,7 +180,7 @@ namespace HornScope.Services
                 if (user.IsEmailConfirmed && !user.IsDeleted && user.Is2FAEnabled)
                 {
                     var r = await SendTwoFactorOTPAsync(user);
-                    if (r.Succeeded) 
+                    if (r.Succeeded)
                     {
                         var sendOpt = new UserResponseDto {};                        
                         return ResultResponseDto<UserResponseDto>.Success(sendOpt,
@@ -225,8 +225,8 @@ namespace HornScope.Services
             {
                 new Claim(ClaimTypes.Name, user.Email),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
-                new Claim("Tier", user.Tier?.ToString() ?? ""),         
-                new Claim("UserId", user!.UserID.ToString())       
+                new Claim("Tier", user.Tier?.ToString() ?? ""),
+                new Claim("UserId", user!.UserID.ToString())
             };
             var tokenExpired = DateTime.UtcNow.AddHours(1);
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSetting.Key));
@@ -295,8 +295,8 @@ namespace HornScope.Services
                     roleName = "Country User";
                 }
 
-                string sub = $"{roleName} Access Granted – HornScope Platform";
-                var url = _appSettings.ApplicationUrl; 
+                string sub = $"{roleName} Access Granted - HornScope Platform";
+                var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
                 string passwordResetLink = url + "/auth/reset-password?PasswordToken=" + token;
 
                 var countryName = string.Join(", ",
@@ -325,7 +325,7 @@ namespace HornScope.Services
                 var isMailSent = await _emailService.SendEmailAsync(inviteUser.Email, sub, viewNamePath, model);
                 user.ResetToken = token;
                 user.ResetTokenDate = DateTime.Now;
-                user.IsDeleted = false;                
+                user.IsDeleted = false;
                 _context.Users.Update(user);
                 if (inviteUser.Role != UserRole.CountryUser)
                 {
@@ -341,7 +341,7 @@ namespace HornScope.Services
                         _context.UserCountryMappings.Add(mapping);
                     }
                 }
-                
+
                 await _context.SaveChangesAsync();
                 if (inviteUser.Role == UserRole.CountryUser)
                 {
@@ -383,7 +383,7 @@ namespace HornScope.Services
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
-        
+
         public async Task<ResultResponseDto<object>> UpdateInviteUser(UpdateInviteUserDto inviteUser)
         {
             try
@@ -402,11 +402,65 @@ namespace HornScope.Services
                 if (user.Role != inviteUser.Role)
                     return ResultResponseDto<object>.Failure(new[] { "User already have different role" });
 
+                bool isEmailChanged = !string.Equals(inviteUser.Email?.Trim(), user.Email?.Trim(), StringComparison.OrdinalIgnoreCase);
+                bool isConfirmationMailSent = false;
+
+                if (isEmailChanged)
+                {
+                    var existUser = await _context.Users.FirstOrDefaultAsync(u =>
+                        u.Email == inviteUser.Email.Trim() && !u.IsDeleted && u.UserID != inviteUser.UserID);
+                    if (existUser != null)
+                        return ResultResponseDto<object>.Failure(new[] { "Email Already Exists" });
+
+                    user.TemporaryEmail = inviteUser.Email.Trim();
+                    var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
+                    var token = hash.Replace("+", " ");
+
+                    var confirmUrl = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                    string confirmLink = confirmUrl + "/auth/confirm-mail?PasswordToken=" + token;
+
+                    var emailModel = new EmailInvitationSendRequestDto
+                    {
+                        ResetPasswordUrl = confirmLink,
+                        Title = "Verify Your Email",
+                        ApiUrl = _appSettings.ApiUrl,
+                        ApplicationUrl = confirmUrl,
+                        MsgText = "A request was made to update the Email for your HornScope (HS) account. Please verify your email or reset your password.",
+                        Mail = _appSettings.AdminMail,
+                        BtnText = "Verify",
+                        DescriptionAboutBtnText = "Please verify your email address by clicking the button above."
+                    };
+
+                    isConfirmationMailSent = await _emailService.SendEmailAsync(
+                        inviteUser.Email,
+                        "Verify Your Email",
+                        "~/Views/EmailTemplates/ChangePassword.cshtml",
+                        emailModel
+                    );
+
+                    if (isConfirmationMailSent)
+                    {
+                        user.IsEmailConfirmed = false;
+                        user.ResetToken = token;
+                        user.ResetTokenDate = DateTime.Now;
+                    }
+                    else
+                    {
+                        return ResultResponseDto<object>.Failure(new[]
+                        {
+                            "Failed to send email confirmation. Please try again later."
+                        });
+                    }
+                }
+                else
+                {
+                    user.Email = inviteUser.Email;
+                }
+
                 // Update basic user info
                 user.FullName = inviteUser.FullName;
                 user.Phone = inviteUser.Phone;
                 user.CreatedBy = inviteUser.InvitedUserID;
-                user.Email = inviteUser.Email;
                 user.Tier = inviteUser.Tier;
                 _context.Users.Update(user);
 
@@ -541,7 +595,7 @@ namespace HornScope.Services
                     isMailSent = true;
                 }
 
-                if (!user.IsEmailConfirmed)
+                if (!user.IsEmailConfirmed && !isEmailChanged)
                 {
                     var hash = BCrypt.Net.BCrypt.HashPassword(inviteUser.Email);
                     var token = hash.Replace("+", " ");
@@ -576,6 +630,9 @@ namespace HornScope.Services
                     msg = $"User updated and invitation {(isMailSent ? "sent successfully" : "failed to send")}";
                     await _context.SaveChangesAsync();
                 }
+
+                if (isConfirmationMailSent)
+                    msg = "Confirmation Mail Sent and User updated successfully";
 
                 return ResultResponseDto<object>.Success(new { }, new[] { msg });
             }
@@ -693,7 +750,7 @@ namespace HornScope.Services
 
                 return ResultResponseDto<object>.Success(
                     messages: new[] { "Email is Valid" }
-                    
+
                 );
             }
             catch (Exception ex)
@@ -756,7 +813,7 @@ namespace HornScope.Services
                     }
 
                     var existingCountryIds = _context.UserCountryMappings
-						.Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
+                        .Where(m => m.UserID == user.UserID && m.AssignedByUserId == inviteUser.InvitedUserID && !m.IsDeleted)
                         .Select(m => m.CountryID)
                         .ToList();
 
@@ -764,7 +821,7 @@ namespace HornScope.Services
                     foreach (var countryId in countriesToAdd)
                     {
                         newMappings.Add(new UserCountryMapping
-						{
+                        {
                             UserID = user.UserID,
                             CountryID = countryId,
                             AssignedByUserId = inviteUser.InvitedUserID,
@@ -938,7 +995,7 @@ namespace HornScope.Services
                         user.ResetTokenDate = DateTime.Now;
                     }
                 }
-                user.TemporaryEmail = user.Email;                
+                user.TemporaryEmail = user.Email;
 
                 _context.Users.Update(user);
 
@@ -951,16 +1008,16 @@ namespace HornScope.Services
                 }
                 else if (isMailSend)
                 {
-                    return ResultResponseDto<UserResponseDto>.Success(new(), new[] 
-                    { 
+                    return ResultResponseDto<UserResponseDto>.Success(new(), new[]
+                    {
                         "We’ve sent you a verification link. Please check your email." 
                     });
                 }
                 else
                 {
-                    return ResultResponseDto<UserResponseDto>.Success(new(), new[] 
-                    { 
-                        "Email could not be sent. Please use 'Forgot Password' to generate a new one." 
+                    return ResultResponseDto<UserResponseDto>.Success(new(), new[]
+                    {
+                        "Email could not be sent. Please use 'Forgot Password' to generate a new one."
                     });
                 }
             }
@@ -1069,7 +1126,7 @@ namespace HornScope.Services
 
                 // 3?? Store hashed OTP + expiry
                 user.ResetToken = otp;
-                user.ResetTokenDate = DateTime.Now; 
+                user.ResetTokenDate = DateTime.Now;
 
                 _context.Users.Update(user);
                 await _context.SaveChangesAsync();
@@ -1201,14 +1258,16 @@ namespace HornScope.Services
                     user.TemporaryEmail = requestDto.Email;
                     var hash = BCrypt.Net.BCrypt.HashPassword(requestDto.Email);
                     var token = hash.Replace("+", " ");
-                    var passwordResetLink = $"{_appSettings.PublicApplicationUrl}/auth/confirm-mail?PasswordToken={token}";
+
+                    var url = user.Role != UserRole.CountryUser ? _appSettings.ApplicationUrl : _appSettings.PublicApplicationUrl;
+                    string passwordResetLink = url + "/auth/confirm-mail?PasswordToken=" + token;
 
                     var emailModel = new EmailInvitationSendRequestDto
                     {
                         ResetPasswordUrl = passwordResetLink,
                         Title = "Verify Your Email",
                         ApiUrl = _appSettings.ApiUrl,
-                        ApplicationUrl = _appSettings.PublicApplicationUrl,
+                        ApplicationUrl = url,
                         MsgText = "A request was made to update the Email for your HornScope (HS) account. Please verify your email or reset your password.",
                         Mail = _appSettings.AdminMail,
                         BtnText = "Verify",

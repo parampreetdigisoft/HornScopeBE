@@ -12,7 +12,7 @@ namespace HornScope.Common.Implementation
         public const string BrandTagline = "Strategic Intelligence for the Horn of Africa and East Africa";
 
         public static string LogoPath =>
-            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", "images", "hornscope-logo.png");
+            Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "assets", "images", "Logo-hornscope-large.png");
 
         public const string Primary = "#C5A05A";
         public const string Secondary = "#D4B86A";
