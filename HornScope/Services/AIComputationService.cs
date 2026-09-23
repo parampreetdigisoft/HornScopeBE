@@ -63,7 +63,7 @@ namespace HornScope.Services
 
                 IQueryable<AiCountrySummeryDto> query = await GetCountryAiSummeryDetails(userID, userRole, request.CountryID, request.Year);
 
-                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, DateTime.Now.Year);
+                var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, request.Year);
                 var countryRanks = CalculateCountryRanks(progress, pillarCount);
 
                 var result = await query.ApplyPaginationAsync(request);
