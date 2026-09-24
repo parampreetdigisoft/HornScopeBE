@@ -314,6 +314,18 @@ namespace HornScope.Services
             );
         }
 
+        public async Task<ChatPillarOverviewResponse?> GetPillarOverview()
+        {
+            var url = aiUrl + AiEndpoints.PillarOverview();
+
+            return await _httpService.SendAsync<ChatPillarOverviewResponse>(
+                HttpMethod.Get,
+                url,
+                null,
+                headers
+            );
+        }
+
         public async Task AnalyzeCountryMissingQuestions(MissingCountryQuestionRequest r)
         {
             var url = aiUrl + AiEndpoints.AnalyzeCityMissingQuestions();
@@ -366,6 +378,7 @@ namespace HornScope.Services
         public static string EmergingTrendsAndIssues(int countryCount) =>
             $"{ChatPath}/emerging-trends-and-issues?countryCount={countryCount}";
         public static string PillarLiveSignals() => $"{ChatPath}/pillar-live-signals";
+        public static string PillarOverview() => $"{ChatPath}/pillar-overview";
         public static string AnalyzeCityMissingQuestions() =>
           $"{BasePath}/analyze/missing-pillar-questions";
 

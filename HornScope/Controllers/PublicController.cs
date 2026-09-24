@@ -94,10 +94,17 @@ namespace HornScope.Controllers
             return Ok(await _publicService.GetPillarLiveSignals());
         }
 
+
         [HttpGet("overAllHornscopeScore")]
         public async Task<IActionResult> GetOverAllHornscopeScore()
         {
             return Ok(await _publicService.GetOverAllHornscopeScore());
+        }
+
+        [HttpGet("pillarOverview")]
+        public async Task<IActionResult> GetPillarOverview()
+        {
+            return Ok(await _publicService.GetPillarOverview());
         }
     }
 }

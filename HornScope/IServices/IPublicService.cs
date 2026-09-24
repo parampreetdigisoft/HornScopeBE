@@ -14,6 +14,10 @@ namespace HornScope.IServices
         Task<ResultResponseDto<EmergingTrendsResult>> GetEmergingTrendsAndIssues(int countryCount);
         Task<bool> RefreshEmergingTrendsCacheAsync(int countryCount, CancellationToken cancellationToken = default);
         Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals();
+        Task<ResultResponseDto<PillarOverviewResult>> GetPillarOverview();
+        Task<bool> RefreshPillarOverviewCacheAsync(CancellationToken cancellationToken = default);
+        bool HydratePillarOverviewCacheFromDisk();
+        DateTime? GetPillarOverviewCacheSavedAtUtc();
         Task<ResultResponseDto<OverallHornscopeResponse>> GetOverAllHornscopeScore();
         bool HydrateEmergingTrendsCacheFromDisk(int countryCount);
 

@@ -23,6 +23,7 @@ namespace HornScope.IServices
         Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId);
         Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount);
         Task<ChatPillarLiveSignalsResponse?> GetPillarLiveSignals();
+        Task<ChatPillarOverviewResponse?> GetPillarOverview();
 
         Task RunEvery2HoursJob();
         Task RunDailyJob();

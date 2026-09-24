@@ -14,6 +14,7 @@ namespace HornScope.Common.DI
             services.AddHostedService<ChannelWorker>();
             services.AddHostedService<AiJobService>();
             services.AddHostedService<EmergingTrendsCacheWorker>();
+            services.AddHostedService<PillarOverviewCacheWorker>();
             services.AddScoped<Download>();
             services.AddHostedService<LogWorker>();
             // Channels

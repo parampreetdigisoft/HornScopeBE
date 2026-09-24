@@ -606,6 +606,152 @@ namespace HornScope.Services
         }
 
         #endregion Emerging Trends
+
+        #region Pillar Overview Cache
+
+        private static readonly object PillarOverviewDiskLock = new();
+        private const string PillarOverviewCacheKey = "PillarOverview";
+
+        private string PillarOverviewDiskPath()
+        {
+            var root = !string.IsNullOrWhiteSpace(_env.WebRootPath)
+                ? _env.WebRootPath
+                : Path.Combine(_env.ContentRootPath, "wwwroot");
+            return Path.Combine(root, "data", "pillar_overview_cache.json");
+        }
+
+        private PillarOverviewDiskSnapshot? ReadPillarOverviewSnapshot()
+        {
+            var path = PillarOverviewDiskPath();
+            if (!File.Exists(path))
+                return null;
+
+            try
+            {
+                string json;
+                lock (PillarOverviewDiskLock)
+                    json = File.ReadAllText(path);
+
+                var snapshot = JsonSerializer.Deserialize<PillarOverviewDiskSnapshot>(json, EmergingTrendsJsonOptions);
+                if (snapshot?.Data?.Pillars == null || snapshot.Data.Pillars.Count == 0)
+                    return null;
+                return snapshot;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void SavePillarOverview(PillarOverviewResult data)
+        {
+            var path = PillarOverviewDiskPath();
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            var json = JsonSerializer.Serialize(
+                new PillarOverviewDiskSnapshot { SavedAtUtc = DateTime.UtcNow, Data = data },
+                EmergingTrendsJsonOptions);
+            lock (PillarOverviewDiskLock)
+                File.WriteAllText(path, json);
+
+            _cache.Set(PillarOverviewCacheKey, data, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(8),
+                Priority = CacheItemPriority.NeverRemove
+            });
+        }
+
+        public DateTime? GetPillarOverviewCacheSavedAtUtc() => ReadPillarOverviewSnapshot()?.SavedAtUtc;
+
+        public bool HydratePillarOverviewCacheFromDisk()
+        {
+            var snapshot = ReadPillarOverviewSnapshot();
+            if (snapshot?.Data == null)
+                return false;
+
+            _cache.Set(PillarOverviewCacheKey, snapshot.Data, new MemoryCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromDays(8),
+                Priority = CacheItemPriority.NeverRemove
+            });
+            return true;
+        }
+
+        public async Task<ResultResponseDto<PillarOverviewResult>> GetPillarOverview()
+        {
+            try
+            {
+                if (!_cache.TryGetValue(PillarOverviewCacheKey, out PillarOverviewResult? cached) || cached == null)
+                {
+                    cached = ReadPillarOverviewSnapshot()?.Data;
+                    if (cached != null)
+                        HydratePillarOverviewCacheFromDisk();
+                }
+
+                if (cached == null)
+                {
+                    return ResultResponseDto<PillarOverviewResult>.Failure(
+                        new[] { "Pillar overview is being updated. Please try again shortly." });
+                }
+
+                return ResultResponseDto<PillarOverviewResult>.Success(
+                    cached,
+                    new List<string> { "Pillar overview fetched successfully from cache." });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("An error occurred while processing the GetPillarOverview request.", ex);
+                return ResultResponseDto<PillarOverviewResult>.Failure(
+                    new[] { "An error occurred while processing your request. Please try again later." });
+            }
+        }
+
+        public async Task<bool> RefreshPillarOverviewCacheAsync(CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                var pillars = (await _commonService.GetPillars()).Select(x => new
+                {
+                    x.PillarID,
+                    x.PillarName,
+                    x.DisplayOrder,
+                    x.ImagePath
+                }).ToList();
+
+                var result = await _aIAnalyzeService.GetPillarOverview();
+                if (result?.Success == true && result.Result?.Pillars != null && result.Result.Pillars.Count > 0)
+                {
+                    foreach (var card in result.Result.Pillars)
+                    {
+                        var matched = pillars.FirstOrDefault(p => p.PillarID == card.PillarId);
+                        if (matched == null)
+                            continue;
+
+                        card.PillarName = matched.PillarName;
+                        card.ImagePath = matched.ImagePath ?? "";
+                        card.DisplayOrder = matched.DisplayOrder;
+                    }
+
+                    result.Result.Pillars = result.Result.Pillars
+                        .OrderBy(p => p.DisplayOrder)
+                        .ToList();
+
+                    SavePillarOverview(result.Result);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("An error occurred while refreshing the pillar overview cache.", ex);
+            }
+
+            return ReadPillarOverviewSnapshot() != null;
+        }
+
+        #endregion Pillar Overview Cache
+
         public async Task<ResultResponseDto<PillarLiveSignalsResult>> GetPillarLiveSignals()
         {
             const string cacheKey = "PillarLiveSignals";
