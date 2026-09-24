@@ -13,6 +13,7 @@ namespace HornScope.Common.Interface
         Task<List<EvaluationCountryProgressHistoryResultDto>> GetCountriesProgressHistoryAsync(int userId, int role, int fromYear, int toYear);
         Task<List<GetCountriesProgressAdminDto>> GetCountriesProgressForAdmin(int userId, int role, int year);
         Task<List<CountryRankingResultDto>> GetCountriesRankings(int countryId, int year);
+        Task<List<CountryPillarRankingResultDto>> GetCountriesPillarRankingAsync(int countryID = 0, int year = 0);
         Task<List<GetPillarDto>> GetPillars();
         void ClearPillarCache();
         Task<List<GetAssessmentResponseDto>> GetUserDetailsAssignedToCountry(int year, int countryID = 0);

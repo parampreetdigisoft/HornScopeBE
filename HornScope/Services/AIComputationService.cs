@@ -367,7 +367,7 @@ namespace HornScope.Services
                 var progress = await _commonService.GetCountriesProgressAsync(userID, (int)userRole, currentYear);
 
                 var countries = progress.Where(x => x.CountryID== CountryID);
-
+ 
                 var answeredQuestions = await _context.AIEstimatedQuestionScores
                .Where(x => x.Year == currentYear && x.CountryID == CountryID)
                .GroupBy(x => x.PillarID)
@@ -687,6 +687,27 @@ namespace HornScope.Services
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsReport", ex);
+                return Array.Empty<byte>();
+            }
+        }
+
+        public async Task<byte[]> GenerateSelectedPillarsReport(List<AiCountryPillarResponse> pillars, UserRole userRole, int userID, IServices.DocumentFormat format = IServices.DocumentFormat.Pdf)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
+
+                if (pillars.Count == 1)
+                    return await GeneratePillarDetailsReport(pillars[0], userRole, format);
+
+                var year = pillars[0].AIDataYear == 0 ? DateTime.Now.Year : pillars[0].AIDataYear;
+                var pillarRanks = await _commonService.GetCountriesPillarRankingAsync(pillars[0].CountryID, year);
+                return await _documentGeneratorService.GenerateSelectedPillarDetails(pillars, pillarRanks, userRole, format);
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -2235,8 +2256,8 @@ namespace HornScope.Services
         }
 
         #endregion ai document
-
-
+        
         #endregion
+
     }
 }

@@ -999,7 +999,6 @@ namespace HornScope.Services
             {
                 int year = DateTime.UtcNow.Year;
                 var countries = await _commonService.GetCountriesProgressForAdmin(userId, (int)userRole, year);
-
                 if (countries == null) return ResultResponseDto<byte[]>.Failure(new string[] { "There is an error please try later" });
                 IEnumerable<IGrouping<(int CountryID, string CountryName, string Continent), GetCountriesProgressAdminDto>>
                 result =
@@ -1026,11 +1025,10 @@ namespace HornScope.Services
         {
             using var workbook = new XLWorkbook();
             var ws = workbook.Worksheets.Add("Countries Score Report");
-
             bool isRanking = request.IsRanking == true;
 
             // ---------------- Header ----------------
-            int totalColumns = isRanking ? 5 : 10;
+            int totalColumns = isRanking ? 5 : 11;
 
             ws.Range(1, 1, 1, totalColumns).Merge().Value = "Countries Score Report";
             ws.Range(2, 1, 2, totalColumns).Merge().Value = $"Report Year: {DateTime.UtcNow.Year}";
@@ -1047,11 +1045,15 @@ namespace HornScope.Services
             // ---------------- Column Header ----------------
             ws.Cell(row, 1).Value = "S.No.";
             ws.Cell(row, 2).Value = "Country Name";
-            ws.Cell(row, 3).Value = "Continent";           
+            ws.Cell(row, 3).Value = "Continent";
+
+            int rankColumn = isRanking ? 4 : 10;
+            int countryScoreColumn = isRanking ? 5 : 11;
 
             if (isRanking)
             {
-                ws.Cell(row, 5).Value = "Evaluated - AI Country Score";
+                ws.Cell(row, rankColumn).Value = "Manual Ranking";
+                ws.Cell(row, countryScoreColumn).Value = "Evaluated - AI Country Score";
             }
             else
             {
@@ -1060,7 +1062,8 @@ namespace HornScope.Services
                 ws.Cell(row, 7).Value = "Total Answers";
                 ws.Cell(row, 8).Value = "Evaluated Domain Score";
                 ws.Cell(row, 9).Value = "AI Domain Score";
-                ws.Cell(row, 10).Value = "Evaluated - AI Country Score";
+                ws.Cell(row, rankColumn).Value = "Manual Ranking";
+                ws.Cell(row, countryScoreColumn).Value = "Evaluated - AI Country Score";
             }
 
             var header = ws.Range(row, 1, row, totalColumns);
@@ -1070,6 +1073,7 @@ namespace HornScope.Services
 
             row++;
             int sno = 1;
+            int countryRank = 1;
 
             // ---------------- Data ----------------
             foreach (var cityGroup in cityGroups)
@@ -1078,32 +1082,34 @@ namespace HornScope.Services
                 var pillars = cityGroup.OrderBy(x => x.DisplayOrder).ToList();
 
                 var cityProgress = pillars.Average(x => x.PillarProgress);
+                string rankValue = cityProgress == 0 ? "N/A" : (countryRank++).ToString();
+                string countryScore = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
 
                 // ========================
-                // ? RANK-WISE (1 ROW ONLY)
+                // RANK-WISE (1 ROW ONLY)
                 // ========================
                 if (isRanking)
                 {
                     ws.Cell(row, 1).Value = sno++;
                     ws.Cell(row, 2).Value = cityData.CountryName;
-                    ws.Cell(row, 3).Value = cityData.Continent;                    
-                    ws.Cell(row, 5).Value = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
+                    ws.Cell(row, 3).Value = cityData.Continent;
+                    ws.Cell(row, rankColumn).Value = rankValue;
+                    ws.Cell(row, countryScoreColumn).Value = countryScore;
 
                     row++;
                     continue;
                 }
 
                 // ========================
-                // ? PILLAR-WISE
+                // PILLAR-WISE
                 // ========================
                 int startRow = row;
-                bool first = true;
 
-                foreach (var pillar in pillars)
+                foreach (var pillar in pillars.OrderByDescending(x => x.PillarProgress))
                 {
                     ws.Cell(row, 1).Value = sno++;
                     ws.Cell(row, 2).Value = cityData.CountryName;
-                    ws.Cell(row, 3).Value = cityData.Continent;                    
+                    ws.Cell(row, 3).Value = cityData.Continent;
 
                     ws.Cell(row, 5).Value = pillar.PillarName;
                     ws.Cell(row, 6).Value = pillar.TotalScore;
@@ -1111,25 +1117,26 @@ namespace HornScope.Services
                     ws.Cell(row, 8).Value = $"{pillar.PillarProgress:F2}";
                     ws.Cell(row, 9).Value = $"{pillar.AIPillarProgress:F2}";
 
-                    if (first)
-                    {
-                        ws.Cell(row, 10).Value = $"{cityProgress:F2} - {cityData.AICountryProgress:F2}";
-                        first = false;
-                    }
-
                     row++;
                 }
 
                 int endRow = row - 1;
 
-                // Merge only for pillar mode
+                ws.Cell(startRow, rankColumn).Value = rankValue;
+                ws.Cell(startRow, countryScoreColumn).Value = countryScore;
+
                 if (endRow > startRow)
                 {
                     ws.Range(startRow, 2, endRow, 2).Merge();
                     ws.Range(startRow, 3, endRow, 3).Merge();
                     ws.Range(startRow, 4, endRow, 4).Merge();
-                    ws.Range(startRow, 10, endRow, 10).Merge();
+                    ws.Range(startRow, rankColumn, endRow, rankColumn).Merge();
+                    ws.Range(startRow, countryScoreColumn, endRow, countryScoreColumn).Merge();
                 }
+
+                var summaryCells = ws.Range(startRow, rankColumn, endRow, countryScoreColumn);
+                summaryCells.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+                summaryCells.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             }
 
             // ---------------- Formatting ----------------

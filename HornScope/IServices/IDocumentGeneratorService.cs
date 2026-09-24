@@ -1,5 +1,6 @@
 
 using HornScope.Dtos.AiDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Models;
 using static HornScope.Services.AIComputationService;
 
@@ -34,6 +35,13 @@ namespace HornScope.IServices
         /// <summary>Single pillar detail report.</summary>
         Task<byte[]> GeneratePillarDetails(
             AiCountryPillarResponse pillarData,
+            UserRole userRole,
+            DocumentFormat format = DocumentFormat.Pdf);
+
+        /// <summary>Combined detail report for the selected pillars.</summary>
+        Task<byte[]> GenerateSelectedPillarDetails(
+            List<AiCountryPillarResponse> pillars,
+            List<CountryPillarRankingResultDto> pillarRankings,
             UserRole userRole,
             DocumentFormat format = DocumentFormat.Pdf);
 

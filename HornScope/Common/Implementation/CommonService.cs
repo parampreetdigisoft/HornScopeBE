@@ -38,7 +38,7 @@ namespace HornScope.Common.Implementation
 
         #endregion
 
-        public static string CountryScoreSummery(decimal? progress, int pillarCount, int kpiCount,string? countryName = "The country")
+        public static string CountryScoreSummery(decimal? progress, int pillarCount, int kpiCount, string? countryName = "The country")
         {
             var evidenceSummaryStaringLine = $"{countryName ?? "The country"} records an overall HS score of {progress ?? 0}, reflecting performance across {pillarCount} domains and {kpiCount} KPIs.";
 
@@ -53,7 +53,7 @@ namespace HornScope.Common.Implementation
         {
             immediateSituationSummary = immediateSituationSummary ?? "";
 
-            var evidenceSummaryStaringLine= $"{countryName ?? "The country"} records an overall HS score of {progress ?? 0}, reflecting performance across {pillarCount} domains and {kpiCount} KPIs.";
+            var evidenceSummaryStaringLine = $"{countryName ?? "The country"} records an overall HS score of {progress ?? 0}, reflecting performance across {pillarCount} domains and {kpiCount} KPIs.";
 
             return immediateSituationSummary + "\n\n " + evidenceSummaryStaringLine + " " + evidenceSummary;
         }
@@ -78,6 +78,27 @@ namespace HornScope.Common.Implementation
             {
                 await _appLogger.LogAsync("Error in Executing usp_getCountriesProgressByUserId", ex);
                 return new List<EvaluationCountryProgressResultDto>();
+            }
+        }
+
+        public async Task<List<CountryPillarRankingResultDto>> GetCountriesPillarRankingAsync(int countryID = 0, int year = 0)
+        {
+            try
+            {
+                return await _context.CountryPillarRankingResults
+                 .FromSqlRaw(
+                     "EXEC usp_getCountryAllPillarsRanking @countryID, @year",
+
+                     new SqlParameter("@countryID", (object?)countryID ?? DBNull.Value),
+                     new SqlParameter("@year", year)
+                 )
+                 .AsNoTracking()
+                 .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in Executing usp_getCountryAllPillarsRanking", ex);
+                return new List<CountryPillarRankingResultDto>();
             }
         }
 
@@ -147,7 +168,7 @@ namespace HornScope.Common.Implementation
             try
             {
                 return await _context.GetCountriesProgressAdminDto
-                 .FromSqlRaw("EXEC usp_getCountriesProgress_Admin @year",new SqlParameter("@year", year))
+                 .FromSqlRaw("EXEC usp_getCountriesProgress_Admin @year", new SqlParameter("@year", year))
                  .AsNoTracking()
                  .ToListAsync();
             }
@@ -170,8 +191,8 @@ namespace HornScope.Common.Implementation
 
                 pillars = await _context.Pillars
                     .Where(x => x.IsActive && !x.IsDeleted)
-                    .OrderBy(x=>x.DisplayOrder)
-                    .Select(x=> new GetPillarDto
+                    .OrderBy(x => x.DisplayOrder)
+                    .Select(x => new GetPillarDto
                     {
                         PillarID = x.PillarID,
                         PillarName = x.PillarName,
@@ -182,7 +203,7 @@ namespace HornScope.Common.Implementation
                         Reliability = x.Reliability,
                         PillarCode = x.PillarCode,
                         IsActive = x.IsActive,
-                        QuestionCount = x.Questions.Where(x=>!x.IsDeleted).Count()
+                        QuestionCount = x.Questions.Where(x => !x.IsDeleted).Count()
                     })
                     .ToListAsync();
 
@@ -228,7 +249,7 @@ namespace HornScope.Common.Implementation
             }
         }
 
-        public async Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds,int userID, int year)
+        public async Task<ResultResponseDto<bool>> RevokeCountriesPermission(List<int> countryIds, int userID, int year)
         {
             try
             {
@@ -238,14 +259,14 @@ namespace HornScope.Common.Implementation
                 if (permissionList == null || permissionList.Count==0)
                     return ResultResponseDto<bool>.Failure(new[] { "Permission not found." });
 
-                foreach(var permission in permissionList)
+                foreach (var permission in permissionList)
                 {
                     permission.Status = permission.Status == AIEditPermissionStatus.PendingRequest
                     ? AIEditPermissionStatus.Rejected
                     : AIEditPermissionStatus.Revoked;
                     permission.GrantedBy = userID;
                     permission.GrantedAt = date;
-                    
+
                 }
 
                 var sessionIds = permissionList.Where(x => x.ActiveSessionID.HasValue).Select(x => x.ActiveSessionID);

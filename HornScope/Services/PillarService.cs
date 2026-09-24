@@ -727,20 +727,20 @@ namespace HornScope.Services
 
                         var count = userData.Count;
 
-                        //var filteredData = userData
-                        //    .Where(x => x.Value.Score!=null)
-                        //    .Select(x => (decimal)x.Value.Score.ToString());
+                        var filteredData = userData
+                            .Where(x => x.Value.Score != null && (x.Value.Score != ScoreValue.Indeterminate.ToString() && x.Value.Score != ScoreValue.NA.ToString()))
+                            .Select(x => Convert.ToDecimal(x.Value.Score));
 
-                        //decimal score = filteredData.Any()
-                        //  ? filteredData.Average()
-                        //  :0m;
+                        decimal score = filteredData.Any()
+                          ? filteredData.Average()
+                          : 0m;
 
                         var richText = ws.Cell(row, c++).GetRichText();
 
                         richText.AddText("Total Score:  ")
                             .SetBold().SetFontColor(XLColor.DarkGray);
 
-                        richText.AddText($"{Math.Round(1.00, 2)}\n")
+                        richText.AddText($"{Math.Round(score, 2)}\n")
                             .SetFontColor(XLColor.Black);
                     }
 
@@ -864,7 +864,7 @@ namespace HornScope.Services
                 // =========================
                 // 2. AI DATA
                 // =========================
-                var aiDataList = await _context.AIPillarScores
+                var aiDataList = await _context.AIEstimatedQuestionScores
                     .Where(x => x.CountryID == request.CountryID
                         && (!request.PillarID.HasValue || x.PillarID == request.PillarID)
                         && x.Year == year)
@@ -873,7 +873,7 @@ namespace HornScope.Services
                     {
                         PillarID = g.Key,
                         Score = g.Sum(x => x.AIScore ?? 0),
-                        ScoreProgress = g.Average(x => x.AIProgress ?? 0),
+                        ScoreProgress = g.Average(x => x.AIScore ?? 0),
                         Count = _context.AIEstimatedQuestionScores.Where(x=> x.PillarID == g.Key && x.CountryID == request.CountryID && x.Year == year).Count()
                     })
                     .ToListAsync();
@@ -923,8 +923,7 @@ namespace HornScope.Services
                             {
                                 var responses = userGroup
                                     .SelectMany(x => x.Responses)
-                                    .Where(r => r.Score.HasValue &&
-                                                (int)r.Score.Value <= (int)ScoreValue.Hundred)
+                                    .Where(r => r.Score.HasValue)
                                     .ToList();
 
                                 var progress = responses.Any()
@@ -940,7 +939,7 @@ namespace HornScope.Services
                                     ScoreProgress = progress,
                                     TotalQuestion = p.TotalQuestion,
                                     AnsQuestion = responses.Count,
-                                    AnsPillar = responses.Any() ?1 :0
+                                    AnsPillar = responses.Any() ? 1 :0
                                 };
                             })
                             .ToList();

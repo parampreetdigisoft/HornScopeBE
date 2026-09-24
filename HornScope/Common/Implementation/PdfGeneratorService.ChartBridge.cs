@@ -165,69 +165,178 @@ namespace HornScope.Common.Implementation
         internal static void DrawPillarsRadialChartCanvas(
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x => x.Value).ToList();
             if (!data.Any()) return;
-            float cx = s.Width / 2f, cy = s.Height / 2f;
-            float maxR = Math.Min(cx, cy) - 18f;
-            float minR = maxR * 0.28f;
-            float step = (maxR - minR) / data.Count;
-            float thick = step * 0.68f;
-            float avg   = (float)data.Average(x => x.Value ?? 0);
 
-            using var title = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Text), TextSize = 10f, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true };
-            c.DrawText("Domain Performance", cx, 14f, title);
+            float avg = (float)data.Average(x => x.Value ?? 0);
+            int n = data.Count;
 
-            for (int i = 0; i < data.Count; i++)
+            const float titleBand = 28f;
+            float cx = s.Width / 2f;
+            float chart = Math.Min(s.Width - 20f, s.Height - titleBand - 12f);
+            if (chart < 40f) chart = Math.Min(s.Width, s.Height);
+            float cy = titleBand + chart / 2f;
+
+            using var title = new SKPaint
             {
-                float v   = (float)(data[i].Value ?? 0);
-                float r   = maxR - i * step;
-                float mid = r - thick / 2f;
-                var rect  = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                TextSize = 11f,
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center,
+                FakeBoldText = true
+            };
+            c.DrawText("Domain Performance", cx, 18f, title);
+
+            float outer = chart / 2f - 6f;
+            float centerR = Math.Clamp(outer * 0.30f, 28f, 46f);
+            float inner = centerR + 10f;
+            float span = Math.Max(8f, outer - inner);
+            float slot = span / n;
+            float thick = Math.Clamp(slot * 0.62f, 5f, 14f);
+
+            for (int i = 0; i < n; i++)
+            {
+                float v = Math.Clamp((float)(data[i].Value ?? 0), 0f, 100f);
+                float mid = outer - slot * i - slot / 2f;
+                var rect = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
                 SKColor col = GetColorStatic(v);
 
-                using var track = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = thick, Color = col.WithAlpha(22), IsAntialias = true };
+                using var track = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = thick,
+                    Color = col.WithAlpha(40),
+                    IsAntialias = true,
+                    StrokeCap = SKStrokeCap.Butt
+                };
                 c.DrawOval(rect, track);
-                using var arc = new SKPaint { Style = SKPaintStyle.Stroke, StrokeWidth = thick, Color = col, StrokeCap = SKStrokeCap.Round, IsAntialias = true };
-                c.DrawArc(rect, -90f, 360f * v / 100f, false, arc);
 
-                float la = (-90f + 360f * v / 100f) * (float)Math.PI / 180f;
-                using var dot = new SKPaint { Color = col, Style = SKPaintStyle.Fill, IsAntialias = true };
-                c.DrawCircle(cx + mid * (float)Math.Cos(la), cy + mid * (float)Math.Sin(la), thick / 2f + 1.5f, dot);
+                if (v <= 0f)
+                    continue;
+
+                using var arc = new SKPaint
+                {
+                    Style = SKPaintStyle.Stroke,
+                    StrokeWidth = thick,
+                    Color = col,
+                    StrokeCap = SKStrokeCap.Round,
+                    IsAntialias = true
+                };
+                c.DrawArc(rect, -90f, 360f * v / 100f, false, arc);
             }
 
-            float cr = minR - step * 0.6f;
-            using var fill = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Text), Style = SKPaintStyle.Fill, IsAntialias = true };
-            c.DrawCircle(cx, cy, cr, fill);
-            using var numP = new SKPaint { Color = GetColorStatic(avg), TextSize = cr * 0.60f, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true };
-            c.DrawText($"{avg:F0}", cx, cy + numP.TextSize * 0.36f, numP);
+            using var fill = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                Style = SKPaintStyle.Fill,
+                IsAntialias = true
+            };
+            c.DrawCircle(cx, cy, centerR, fill);
+
+            using var numP = new SKPaint
+            {
+                Color = SKColors.White,
+                TextSize = Math.Min(18f, centerR * 0.62f),
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center,
+                FakeBoldText = true
+            };
+            c.DrawText($"{avg:F1}", cx, cy + numP.TextSize * 0.12f, numP);
+
+            using var avgLbl = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.SuccessGreenMuted),
+                TextSize = Math.Min(9f, centerR * 0.28f),
+                IsAntialias = true,
+                TextAlign = SKTextAlign.Center
+            };
+            c.DrawText("avg", cx, cy + numP.TextSize * 0.12f + avgLbl.TextSize + 2f, avgLbl);
         }
 
-        // ── Horizontal bar list for pillars ─────────────────────────────────
+        // ── Horizontal bar list for pillars (same layout as the PDF Domain Overview) ─
         internal static void DrawPillarHorizontalBarsCanvas(
             SKCanvas c, QPDF.Size s, List<PillarChartItem> pillars)
         {
             var sorted = pillars.OrderByDescending(x => x.Value).ToList();
-            float rowH  = s.Height / Math.Max(sorted.Count, 1);
-            float labelW = 110f;
-            float barArea = s.Width - labelW - 50f;
+            if (sorted.Count == 0) return;
 
-            using var lbl = new SKPaint { Color = SKColor.Parse(ReportThemeColors.LightText), TextSize = 8.5f, IsAntialias = true };
+            using (var border = new SKPaint
+            {
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1.2f,
+                Color = SKColor.Parse(ReportThemeColors.BorderGreenLight),
+                IsAntialias = true
+            })
+            {
+                c.DrawRect(new SKRect(0.6f, 0.6f, s.Width - 0.6f, s.Height - 0.6f), border);
+            }
+
+            const float pad = 12f;
+            using var title = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
+                TextSize = 13f,
+                IsAntialias = true,
+                FakeBoldText = true,
+                Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+            };
+            c.DrawText("Domain Overview", pad, pad + 12f, title);
+
+            float top = pad + 26f;
+            float rowH = (s.Height - top - 8f) / sorted.Count;
+            float labelW = Math.Min(130f, s.Width * 0.34f);
+            float scoreW = Math.Min(108f, s.Width * 0.28f);
+            float barLeft = pad + labelW;
+            float barRight = s.Width - pad - scoreW;
+            float barH = Math.Clamp(rowH * 0.42f, 8f, 13f);
+
+            using var lbl = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.BlueGray),
+                TextSize = 9.5f,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial")
+            };
+            using var track = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.SurfaceGreenLight),
+                IsAntialias = true
+            };
+
+            int total = sorted.Count;
             for (int i = 0; i < sorted.Count; i++)
             {
-                float v  = (float)(sorted[i].Value ?? 0);
-                float y  = i * rowH;
-                float bw = v / 100f * barArea;
-                SKColor col = GetColorStatic(v);
+                float v = Math.Clamp((float)(sorted[i].Value ?? 0), 0f, 100f);
+                float midY = top + i * rowH + rowH / 2f;
+                SKColor col = SKColor.Parse(GetBarColor(v));
 
-                if (i % 2 == 0) c.DrawRect(new SKRect(0, y, s.Width, y + rowH), new SKPaint { Color = SKColor.Parse(ReportThemeColors.Background) });
+                string name = Shorten(sorted[i].Name ?? sorted[i].ShortName ?? "—", 18);
+                c.DrawText(name, pad, midY + lbl.TextSize * 0.35f, lbl);
 
-                c.DrawText(Shorten(sorted[i].Name ?? "—", 16), 4, y + rowH * 0.65f, lbl);
-                using var shader = SKShader.CreateLinearGradient(new SKPoint(0, 0), new SKPoint(bw, 0),
-                    new[] { col.WithAlpha(210), col }, null, SKShaderTileMode.Clamp);
-                using var bar = new SKPaint { Shader = shader, IsAntialias = true };
-                c.DrawRoundRect(new SKRoundRect(new SKRect(labelW, y + 3, labelW + bw, y + rowH - 3), 3), bar);
-                using var scorePaint = new SKPaint { Color = col, TextSize = 8.5f, IsAntialias = true, TextAlign = SKTextAlign.Left };
-                c.DrawText($"{v:F1}%", labelW + bw + 5, y + rowH * 0.65f, scorePaint);
+                float trackTop = midY - barH / 2f;
+                c.DrawRoundRect(new SKRoundRect(new SKRect(barLeft, trackTop, barRight, trackTop + barH), 2), track);
+
+                float fillW = Math.Max(0f, (barRight - barLeft) * v / 100f);
+                if (fillW > 0.5f)
+                {
+                    using var shader = SKShader.CreateLinearGradient(
+                        new SKPoint(barLeft, 0), new SKPoint(barLeft + fillW, 0),
+                        new[] { col.WithAlpha(210), col }, null, SKShaderTileMode.Clamp);
+                    using var bar = new SKPaint { Shader = shader, IsAntialias = true };
+                    c.DrawRoundRect(
+                        new SKRoundRect(new SKRect(barLeft, trackTop, barLeft + fillW, trackTop + barH), 2), bar);
+                }
+
+                using var score = new SKPaint
+                {
+                    Color = col,
+                    TextSize = 9f,
+                    IsAntialias = true,
+                    FakeBoldText = true,
+                    TextAlign = SKTextAlign.Right,
+                    Typeface = SKTypeface.FromFamilyName("Arial", SKFontStyle.Bold)
+                };
+                c.DrawText($"{v:F1}, Rank {i + 1}/{total}", s.Width - pad, midY + score.TextSize * 0.35f, score);
             }
         }
 

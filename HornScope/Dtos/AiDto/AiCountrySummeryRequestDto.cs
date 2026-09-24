@@ -16,6 +16,7 @@ namespace HornScope.Dtos.AiDto
     public class AiCountrySummeryRequestPdfDto : AiCountryPillarRequestDto
     {
         public int? PillarID { get; set; }
+        public List<int>? PillarIDs { get; set; }
         public HornScope.IServices.DocumentFormat Format { get; set; } = HornScope.IServices.DocumentFormat.Pdf;
         public string ReportType { get; set; } = "ai";
     }

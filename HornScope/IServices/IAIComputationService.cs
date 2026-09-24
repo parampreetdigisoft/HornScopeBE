@@ -16,6 +16,7 @@ namespace HornScope.IServices
         Task<IQueryable<AiCountrySummeryDto>> GetCountryAiSummeryDetails(int userID, UserRole userRole, int? countryID, int year=0);
         Task<byte[]> GenerateCountryDetailsReport(AiCountrySummeryDto countriesDetails, UserRole userRole, int userID, DocumentFormat format = DocumentFormat.Pdf, string reportType = "AI");
         Task<byte[]> GeneratePillarDetailsReport(AiCountryPillarResponse countriesDetails, UserRole userRole,DocumentFormat format = DocumentFormat.Pdf);
+        Task<byte[]> GenerateSelectedPillarsReport(List<AiCountryPillarResponse> pillars, UserRole userRole, int userID, DocumentFormat format = DocumentFormat.Pdf);
         Task<ResultResponseDto<AiCrossCountryResponseDto>> GetAICrossCountryPillars(AiCountryIdsDto ids, int userID, UserRole userRole);
         Task<ResultResponseDto<bool>> ChangedAiCountryEvaluationStatus(ChangedAiCountryEvaluationStatusDto aiCountryIdsDto, int userID, UserRole userRole);
         Task<ResultResponseDto<bool>> RegenerateAiSearch(RegenerateAiSearchDto aiCountryIdsDto, int userID, UserRole userRole);

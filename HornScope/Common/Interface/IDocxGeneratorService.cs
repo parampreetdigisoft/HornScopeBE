@@ -1,6 +1,7 @@
 
 
 using HornScope.Dtos.AiDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.Models;
 using static HornScope.Services.AIComputationService;
 
@@ -22,6 +23,11 @@ namespace HornScope.Common.Interface
 
         Task<byte[]> GeneratePillarDetailsDocx(
             AiCountryPillarResponse pillarData,
+            UserRole userRole);
+
+        Task<byte[]> GenerateSelectedPillarsDetailsDocx(
+            List<AiCountryPillarResponse> pillars,
+            List<CountryPillarRankingResultDto> pillarRankings,
             UserRole userRole);
 
         Task<byte[]> GenerateAllCountriesDetailsDocx(

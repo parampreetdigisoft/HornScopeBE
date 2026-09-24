@@ -3,6 +3,7 @@ using AssessmentPlatform.Dtos.AiDto;
 using AssessmentPlatform.Models;
 using HornScope.Common.Interface;
 using HornScope.Dtos.AiDto;
+using HornScope.Dtos.CountryDto;
 using HornScope.IServices;
 using HornScope.Models;
 using static HornScope.Services.AIComputationService;
@@ -51,6 +52,15 @@ namespace HornScope.Services
             => format == HornScope.IServices.DocumentFormat.Docx
                 ? _docx.GeneratePillarDetailsDocx(pillarData, userRole)
                 : _pdf.GeneratePillarDetailsPdf(pillarData, userRole);
+
+        public Task<byte[]> GenerateSelectedPillarDetails(
+            List<AiCountryPillarResponse> pillars,
+            List<CountryPillarRankingResultDto> pillarRankings,
+            UserRole userRole,
+            HornScope.IServices.DocumentFormat format = HornScope.IServices.DocumentFormat.Pdf)
+            => format == HornScope.IServices.DocumentFormat.Docx
+                ? _docx.GenerateSelectedPillarsDetailsDocx(pillars, pillarRankings, userRole)
+                : _pdf.GenerateSelectedPillarsDetailsPdf(pillars, pillarRankings, userRole);
 
         public Task<byte[]> GenerateAllCountriesDetails(
             List<AiCountrySummeryDto> countries,

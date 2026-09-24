@@ -29,6 +29,7 @@ using A    = DocumentFormat.OpenXml.Drawing;
 using DW   = DocumentFormat.OpenXml.Drawing.Wordprocessing;
 using PIC  = DocumentFormat.OpenXml.Drawing.Pictures;
 using QPDF = QuestPDF.Infrastructure;
+using HornScope.Dtos.CountryDto;
 
 namespace HornScope.Common.Implementation
 {
@@ -109,6 +110,53 @@ namespace HornScope.Common.Implementation
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error in GeneratePillarDetailsDocx", ex);
+                return Array.Empty<byte>();
+            }
+        }
+
+        public async Task<byte[]> GenerateSelectedPillarsDetailsDocx(List<AiCountryPillarResponse> pillars, List<CountryPillarRankingResultDto> pillarRanks, UserRole userRole)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
+
+                var first = pillars[0];
+                var countryDetails = new AiCountrySummeryDto
+                {
+                    CountryID = first.CountryID,
+                    CountryName = first.CountryName,
+                    Continent = first.Continent,
+                    Year = first.AIDataYear,
+                    AIProgress = pillars.Average(x => x.AIProgress ?? 0)
+                };
+                var pillarChartItems = pillars.Select(p => new PillarChartItem(
+                    (p.PillarName?.Length > 20 ? p.PillarName[..20] : p.PillarName) ?? "-",
+                    p.PillarName ?? "-",
+                    p.AIProgress)).ToList();
+
+                return BuildDocument(mainPart =>
+                {
+                    var body = mainPart.Document.Body!;
+                    _imgId = 1;
+
+                    AppendCountryHeader(mainPart, countryDetails, "Domain Performance Overview");
+                    AddPillarOverviewSection(body, mainPart, pillarChartItems);
+
+                    foreach (var pillarData in pillars)
+                    {
+                        AppendCountryHeader(mainPart, countryDetails, pillarData.PillarName);
+                        var pillarRank = pillarRanks?.FirstOrDefault(p =>
+                            p.PillarID == pillarData.PillarID && p.CountryID == pillarData.CountryID);
+                        AddSelectedPillarMarkedSection(body, pillarData, pillarRank);
+                    }
+
+                    FinalizeLastSection(mainPart);
+                });
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error in GenerateSelectedPillarsDetailsDocx", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -798,6 +846,16 @@ namespace HornScope.Common.Implementation
         //  PER-PILLAR SECTION
         // ════════════════════════════════════════════════════════════════════
 
+        private void AddSelectedPillarMarkedSection(Body body, AiCountryPillarResponse data, CountryPillarRankingResultDto? pillarRank)
+        {
+            body.AppendChild(SectionHeading("Domain Score", DarkBlue));
+            body.AppendChild(CreateProgressBar("Score", (float)(data.AIProgress ?? 0), MedBlue));
+            body.AppendChild(Gap(160));
+            body.AppendChild(CreateRankTable(pillarRank));
+            body.AppendChild(Gap(160));
+            AppendContentSection(body, "Executive Summary", data.EvidenceSummary, ReportThemeColors.PdfDarkGreenHex);
+        }
+
         private void AddPillarSection(
     Body body, MainDocumentPart mainPart,
     AiCountryPillarResponse data, UserRole userRole)
@@ -1023,24 +1081,33 @@ namespace HornScope.Common.Implementation
             using (var gold = new SKPaint { Color = SKColor.Parse(ReportThemeColors.Primary), IsAntialias = true })
                 canvas.DrawRect(0, navyH, w, h, gold);
 
-            float logoBox = navyH - pad * 2f;
-            float logoLeft = w - pad - logoBox;
-
-            using (var white = new SKPaint { Color = SKColors.White, IsAntialias = true })
-                canvas.DrawRoundRect(new SKRoundRect(new SKRect(logoLeft, pad, w - pad, navyH - pad), 8), white);
-
+            float logoLeft = w - pad;
             if (File.Exists(logoPath))
             {
-                using var logo = SKBitmap.Decode(logoPath);
-                if (logo != null)
+                using var decoded = SKBitmap.Decode(logoPath);
+                if (decoded != null)
                 {
-                    float inset = logoBox * 0.08f;
-                    var dest = new SKRect(logoLeft + inset, pad + inset, w - pad - inset, navyH - pad - inset);
-                    canvas.DrawBitmap(logo, dest);
+                    using var logo = RemoveLogoBackground(decoded);
+                    var source = CropLogoBounds(logo);
+                    float srcW = Math.Max(1, source.Width);
+                    float srcH = Math.Max(1, source.Height);
+                    float maxH = navyH * 0.9f;
+                    float maxW = maxH * (srcW / srcH);
+                    float maxAllowedW = w * 0.28f;
+                    if (maxW > maxAllowedW)
+                    {
+                        maxW = maxAllowedW;
+                        maxH = maxW * (srcH / srcW);
+                    }
+
+                    float top = (navyH - maxH) / 2f;
+                    logoLeft = w - pad * 0.35f - maxW;
+                    var dest = new SKRect(logoLeft, top, logoLeft + maxW, top + maxH);
+                    using var paint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.High };
+                    canvas.DrawBitmap(logo, source, dest, paint);
                 }
             }
 
-            float textRight = logoLeft - pad;
             using var titlePaint = new SKPaint
             {
                 Color = SKColor.Parse(ReportThemeColors.HeaderSubtitle),
@@ -1070,6 +1137,52 @@ namespace HornScope.Common.Implementation
             canvas.DrawText(FitHeaderText(title, titlePaint, maxTextW), textX, titleY, titlePaint);
             canvas.DrawText(FitHeaderText(subtitle, subPaint, maxTextW), textX, titleY + subPaint.TextSize + 10, subPaint);
             canvas.DrawText(generated, textX, titleY + subPaint.TextSize + metaPaint.TextSize + 22, metaPaint);
+        }
+
+        private static SKBitmap RemoveLogoBackground(SKBitmap source)
+        {
+            var copy = source.Copy();
+            for (int y = 0; y < copy.Height; y++)
+            {
+                for (int x = 0; x < copy.Width; x++)
+                {
+                    var pixel = copy.GetPixel(x, y);
+                    if (pixel.Alpha < 20 || (pixel.Red > 245 && pixel.Green > 245 && pixel.Blue > 245))
+                        copy.SetPixel(x, y, SKColors.Transparent);
+                }
+            }
+
+            return copy;
+        }
+
+        private static SKRect CropLogoBounds(SKBitmap logo)
+        {
+            int minX = logo.Width;
+            int minY = logo.Height;
+            int maxX = 0;
+            int maxY = 0;
+
+            for (int y = 0; y < logo.Height; y++)
+            {
+                for (int x = 0; x < logo.Width; x++)
+                {
+                    var pixel = logo.GetPixel(x, y);
+                    bool isBackground = pixel.Alpha < 20
+                        || (pixel.Red > 245 && pixel.Green > 245 && pixel.Blue > 245);
+                    if (isBackground)
+                        continue;
+
+                    if (x < minX) minX = x;
+                    if (y < minY) minY = y;
+                    if (x > maxX) maxX = x;
+                    if (y > maxY) maxY = y;
+                }
+            }
+
+            if (maxX < minX || maxY < minY)
+                return new SKRect(0, 0, logo.Width, logo.Height);
+
+            return new SKRect(minX, minY, maxX + 1, maxY + 1);
         }
 
         private static string FitHeaderText(string text, SKPaint paint, float maxWidth)
@@ -1243,6 +1356,50 @@ namespace HornScope.Common.Implementation
                         new InsideHorizontalBorder { Val = BorderValues.None },
                         new InsideVerticalBorder   { Val = BorderValues.None })),
                 labelRow, barRow, scoreRow);
+        }
+
+        private static Table CreateRankTable(CountryPillarRankingResultDto? data)
+        {
+            var border = new TableCellBorders(
+                new TopBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                new BottomBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                new LeftBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                new RightBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 });
+
+            TableCell Cell(string text, bool header, bool right, bool shade)
+            {
+                var props = new TableCellProperties(border.CloneNode(true));
+                if (header || shade)
+                    props.Append(new Shading { Val = ShadingPatternValues.Clear, Fill = header ? "F7F1E6" : "FAF6EF" });
+
+                var runProps = new RunProperties(new FontSize { Val = "22" }, new Color { Val = "1F2933" });
+                if (header || right)
+                    runProps.Append(new Bold());
+
+                var paragraph = new Paragraph(
+                    new ParagraphProperties(new Justification { Val = right ? JustificationValues.Right : JustificationValues.Left }),
+                    new Run(runProps, new Text(text) { Space = SpaceProcessingModeValues.Preserve }));
+
+                return new TableCell(props, paragraph);
+            }
+
+            static string FormatRank(int rank, int total) =>
+                rank > 0 && total > 0 ? $"{rank} / {total}" : "-";
+
+            return new Table(
+                new TableProperties(
+                    new TableWidth { Width = ContentDxa.ToString(), Type = TableWidthUnitValues.Dxa },
+                    new TableBorders(
+                        new InsideHorizontalBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                        new InsideVerticalBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                        new TopBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                        new BottomBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                        new LeftBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
+                        new RightBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 })),
+                new TableRow(Cell("Ranking", true, false, false), Cell("Result", true, true, false)),
+                new TableRow(Cell("Continent Rank", false, false, false), Cell(FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false, true, false)),
+                new TableRow(Cell("Region Rank", false, false, true), Cell(FormatRank(data?.RegionPillarRank ?? 0, data?.TotalCountryInRegion ?? 0), false, true, true)),
+                new TableRow(Cell("Country Level Rank", false, false, false), Cell(FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false, true, false)));
         }
 
         /// <summary>Two-column content block: accent bar on left, title + body text on right.</summary>

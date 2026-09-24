@@ -12,6 +12,7 @@ using QuestPDF.Infrastructure;
 using SkiaSharp;
 using System.Text;
 using static HornScope.Services.AIComputationService;
+using HornScope.Dtos.CountryDto;
 
 namespace HornScope.Common.Implementation
 {
@@ -109,6 +110,66 @@ namespace HornScope.Common.Implementation
             catch (Exception ex)
             {
                 await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsPdf", ex);
+                return Array.Empty<byte>();
+            }
+        }
+
+        public async Task<byte[]> GenerateSelectedPillarsDetailsPdf(List<AiCountryPillarResponse> pillars, List<CountryPillarRankingResultDto> pillarRankings, UserRole userRole)
+        {
+            try
+            {
+                if (pillars == null || pillars.Count == 0)
+                    return Array.Empty<byte>();
+
+                QuestPDF.Settings.EnableDebugging = true;
+                _pillarCount = (await _commonService.GetPillars()).Count;
+
+                var first = pillars[0];
+                var countryDetails = new AiCountrySummeryDto
+                {
+                    CountryID = first.CountryID,
+                    CountryName = first.CountryName,
+                    Continent = first.Continent,
+                    Year = first.AIDataYear,
+                    AIProgress = pillars.Average(x => x.AIProgress ?? 0)
+                };
+
+                var pillarChartItems = pillars.Select(p => new PillarChartItem(SanitizeText(p.PillarName)?.Length > 20 ? SanitizeText(p.PillarName)[..20] : SanitizeText(p.PillarName) ?? "-", SanitizeText(p.PillarName) ?? "-", p.AIProgress)).ToList();
+
+                var document = Document.Create(container =>
+                {
+                    container.Page(page =>
+                    {
+                        ApplyPageDefaults(page);
+                        page.Header().Element(header =>
+                            CountryComposeHeader(header, countryDetails, userRole, "Domain Performance Overview"));
+                        page.Content().Element(content => PillarLineChartPage(content, pillarChartItems));
+                        PageFooter(page);
+                    });
+
+                    foreach (var pillarData in pillars)
+                    {
+                        var pillarRank = pillarRankings?.FirstOrDefault(p =>
+                            p.PillarID == pillarData.PillarID && p.CountryID == pillarData.CountryID);
+                        container.Page(page =>
+                        {
+                            page.Size(PageSizes.A4);
+                            page.Margin(25);
+                            page.PageColor(ReportThemeColors.PageBg);
+                            page.DefaultTextStyle(x => x.FontSize(10).FontFamily("Segoe UI"));
+                            page.Header().Element(header => PillarComposeHeader(header, pillarData));
+                            page.Content().Element(content =>
+                                SelectedPillarMarkedContent(content, pillarData, pillarRank, userRole));
+                            page.Footer().Element(PillarComposeFooter);
+                        });
+                    }
+                });
+
+                return document.GeneratePdf();
+            }
+            catch (Exception ex)
+            {
+                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -1195,10 +1256,6 @@ namespace HornScope.Common.Implementation
                 });
         }
 
-        // -----------------------------------------------------------------------------
-        //  PILLAR OVERVIEW PAGE  .  redesigned horizontal bar layout + ring chart
-        // -----------------------------------------------------------------------------
-
         void PillarLineChartPage(IContainer container, List<PillarChartItem> pillars)
         {
             var data = pillars.Where(p => p.Value.HasValue).ToList();
@@ -1213,7 +1270,7 @@ namespace HornScope.Common.Implementation
                 col.Spacing(10);
 
                 // -- two-column layout: ring chart (left) + bar list (right) ------
-                col.Item().Height(500).Row(row =>
+                col.Item().Height(420).Row(row =>
                 {
                     // Left: radial ring chart
                     row.RelativeItem(5).Element(x => DrawPillarsRadialChart(x, data));
@@ -1365,130 +1422,13 @@ namespace HornScope.Common.Implementation
 
         void DrawPillarsRadialChart(IContainer container, List<PillarChartItem> pillars)
         {
-            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x=>x.Value).ToList();
+            var data = pillars.Where(p => p.Value.HasValue).OrderByDescending(x => x.Value).ToList();
             if (!data.Any()) return;
-
-            float avg = (float)data.Average(x => x.Value ?? 0);
 
             container
                 .Background(ReportThemeColors.White)
                 .Border(1).BorderColor(ReportThemeColors.BorderGreenLight)
-                .Canvas((canvas, size) =>
-                {
-                    float cx = size.Width / 2f;
-                    float cy = size.Height / 2f;
-
-                    // Use concentric rings: outermost = first pillar
-                    int n = data.Count;
-                    float maxRadius = Math.Min(cx, cy) - 18f;
-                    float minRadius = maxRadius * 0.28f;
-                    float ringStep = (maxRadius - minRadius) / n;
-                    float ringThick = ringStep * 0.68f;
-
-                    // Chart title
-                    using var titlePaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
-                        TextSize = 10f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center,
-                        FakeBoldText = true
-                    };
-                    canvas.DrawText("Domain Performance", cx, 14f, titlePaint);
-
-                    for (int i = 0; i < n; i++)
-                    {
-                        float v = (float)(data[i].Value ?? 0);
-                        float r = maxRadius - i * ringStep;
-                        float mid = r - ringThick / 2f;
-
-                        var rect = new SKRect(cx - mid, cy - mid, cx + mid, cy + mid);
-
-                        SKColor barCol = GetColor(v);
-
-                        // Track ring
-                        using var trackPaint = new SKPaint
-                        {
-                            Style = SKPaintStyle.Stroke,
-                            StrokeWidth = ringThick,
-                            Color = barCol.WithAlpha(22),
-                            IsAntialias = true
-                        };
-                        canvas.DrawOval(rect, trackPaint);
-
-                        // Filled arc
-                        using var arcPaint = new SKPaint
-                        {
-                            Style = SKPaintStyle.Stroke,
-                            StrokeWidth = ringThick,
-                            Color = barCol,
-                            StrokeCap = SKStrokeCap.Round,
-                            IsAntialias = true
-                        };
-                        float sweep = 360f * v / 100f;
-                        canvas.DrawArc(rect, -90f, sweep, false, arcPaint);
-
-                        // Label at end of arc
-                        float labelAngle = (-90f + sweep) * (float)Math.PI / 180f;
-                        float labelR = mid + ringThick / 2f + 6f;
-                        float lx = cx + labelR * (float)Math.Cos(labelAngle);
-                        float ly = cy + labelR * (float)Math.Sin(labelAngle);
-
-                        // dot at arc end
-                        using var dotPaint = new SKPaint
-                        {
-                            Color = barCol,
-                            Style = SKPaintStyle.Fill,
-                            IsAntialias = true
-                        };
-                        canvas.DrawCircle(
-                            cx + mid * (float)Math.Cos(labelAngle),
-                            cy + mid * (float)Math.Sin(labelAngle),
-                            ringThick / 2f + 1.5f, dotPaint);
-                    }
-
-                    // -- centre: average score ----------------------------------
-                    using var circleFill = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.PdfDarkGreen),
-                        Style = SKPaintStyle.Fill,
-                        IsAntialias = true
-                    };
-                    float cr = minRadius - ringStep * 0.6f;
-                    canvas.DrawCircle(cx, cy, cr, circleFill);
-
-                    using var circleRing = new SKPaint
-                    {
-                        Color = GetColor(avg).WithAlpha(180),
-                        Style = SKPaintStyle.Stroke,
-                        StrokeWidth = 2f,
-                        IsAntialias = true
-                    };
-                    canvas.DrawCircle(cx, cy, cr, circleRing);
-
-                    using var avgNumPaint = new SKPaint
-                    {
-                        Color = GetColor(avg),
-                        TextSize = cr * 0.60f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center,
-                        FakeBoldText = true
-                    };
-                    canvas.DrawText($"{avg:F1}", cx, cy + avgNumPaint.TextSize * 0.36f, avgNumPaint);
-
-                    using var avgLblPaint = new SKPaint
-                    {
-                        Color = SKColor.Parse(ReportThemeColors.SuccessGreenMuted),
-                        TextSize = cr * 0.26f,
-                        IsAntialias = true,
-                        TextAlign = SKTextAlign.Center
-                    };
-                    canvas.DrawText("avg", cx, cy + avgNumPaint.TextSize * 0.36f + avgLblPaint.TextSize + 1f, avgLblPaint);
-
-                    // -- legend on the right side -------------------------------
-                    float legendX = cx + Math.Min(cx, cy) + 2f;  // just outside chart . won't fit; draw below instead
-                                                                 // (legend is in the horizontal bar panel on the right; no need to repeat here)
-                });
+                .Canvas((canvas, size) => DrawPillarsRadialChartCanvas(canvas, size, data));
         }
 
         // -----------------------------------------------------------------------------
@@ -1531,7 +1471,7 @@ namespace HornScope.Common.Implementation
                         row.ConstantItem(108)
                             .AlignRight()
                             .AlignMiddle()
-                            .Background(ReportThemeColors.White)
+                            .Background(ReportThemeColors.DarkBg)
                             .Padding(3)
                             .Height(70)
                             .Image(logoPath)
@@ -1574,7 +1514,7 @@ namespace HornScope.Common.Implementation
                         row.ConstantItem(108)
                             .AlignRight()
                             .AlignMiddle()
-                            .Background(ReportThemeColors.White)
+                            .Background(ReportThemeColors.DarkBg)
                             .Padding(3)
                             .Height(70)
                             .Image(logoPath)
@@ -1732,6 +1672,23 @@ namespace HornScope.Common.Implementation
                         PillarContentSection(c, "Why This Assessment Matters", SanitizeText(data.DataTransparencyNote), ReportThemeColors.AccentDataTransparency));
 
                 }
+            });
+        }
+
+        void SelectedPillarMarkedContent(
+            IContainer container, AiCountryPillarResponse data, CountryPillarRankingResultDto? pillarRank, UserRole userRole)
+        {
+            container.PaddingTop(8).Column(column =>
+            {
+                column.Item().PaddingTop(10)
+                    .Element(c => PillarProgressSection(c, data, userRole));
+
+                column.Item().PaddingTop(10)
+                    .Element(c => SelectedPillarRankTable(c, pillarRank));
+
+                column.Item().PaddingTop(10).Element(c =>
+                    PillarContentSection(c, "Executive Summary", SanitizeText(data.EvidenceSummary ?? ""), ReportThemeColors.AccentExecutiveSummary));
+
             });
         }
 
@@ -1909,6 +1866,44 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(15);
 
                     PillarProgressBar(column, "Score", data.AIProgress, ReportThemeColors.ProgressGreen);
+                });
+        }
+
+        void SelectedPillarRankTable(IContainer container, CountryPillarRankingResultDto? data)
+        {
+            static string FormatRank(int rank, int total) =>
+                rank > 0 && total > 0 ? $"{rank} / {total}" : "-";
+
+            container
+                .Border(1).BorderColor(ReportThemeColors.Gray300)
+                .Table(table =>
+                {
+                    table.ColumnsDefinition(columns =>
+                    {
+                        columns.RelativeColumn(3);
+                        columns.RelativeColumn(1);
+                    });
+
+                    table.Header(header =>
+                    {
+                        header.Cell().Background(ReportThemeColors.Gray100).Padding(8)
+                            .Text("Ranking").SemiBold().FontSize(11).FontColor(ReportThemeColors.GrayTailwind800);
+                        header.Cell().Background(ReportThemeColors.Gray100).Padding(8).AlignRight()
+                            .Text("Result").SemiBold().FontSize(11).FontColor(ReportThemeColors.GrayTailwind800);
+                    });
+
+                    void Row(string label, string value, bool shade)
+                    {
+                        var background = shade ? ReportThemeColors.Gray50 : ReportThemeColors.White;
+                        table.Cell().Background(background).BorderTop(1).BorderColor(ReportThemeColors.Gray300).Padding(8)
+                            .Text(label).FontSize(11).FontColor(ReportThemeColors.GrayTailwind700);
+                        table.Cell().Background(background).BorderTop(1).BorderColor(ReportThemeColors.Gray300).Padding(8).AlignRight()
+                            .Text(value).FontSize(11).Bold().FontColor(ReportThemeColors.GrayTailwind900);
+                    }
+
+                    Row("Continent Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
+                    Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalCountryInRegion ?? 0), true);
+                    Row("Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
                 });
         }
         void PillarProgressBar(ColumnDescriptor column, string label, decimal? percentage, string color)
@@ -2124,8 +2119,6 @@ namespace HornScope.Common.Implementation
             if (string.IsNullOrEmpty(text) || text.Length <= maxLength) return text;
             return text[..maxLength] + "...";
         }
-
-
 
         #endregion pdf pillars and country report
 
