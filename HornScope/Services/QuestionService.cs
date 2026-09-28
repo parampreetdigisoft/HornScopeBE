@@ -36,7 +36,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetPillarsAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetPillarsAsync", ex);
                 return new List<GetPillarDto>();
             }
         }
@@ -88,7 +88,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetQuestionsAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetQuestionsAsync", ex);
                 return new PaginationResponse<GetQuestionResponse>();
             }
         }
@@ -103,7 +103,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddQuestionAsync", ex);
+                await _appLogger.LogAsync("Error occured in AddQuestionAsync", ex);
                 return new Question();
             }
         }
@@ -122,7 +122,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure", ex);
+                await _appLogger.LogAsync("Error occured", ex);
                 return new Question();
             }
         }
@@ -141,7 +141,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure", ex);
+                await _appLogger.LogAsync("Error occured", ex);
                 return true;
             }
         }
@@ -223,7 +223,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddUpdateQuestion", ex);
+                await _appLogger.LogAsync("Error occured in AddUpdateQuestion", ex);
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -300,7 +300,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddBulkQuestion", ex);
+                await _appLogger.LogAsync("Error occured in AddBulkQuestion", ex);
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -419,7 +419,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetQuestionsByCityIdAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetQuestionsByCityIdAsync", ex);
                 return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -471,7 +471,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in ExportAssessment", ex);
+                await _appLogger.LogAsync("Error occured in ExportAssessment", ex);
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
         }
@@ -1278,7 +1278,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetQuestionsByCityIdAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetQuestionsByCityIdAsync", ex);
                 return ResultResponseDto<GetPillarQuestionByCountryResponse>.Failure(
                     new[] { "There is an error please try later" });
             }

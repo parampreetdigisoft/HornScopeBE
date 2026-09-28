@@ -65,7 +65,7 @@ namespace HornScope.Services
                         Role = u.Role.ToString(),
                         CreatedBy = uc != null ? uc.AssignedByUserId : null,
                         IsDeleted = u.IsDeleted,
-                        IsEmailConfirmed = u.IsEmailConfirmed,
+                        IsEmailConfirmed = !string.IsNullOrEmpty(u.TemporaryEmail) ? false : u.IsEmailConfirmed,
                         CreatedAt = u.CreatedAt,
                         CreatedByName = ab != null ? ab.FullName : null,
                         Tier = u.Tier,
@@ -141,7 +141,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetUserByRoleWithAssignedCity", ex);
+                await _appLogger.LogAsync("Error occured in GetUserByRoleWithAssignedCity", ex);
                 return new PaginationResponse<GetUserByRoleResponse>();
             }
         }
@@ -197,7 +197,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetUsersAssignedToCity", ex);
+                await _appLogger.LogAsync("Error occured in GetUsersAssignedToCity", ex);
                 return ResultResponseDto<List<GetAssessmentResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -224,7 +224,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure UpdateUser", ex);
+                await _appLogger.LogAsync("Error occured UpdateUser", ex);
                 return ResultResponseDto<UpdateUserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }

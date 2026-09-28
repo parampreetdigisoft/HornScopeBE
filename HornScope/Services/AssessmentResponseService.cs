@@ -45,7 +45,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetAllAsync", ex);
                 return new List<AssessmentResponse>();
             }
         }
@@ -57,7 +57,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetByIdAsync ", ex);
+                await _appLogger.LogAsync("Error occured in GetByIdAsync ", ex);
                 return new AssessmentResponse();
             }
 
@@ -72,7 +72,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddAsync", ex);
+                await _appLogger.LogAsync("Error occured in AddAsync", ex);
                 return new AssessmentResponse();
             }
         }
@@ -89,7 +89,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in UpdateAsync", ex);
+                await _appLogger.LogAsync("Error occured in UpdateAsync", ex);
                 return new AssessmentResponse();
             }
 
@@ -106,7 +106,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure DeleteAsync", ex);
+                await _appLogger.LogAsync("Error occured DeleteAsync", ex);
                 return false;
             }
 
@@ -490,7 +490,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetAssessmentQuestion", ex);
+                await _appLogger.LogAsync("Error occured in GetAssessmentQuestion", ex);
                 return new PaginationResponse<GetAssessmentQuestionResponseDto>
                 {
                     Data = new List<GetAssessmentQuestionResponseDto>(),
@@ -739,7 +739,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCountryQuestionHistory", ex);
+                await _appLogger.LogAsync("Error occured in GetCountryQuestionHistory", ex);
                 return new GetCountryQuestionHistoryResponseDto
                 {
                     CountryID = 0,

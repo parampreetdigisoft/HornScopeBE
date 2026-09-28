@@ -82,7 +82,7 @@ namespace HornScope.Common.Implementation
             {
                 <= 0 => 0m,
                 1 => 10m,
-                2 => 20m,
+                2 => 15m,
                 _ => 25m 
             };
 

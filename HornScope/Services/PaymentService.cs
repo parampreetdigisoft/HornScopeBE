@@ -103,7 +103,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in Create Checkout Session", ex);
+                await _appLogger.LogAsync("Error occured in Create Checkout Session", ex);
                 return ResultResponseDto<CheckoutSessionResponse>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -157,7 +157,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in VerifySession", ex);
+                await _appLogger.LogAsync("Error occured in VerifySession", ex);
                 return ResultResponseDto<VerifySessionResponse>.Failure(new string[] { "There is an error please try later" });
             }
         }

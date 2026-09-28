@@ -47,7 +47,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetAllAsync", ex);
                 return new List<Pillar>();
             }
 
@@ -347,7 +347,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCountriesProgressByUserId", ex);
+                await _appLogger.LogAsync("Error occured in GetCountriesProgressByUserId", ex);
                 return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Failure(new[] { "There is an error please try later" });
             }
         }
@@ -1096,7 +1096,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAICityPillars", ex);
+                await _appLogger.LogAsync("Error occured in GetAICityPillars", ex);
                 return ResultResponseDto<AiCountryPillarResponseDto>.Failure(new[] { "Error in getting pillar details", });
             }
         }

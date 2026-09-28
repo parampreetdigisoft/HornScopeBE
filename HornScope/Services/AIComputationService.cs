@@ -140,7 +140,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetCountriesAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetCountriesAsync", ex);
                 return new PaginationResponse<AiCountrySummeryDto>();
             }
         }
@@ -410,7 +410,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAICityPillars", ex);
+                await _appLogger.LogAsync("Error occured in GetAICityPillars", ex);
                 return ResultResponseDto<AiCountryPillarResponseDto>.Failure(new[] { "Error in getting pillar details", });
             }
         }
@@ -501,7 +501,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAICountryPillars", ex);
+                await _appLogger.LogAsync("Error occured in GetAICountryPillars", ex);
                 return new PaginationResponse<AIEstimatedQuestionScoreDto>();
             }
         }        
@@ -671,7 +671,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsReport", ex);
+                await _appLogger.LogAsync("Error occured in GenerateCountryDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -686,7 +686,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsReport", ex);
+                await _appLogger.LogAsync("Error occured in GeneratePillarDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -707,7 +707,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsReport", ex);
+                await _appLogger.LogAsync("Error occured in GenerateSelectedPillarsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -1575,7 +1575,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GeneratecountryDetailsReport", ex);
+                await _appLogger.LogAsync("Error occured in GeneratecountryDetailsReport", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -1723,7 +1723,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in getAllCountriesAIPillars", ex);
+                await _appLogger.LogAsync("Error occured in getAllCountriesAIPillars", ex);
 
                 return ResultResponseDto<Dictionary<int, List<AiCountryPillarResponse>>>
                     .Failure(new[] { "Error in getting countries pillar details" });
@@ -2110,7 +2110,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAIDocuments", ex);
+                await _appLogger.LogAsync("Error occured in GetAIDocuments", ex);
 
                 return new PaginationResponse<GetCountryDocumentResponseDto>();
             }
@@ -2163,7 +2163,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GetAIDocuments", ex);
+                await _appLogger.LogAsync("Error occured in GetAIDocuments", ex);
                 return  ResultResponseDto<List<GetCountryPillarDocumentResponseDto>>.Failure(new[] { "Failed to get Documents, please try again later." });
             }
         }
@@ -2207,7 +2207,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in DeleteDocument", ex);
+                await _appLogger.LogAsync("Error occured in DeleteDocument", ex);
 
                 return ResultResponseDto<string>.Failure(
                     new[] { "Failed to delete document, please try again later." });
@@ -2244,7 +2244,7 @@ namespace HornScope.Services
             }
             catch(Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in getDocument", ex);
+                await _appLogger.LogAsync("Error occured in getDocument", ex);
 
                 var emptyStream = new MemoryStream();
 

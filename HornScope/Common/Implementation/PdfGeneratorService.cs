@@ -58,7 +58,7 @@ namespace HornScope.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
+                await _appLogger.LogAsync("Error occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -79,7 +79,7 @@ namespace HornScope.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateCountryDetailsPdf", ex);
+                await _appLogger.LogAsync("Error occured in GenerateCountryDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -109,7 +109,7 @@ namespace HornScope.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GeneratePillarDetailsPdf", ex);
+                await _appLogger.LogAsync("Error occured in GeneratePillarDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -169,7 +169,7 @@ namespace HornScope.Common.Implementation
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in GenerateSelectedPillarsDetailsPdf", ex);
+                await _appLogger.LogAsync("Error occured in GenerateSelectedPillarsDetailsPdf", ex);
                 return Array.Empty<byte>();
             }
         }
@@ -1902,7 +1902,7 @@ namespace HornScope.Common.Implementation
                     }
 
                     Row("Continent Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
-                    Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalCountryInRegion ?? 0), true);
+                    Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarsInRegion ?? 0), true);
                     Row("Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
                 });
         }

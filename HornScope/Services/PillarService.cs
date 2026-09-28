@@ -70,7 +70,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetAllAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetAllAsync", ex);
                 return new List<GetPillarDto>();
             }
         }
@@ -83,7 +83,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetByIdAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetByIdAsync", ex);
                 return new Pillar();
             }
         }
@@ -98,7 +98,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddAsync", ex);
+                await _appLogger.LogAsync("Error occured in AddAsync", ex);
                 return new Pillar();
             }
 
@@ -151,7 +151,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AddPillarAsync", ex);
+                await _appLogger.LogAsync("Error occured in AddPillarAsync", ex);
                 return ResultResponseDto<Pillar>.Failure(new[] { "Failed to create pillar." });
             }
         }
@@ -204,7 +204,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured", ex);
+                await _appLogger.LogAsync("Error occuredd", ex);
                 return new Pillar();
             }
         }
@@ -234,7 +234,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetPillarKpiMappingsAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetPillarKpiMappingsAsync", ex);
                 return ResultResponseDto<List<PillarKpiMappingDto>>.Failure(new[] { "Failed to load KPI mappings." });
             }
         }
@@ -326,7 +326,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in DeleteAsync", ex);
+                await _appLogger.LogAsync("Error occured in DeleteAsync", ex);
                 return ResultResponseDto<bool>.Failure(new[] { "Failed to delete pillar." });
             }
         }
@@ -524,7 +524,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in ExportPillarsHistoryByUserId", ex);
+                await _appLogger.LogAsync("Error occured in ExportPillarsHistoryByUserId", ex);
                 return new Tuple<string, byte[]>("", Array.Empty<byte>());
             }
         }

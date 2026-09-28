@@ -56,7 +56,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCountries", ex);
+                await _appLogger.LogAsync("Error occured in getAllCountries", ex);
                 return ResultResponseDto<List<PartnerCountryResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -78,7 +78,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetAllPillarAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetAllPillarAsync", ex);
                 return ResultResponseDto<List<PillarResponseDto>>.Failure(new string[] { "Failed to get Piilar detail" });
             }
         }

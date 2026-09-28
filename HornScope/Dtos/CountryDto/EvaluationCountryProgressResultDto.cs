@@ -53,7 +53,7 @@ namespace HornScope.Dtos.CountryDto
         public int TotalPillarsInAllCountries { get; set; }
         public int GlobalPillarRank { get; set; }
         public int CountryPillarRank { get; set; }
-        public int TotalCountryInRegion { get; set; }
+        public int TotalPillarsInRegion { get; set; }
         public int RegionPillarRank { get; set; }
         public decimal? CountryPillarScore { get; set; }
         public int? Year { get; set; }

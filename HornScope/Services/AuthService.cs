@@ -428,6 +428,7 @@ namespace HornScope.Services
                         MsgText = "A request was made to update the Email for your HornScope (HS) account. Please verify your email or reset your password.",
                         Mail = _appSettings.AdminMail,
                         BtnText = "Verify",
+                        Name = "Dear" + " " + user.FullName,
                         DescriptionAboutBtnText = "Please verify your email address by clicking the button above."
                     };
 
@@ -729,7 +730,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure RefreshToken", ex);
+                await _appLogger.LogAsync("Error occured RefreshToken", ex);
                 return ResultResponseDto<UserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -755,7 +756,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occured in fetch emails", ex);
+                await _appLogger.LogAsync("Error occuredd in fetch emails", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -1323,7 +1324,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure UpdateUser", ex);
+                await _appLogger.LogAsync("Error occured UpdateUser", ex);
                 return ResultResponseDto<UpdateUserResponseDto>.Failure(new string[] { "There is an error please try later" });
             }
         }

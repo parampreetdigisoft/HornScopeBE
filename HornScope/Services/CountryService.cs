@@ -113,7 +113,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in UnAssignCountry", ex);
+                await _appLogger.LogAsync("Error occured in UnAssignCountry", ex);
                 return ResultResponseDto<string>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -311,7 +311,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in DeleteCityAsync", ex);
+                await _appLogger.LogAsync("Error occured in DeleteCityAsync", ex);
                 return ResultResponseDto<bool>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -341,7 +341,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in EditCountryAsync", ex);
+                await _appLogger.LogAsync("Error occured in EditCountryAsync", ex);
                 return ResultResponseDto<Country>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -533,7 +533,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCountryByUserId", ex);
+                await _appLogger.LogAsync("Error occured in getAllCountryByUserId", ex);
                 return ResultResponseDto<List<UserCountryMappingResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -547,7 +547,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetByIdAsync", ex);
+                await _appLogger.LogAsync("Error occured in GetByIdAsync", ex);
                 return ResultResponseDto<Country>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -581,7 +581,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in AssingCountryToUser", ex);
+                await _appLogger.LogAsync("Error occured in AssingCountryToUser", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -612,7 +612,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure", ex);
+                await _appLogger.LogAsync("Error occured", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -638,7 +638,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in UnAssignCountry", ex);
+                await _appLogger.LogAsync("Error occured in UnAssignCountry", ex);
                 return ResultResponseDto<object>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -700,7 +700,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCityByUserIdForAssessment", ex);
+                await _appLogger.LogAsync("Error occured in GetCityByUserIdForAssessment", ex);
                 return ResultResponseDto<List<UserCountryMappingResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -787,7 +787,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCountryHistory", ex);
+                await _appLogger.LogAsync("Error occured in GetCountryHistory", ex);
                 return ResultResponseDto<CountryHistoryDto>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -857,7 +857,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in GetCountriesProgressByUserId", ex);
+                await _appLogger.LogAsync("Error occured in GetCountriesProgressByUserId", ex);
                 return ResultResponseDto<List<GetCountriesSubmitionHistoryResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }
@@ -989,7 +989,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCityByUserId", ex);
+                await _appLogger.LogAsync("Error occured in getAllCityByUserId", ex);
                 return ResultResponseDto<List<UserCountryMappingResponseDto>>.Failure(new string[] { "There is an error please try later" });
             }
         }       
@@ -1015,7 +1015,7 @@ namespace HornScope.Services
             }
             catch (Exception ex)
             {
-                await _appLogger.LogAsync("Error Occure in getAllCityByUserId", ex);
+                await _appLogger.LogAsync("Error occured in getAllCityByUserId", ex);
                 return ResultResponseDto<byte[]>.Failure(new string[] { "There is an error please try later" });
             }
         }
