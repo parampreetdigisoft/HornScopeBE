@@ -54,6 +54,8 @@ namespace HornScope.Dtos.chatDto
     {
         public DateTime SavedAtUtc { get; set; }
 
+        public int NextCountryIndex { get; set; }
+
         public EmergingTrendsResult Data { get; set; } = new();
     }
 }

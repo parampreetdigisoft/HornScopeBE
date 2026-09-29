@@ -290,9 +290,10 @@ namespace HornScope.Services
             );
         }
 
-        public async Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount)
+        public async Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(string countryName, int maxRecords)
         {
-            var url = aiUrl + AiEndpoints.EmergingTrendsAndIssues(countryCount);
+            var take = maxRecords < 1 ? 1 : maxRecords > 3 ? 3 : maxRecords;
+            var url = aiUrl + AiEndpoints.EmergingTrendsAndIssues(countryName, take);
 
             return await _httpService.SendAsync<ChatEmergingTrendsResponse>(
                 HttpMethod.Get,
@@ -375,8 +376,8 @@ namespace HornScope.Services
         public static string CrossComparision() => $"{ChatPath}/cross-comparision";
         public static string KpiSummary() => $"{ChatPath}/kpi-summary";
         public static string CountrySlides() => $"{ChatPath}/executive-slides";
-        public static string EmergingTrendsAndIssues(int countryCount) =>
-            $"{ChatPath}/emerging-trends-and-issues?countryCount={countryCount}";
+        public static string EmergingTrendsAndIssues(string countryName, int maxRecords) =>
+            $"{ChatPath}/emerging-trends-and-issues?countryName={Uri.EscapeDataString(countryName)}&maxRecords={maxRecords}";
         public static string PillarLiveSignals() => $"{ChatPath}/pillar-live-signals";
         public static string PillarOverview() => $"{ChatPath}/pillar-overview";
         public static string AnalyzeCityMissingQuestions() =>

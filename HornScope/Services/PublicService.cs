@@ -249,11 +249,11 @@ namespace HornScope.Services
             WriteIndented = true
         };
 
-        private static string EmergingTrendsCacheKey(int countryCount) =>
-            $"EmergingTrendsAndIssues_{countryCount}";
-
-        private static string EmergingTrendsStaleCacheKey(int countryCount) =>
-            $"EmergingTrendsAndIssues_Stale_{countryCount}";
+        private const string EmergingTrendsCacheKeyName = "EmergingTrendsFeed";
+        private const string EmergingTrendsStaleCacheKeyName = "EmergingTrendsFeed_Stale";
+        private const int EmergingTrendsDisplayCap = 8;
+        private const int EmergingTrendsStoreCap = 20;
+        private const int EmergingTrendsFetchCap = 3;
 
         private TimeSpan EmergingTrendsCacheDuration =>
             TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:CacheExpirationHours", 48));
@@ -261,17 +261,47 @@ namespace HornScope.Services
         private TimeSpan EmergingTrendsStaleCacheDuration =>
             TimeSpan.FromHours(_configuration.GetValue("EmergingTrendsCache:StaleCacheExpirationHours", 48));
 
-        private int ConfiguredEmergingTrendsCountryCount(int fallback = 8) =>
-            _configuration.GetValue("EmergingTrendsCache:CountryCount", fallback);
-
-        private string EmergingTrendsDiskPath(int countryCount)
+        private int EmergingTrendsTakeCount(int requested)
         {
-            var root = !string.IsNullOrWhiteSpace(_env.WebRootPath)
+            if (requested < 1)
+                return EmergingTrendsDisplayCap;
+            if (requested > EmergingTrendsDisplayCap)
+                return EmergingTrendsDisplayCap;
+            return requested;
+        }
+
+        private int EmergingTrendsMaxStored()
+        {
+            var configured = _configuration.GetValue("EmergingTrendsCache:MaxStoredRecords", EmergingTrendsStoreCap);
+            if (configured < 1)
+                return 1;
+            if (configured > EmergingTrendsStoreCap)
+                return EmergingTrendsStoreCap;
+            return configured;
+        }
+
+        private int EmergingTrendsRecordsPerRefresh()
+        {
+            var configured = _configuration.GetValue("EmergingTrendsCache:RecordsPerRefresh", EmergingTrendsFetchCap);
+            if (configured < 1)
+                return 1;
+            if (configured > EmergingTrendsFetchCap)
+                return EmergingTrendsFetchCap;
+            return configured;
+        }
+
+        private string EmergingTrendsDataRoot()
+        {
+            return !string.IsNullOrWhiteSpace(_env.WebRootPath)
                 ? _env.WebRootPath
                 : Path.Combine(_env.ContentRootPath, "wwwroot");
-
-            return Path.Combine(root, "data", $"emerging_trends_cache_{countryCount}.json");
         }
+
+        private string EmergingTrendsDiskPath() =>
+            Path.Combine(EmergingTrendsDataRoot(), "data", "emerging_trends_feed.json");
+
+        private string LegacyEmergingTrendsDiskPath() =>
+            Path.Combine(EmergingTrendsDataRoot(), "data", "emerging_trends_cache_8.json");
 
         private static bool HasUsableEmergingTrends(EmergingTrendsResult? data) =>
             data?.Countries != null && data.Countries.Any(IsUsableCountryCard);
@@ -302,13 +332,12 @@ namespace HornScope.Services
         }
 
         private bool TryGetEmergingTrendsFromCache(
-            int countryCount,
             out EmergingTrendsResult? result,
             bool allowStale = false)
         {
             result = null;
 
-            if (_cache.TryGetValue(EmergingTrendsCacheKey(countryCount), out EmergingTrendsResult? cached)
+            if (_cache.TryGetValue(EmergingTrendsCacheKeyName, out EmergingTrendsResult? cached)
                 && HasUsableEmergingTrends(cached))
             {
                 result = cached;
@@ -316,79 +345,78 @@ namespace HornScope.Services
             }
 
             if (allowStale
-                && _cache.TryGetValue(EmergingTrendsStaleCacheKey(countryCount), out EmergingTrendsResult? stale)
+                && _cache.TryGetValue(EmergingTrendsStaleCacheKeyName, out EmergingTrendsResult? stale)
                 && HasUsableEmergingTrends(stale))
             {
                 result = stale;
                 return true;
             }
 
-            if (allowStale && TryReadEmergingTrendsFromDisk(countryCount, out var disk) && disk != null)
+            if (allowStale)
             {
-                result = disk;
-                SetEmergingTrendsCache(countryCount, disk, updateStale: true, persistToDisk: false);
-                return true;
+                var snapshot = ReadEmergingTrendsSnapshot();
+                if (snapshot?.Data != null && HasUsableEmergingTrends(snapshot.Data))
+                {
+                    result = snapshot.Data;
+                    SetEmergingTrendsMemory(snapshot.Data, updateStale: true);
+                    return true;
+                }
             }
 
             return false;
         }
 
-        private bool TryReadEmergingTrendsFromDisk(int countryCount, out EmergingTrendsResult? result)
+        private EmergingTrendsDiskSnapshot? ReadEmergingTrendsSnapshot()
         {
-            result = null;
-            var path = EmergingTrendsDiskPath(countryCount);
+            var path = EmergingTrendsDiskPath();
+            if (!File.Exists(path))
+                path = LegacyEmergingTrendsDiskPath();
+
+            if (!File.Exists(path))
+                return null;
 
             try
             {
-                if (!File.Exists(path))
-                {
-                    return false;
-                }
-
                 string json;
                 lock (EmergingTrendsDiskLock)
-                {
                     json = File.ReadAllText(path);
-                }
 
                 var snapshot = JsonSerializer.Deserialize<EmergingTrendsDiskSnapshot>(json, EmergingTrendsJsonOptions);
-                var data = FilterToUsableFeed(snapshot?.Data);
-                if (data == null)
+                if (snapshot == null)
+                    return null;
+
+                var filtered = FilterToUsableFeed(snapshot.Data);
+                if (filtered == null)
                 {
-                    return false;
+                    snapshot.Data = new EmergingTrendsResult();
+                    return snapshot;
                 }
 
-                result = data;
-                return true;
+                filtered.Countries = filtered.Countries.Take(EmergingTrendsMaxStored()).ToList();
+                snapshot.Data = filtered;
+                return snapshot;
             }
             catch
             {
-                return false;
+                return null;
             }
         }
 
-        private void WriteEmergingTrendsToDisk(int countryCount, EmergingTrendsResult data)
+        private void WriteEmergingTrendsSnapshot(EmergingTrendsDiskSnapshot snapshot)
         {
             try
             {
-                var path = EmergingTrendsDiskPath(countryCount);
+                var path = EmergingTrendsDiskPath();
                 var directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrWhiteSpace(directory))
-                {
                     Directory.CreateDirectory(directory);
-                }
 
-                var snapshot = new EmergingTrendsDiskSnapshot
-                {
-                    SavedAtUtc = DateTime.UtcNow,
-                    Data = data
-                };
+                if (snapshot.Data?.Countries != null)
+                    snapshot.Data.Countries = snapshot.Data.Countries.Take(EmergingTrendsMaxStored()).ToList();
 
                 var json = JsonSerializer.Serialize(snapshot, EmergingTrendsJsonOptions);
                 lock (EmergingTrendsDiskLock)
-                {
                     File.WriteAllText(path, json);
-                }
             }
             catch (Exception ex)
             {
@@ -396,11 +424,7 @@ namespace HornScope.Services
             }
         }
 
-        private void SetEmergingTrendsCache(
-            int countryCount,
-            EmergingTrendsResult data,
-            bool updateStale = true,
-            bool persistToDisk = true)
+        private void SetEmergingTrendsMemory(EmergingTrendsResult data, bool updateStale = true)
         {
             var cacheOptions = new MemoryCacheEntryOptions
             {
@@ -408,12 +432,12 @@ namespace HornScope.Services
                 Priority = CacheItemPriority.NeverRemove
             };
 
-            _cache.Set(EmergingTrendsCacheKey(countryCount), data, cacheOptions);
+            _cache.Set(EmergingTrendsCacheKeyName, data, cacheOptions);
 
             if (updateStale)
             {
                 _cache.Set(
-                    EmergingTrendsStaleCacheKey(countryCount),
+                    EmergingTrendsStaleCacheKeyName,
                     data,
                     new MemoryCacheEntryOptions
                     {
@@ -422,35 +446,85 @@ namespace HornScope.Services
                     }
                 );
             }
-
-            if (persistToDisk)
-            {
-                WriteEmergingTrendsToDisk(countryCount, data);
-            }
         }
 
-        private bool PreserveEmergingTrendsCacheOnRefreshFailure(int countryCount)
+        private bool PreserveEmergingTrendsCacheOnRefreshFailure()
         {
-            if (!TryGetEmergingTrendsFromCache(countryCount, out var stale, allowStale: true)
-                || stale == null)
-            {
+            if (!TryGetEmergingTrendsFromCache(out var stale, allowStale: true) || stale == null)
                 return false;
+
+            SetEmergingTrendsMemory(stale, updateStale: false);
+            return true;
+        }
+
+        private static EmergingTrendsResult CopyLatest(EmergingTrendsResult source, int take)
+        {
+            return new EmergingTrendsResult
+            {
+                UpdatedAt = source.UpdatedAt,
+                Headline = source.Headline,
+                SubHeadline = source.SubHeadline,
+                Countries = (source.Countries ?? new List<EmergingTrendCountryCard>()).Take(take).ToList()
+            };
+        }
+
+        private static EmergingTrendsResult MergeEmergingTrends(
+            EmergingTrendsResult existing,
+            EmergingTrendsResult incoming,
+            int maxStored)
+        {
+            var merged = new List<EmergingTrendCountryCard>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            void AddRange(IEnumerable<EmergingTrendCountryCard>? cards)
+            {
+                if (cards == null)
+                    return;
+
+                foreach (var card in cards)
+                {
+                    if (!IsUsableCountryCard(card))
+                        continue;
+
+                    var url = card.SourceUrl.Trim();
+                    if (!seen.Add(url))
+                        continue;
+
+                    merged.Add(card);
+                    if (merged.Count >= maxStored)
+                        return;
+                }
             }
 
-            SetEmergingTrendsCache(countryCount, stale, updateStale: false, persistToDisk: false);
-            return true;
+            AddRange(incoming.Countries);
+            if (merged.Count < maxStored)
+                AddRange(existing.Countries);
+
+            return new EmergingTrendsResult
+            {
+                UpdatedAt = string.IsNullOrWhiteSpace(incoming.UpdatedAt)
+                    ? existing.UpdatedAt
+                    : incoming.UpdatedAt,
+                Headline = string.IsNullOrWhiteSpace(incoming.Headline)
+                    ? (string.IsNullOrWhiteSpace(existing.Headline)
+                        ? "HornScope Emerging Issues & Risks"
+                        : existing.Headline)
+                    : incoming.Headline,
+                SubHeadline = string.IsNullOrWhiteSpace(incoming.SubHeadline)
+                    ? existing.SubHeadline
+                    : incoming.SubHeadline,
+                Countries = merged
+            };
         }
 
         public bool HydrateEmergingTrendsCacheFromDisk(int countryCount)
         {
-            countryCount = ConfiguredEmergingTrendsCountryCount(countryCount);
-
-            if (!TryReadEmergingTrendsFromDisk(countryCount, out var disk) || disk == null)
-            {
+            _ = countryCount;
+            var snapshot = ReadEmergingTrendsSnapshot();
+            if (snapshot?.Data == null || !HasUsableEmergingTrends(snapshot.Data))
                 return false;
-            }
 
-            SetEmergingTrendsCache(countryCount, disk, updateStale: true, persistToDisk: false);
+            SetEmergingTrendsMemory(snapshot.Data, updateStale: true);
             return true;
         }
 
@@ -458,17 +532,18 @@ namespace HornScope.Services
         {
             try
             {
-                countryCount = ConfiguredEmergingTrendsCountryCount(8);
+                var take = EmergingTrendsTakeCount(countryCount);
 
-                if (TryGetEmergingTrendsFromCache(countryCount, out var cachedResult, allowStale: true)
+                if (TryGetEmergingTrendsFromCache(out var cachedResult, allowStale: true)
+                    && cachedResult != null
                     && HasUsableEmergingTrends(cachedResult))
                 {
                     var fromPrimary = _cache.TryGetValue(
-                        EmergingTrendsCacheKey(countryCount),
+                        EmergingTrendsCacheKeyName,
                         out EmergingTrendsResult _);
 
                     return ResultResponseDto<EmergingTrendsResult>.Success(
-                        cachedResult,
+                        CopyLatest(cachedResult, take),
                         new List<string>
                         {
                             fromPrimary
@@ -492,12 +567,12 @@ namespace HornScope.Services
                     ex
                 );
 
-                countryCount = ConfiguredEmergingTrendsCountryCount(8);
-                if (TryGetEmergingTrendsFromCache(countryCount, out var fallback, allowStale: true)
+                if (TryGetEmergingTrendsFromCache(out var fallback, allowStale: true)
+                    && fallback != null
                     && HasUsableEmergingTrends(fallback))
                 {
                     return ResultResponseDto<EmergingTrendsResult>.Success(
-                        fallback,
+                        CopyLatest(fallback, EmergingTrendsTakeCount(countryCount)),
                         new List<string>
                         {
                             "Emerging trends and issues fetched successfully from last known data."
@@ -518,19 +593,83 @@ namespace HornScope.Services
             int countryCount,
             CancellationToken cancellationToken = default)
         {
+            _ = countryCount;
             try
             {
-                countryCount = ConfiguredEmergingTrendsCountryCount(countryCount);
+                var countries = await _context.Countries
+                    .AsNoTracking()
+                    .Where(c =>
+                        c.IsActive &&
+                        !c.IsDeleted &&
+                        c.CountryName != null &&
+                        c.CountryName != "" &&
+                        c.CountryCode != null &&
+                        c.CountryCode != "")
+                    .OrderBy(c => c.CountryName)
+                    .Select(c => new
+                    {
+                        c.CountryName,
+                        c.CountryCode,
+                        c.Image
+                    })
+                    .ToListAsync(cancellationToken);
 
-                var enriched = await FetchAndEnrichEmergingTrendsAsync(countryCount, cancellationToken);
-
-                if (HasUsableEmergingTrends(enriched) && enriched != null)
+                if (countries.Count == 0)
                 {
-                    SetEmergingTrendsCache(countryCount, enriched);
-                    return true;
+                    await _appLogger.LogAsync("Emerging trends refresh skipped: no active countries.");
+                    return PreserveEmergingTrendsCacheOnRefreshFailure();
                 }
 
-                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
+                var snapshot = ReadEmergingTrendsSnapshot();
+                var index = snapshot?.NextCountryIndex ?? 0;
+                if (index < 0)
+                    index = 0;
+                var picked = countries[index % countries.Count];
+                var nextIndex = (index + 1) % countries.Count;
+
+                var fetched = await _aIAnalyzeService.GetEmergingTrendsAndIssues(
+                    picked.CountryName,
+                    EmergingTrendsRecordsPerRefresh());
+
+                var usable = fetched?.Success == true
+                    ? FilterToUsableFeed(fetched.Result)
+                    : null;
+
+                EmergingTrendsResult stored = usable != null
+                    ? MergeEmergingTrends(snapshot?.Data ?? new EmergingTrendsResult(), usable, EmergingTrendsMaxStored())
+                    : (snapshot?.Data ?? new EmergingTrendsResult());
+
+                if (stored.Countries == null)
+                    stored.Countries = new List<EmergingTrendCountryCard>();
+
+                foreach (var card in stored.Countries)
+                {
+                    var match = countries.FirstOrDefault(c =>
+                        string.Equals(c.CountryCode, card.CountryCode, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(c.CountryName, card.Country, StringComparison.OrdinalIgnoreCase));
+
+                    if (match != null && !string.IsNullOrWhiteSpace(match.Image))
+                        card.ImagePath = match.Image;
+                }
+
+                if (usable != null)
+                    stored.UpdatedAt = DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'");
+
+                WriteEmergingTrendsSnapshot(new EmergingTrendsDiskSnapshot
+                {
+                    SavedAtUtc = DateTime.UtcNow,
+                    NextCountryIndex = nextIndex,
+                    Data = stored
+                });
+
+                await _appLogger.LogAsync(
+                    $"Emerging trends refresh country={picked.CountryName} newRecords={(usable?.Countries?.Count ?? 0)} stored={stored.Countries.Count} nextIndex={nextIndex}");
+
+                if (!HasUsableEmergingTrends(stored))
+                    return false;
+
+                SetEmergingTrendsMemory(stored, updateStale: true);
+                return true;
             }
             catch (Exception ex)
             {
@@ -539,70 +678,8 @@ namespace HornScope.Services
                     ex
                 );
 
-                return PreserveEmergingTrendsCacheOnRefreshFailure(countryCount);
+                return PreserveEmergingTrendsCacheOnRefreshFailure();
             }
-        }
-
-        private async Task<EmergingTrendsResult?> FetchAndEnrichEmergingTrendsAsync(
-            int countryCount,
-            CancellationToken cancellationToken = default)
-        {
-            var result = await _aIAnalyzeService.GetEmergingTrendsAndIssues(countryCount);
-
-            if (result == null || result.Success != true || result.Result == null)
-            {
-                return null;
-            }
-
-            var filtered = FilterToUsableFeed(result.Result);
-            if (filtered == null)
-            {
-                return null;
-            }
-
-            var countryCodes = filtered.Countries
-                .Select(c => c.CountryCode?.Trim().ToLower())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            var countries = filtered.Countries
-                .Select(c => c.Country?.Trim().ToLower())
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            var countryLookup = await _context.Countries
-                .AsNoTracking()
-                .Where(c =>
-                    c.IsActive &&
-                    !c.IsDeleted &&
-                    (
-                        countryCodes.Contains(c.CountryCode.ToLower()) ||
-                        countries.Contains(c.CountryName.ToLower())
-                    ))
-                .Select(c => new
-                {
-                    CountryCode = c.CountryCode.ToLower(),
-                    CountryName = c.CountryName.ToLower(),
-                    c.Image,
-                    c.Region,
-                    c.Continent,
-                    c.CountryID
-                })
-                .ToListAsync(cancellationToken);
-
-            foreach (var trendCountry in filtered.Countries)
-            {
-                var countryCode = trendCountry.CountryCode?.Trim().ToLower();
-                var countryName = trendCountry.Country?.Trim().ToLower();
-
-                var matchedCountry = countryLookup.FirstOrDefault(x =>
-                    x.CountryCode == countryCode ||
-                    x.CountryName == countryName);
-
-                trendCountry.ImagePath = matchedCountry?.Image ?? "";
-            }
-
-            return FilterToUsableFeed(filtered);
         }
 
         #endregion Emerging Trends

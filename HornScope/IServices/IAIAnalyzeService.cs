@@ -21,7 +21,7 @@ namespace HornScope.IServices
         Task<ChatCountryAskQuestionResponse> CrossComparision(CrossComparisionRequest request);
         Task<KpiSummaryAiResponse?> SummarizeKpiPerformance(KpiSummaryAiRequest request);
         Task<ChatCountryExecutiveSlidesResponse?> GetCountrySlides(int countryId);
-        Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(int countryCount);
+        Task<ChatEmergingTrendsResponse?> GetEmergingTrendsAndIssues(string countryName, int maxRecords);
         Task<ChatPillarLiveSignalsResponse?> GetPillarLiveSignals();
         Task<ChatPillarOverviewResponse?> GetPillarOverview();
 
