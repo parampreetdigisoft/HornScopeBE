@@ -455,11 +455,7 @@ namespace HornScope.Common.Implementation
 
             // ── Heading ──
             cell.Append(CenteredBoldPara("Overall Country Score", ReportThemeColors.PdfDarkGreenHex, "20"));
-            // ── Ranking Labels ──
-            var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry >=1
-                ? $"Continent Rank: {country.Rank} / {country.TotalCountry}"
-                : "Continent Rank: N/A";
-
+           
             var regionName = string.IsNullOrEmpty(country.Region) ? "Region" : country.Region;
 
             var regionRankLabel = country.RegionRank.HasValue && country.RegionTotalCountry.HasValue && country.RegionTotalCountry >= 1
@@ -475,20 +471,7 @@ namespace HornScope.Common.Implementation
             cell.Append(BuildPillarKpiTable(pillarCount, kpiCount, leftDxa));
 
 
-            if (best != null)
-            {
-                cell.Append(
-                    BuildDualBadgeRow(
-                        $"▲ {Shorten(best.Name, 16)} ({best.Value:F0})",
-                        ReportThemeColors.SuccessGreenBgHex,
-                        ReportThemeColors.PdfDarkGreenHex,
-
-                        globalRankLabel,
-                        ReportThemeColors.BackgroundHex,
-                        ReportThemeColors.PdfDarkGreenHex
-                    ));
-            }
-
+           
             // ─────────────────────────────────────────────
             // Worst Domain + Region Rank
             // ─────────────────────────────────────────────
@@ -722,9 +705,7 @@ namespace HornScope.Common.Implementation
             // Rankings Section
             body.AppendChild(CreateRankingHeader("Rankings"));
 
-            body.AppendChild(CreateRankRow("Continent Rank",
-                data.Rank, data.TotalCountry, ReportThemeColors.AccentGreenHex));
-
+            
             body.AppendChild(CreateRankRow("Region Rank",
                 data.RegionRank, data.RegionTotalCountry, ReportThemeColors.PrimaryHex));
 
@@ -1397,7 +1378,6 @@ namespace HornScope.Common.Implementation
                         new LeftBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 },
                         new RightBorder { Val = BorderValues.Single, Color = "E5E0D6", Size = 4 })),
                 new TableRow(Cell("Ranking", true, false, false), Cell("Result", true, true, false)),
-                new TableRow(Cell("Continent Rank", false, false, false), Cell(FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false, true, false)),
                 new TableRow(Cell("Region Rank", false, false, true), Cell(FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarsInRegion ?? 0), false, true, true)),
                 new TableRow(Cell("Country Level Rank", false, false, false), Cell(FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false, true, false)));
         }

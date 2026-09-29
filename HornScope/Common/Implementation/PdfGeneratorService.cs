@@ -384,11 +384,7 @@ namespace HornScope.Common.Implementation
 
             float score = (float)country.AIProgress.GetValueOrDefault();
 
-            // Overall rank label
-            var globalRankLabel = country.Rank.HasValue && country.TotalCountry.HasValue && country.TotalCountry > 1
-                ? $"Continent Rank: {country.Rank} / {country.TotalCountry}"
-                : "Continent Rank: N/A";
-
+            
             // Regional rank label
             var regionRankLabel = country.RegionRank.HasValue && country.RegionTotalCountry.HasValue && country.RegionTotalCountry >= 1
                 ? $"{country.Region} Region: {country.RegionRank} / {country.RegionTotalCountry}"
@@ -498,15 +494,7 @@ namespace HornScope.Common.Implementation
 
                                 row.ConstantItem(4);
 
-                                // Global rank
-                                row.AutoItem()
-                                    .Background(ReportThemeColors.SurfaceGreen)
-                                    .PaddingVertical(3)
-                                    .PaddingHorizontal(5)
-                                    .Text(globalRankLabel)
-                                    .FontSize(7)
-                                    .Bold()
-                                    .FontColor(ReportThemeColors.PdfDarkGreen);
+                             
                             });
                     }
 
@@ -1804,7 +1792,6 @@ namespace HornScope.Common.Implementation
 
                         col.Item().PaddingTop(8);
 
-                        RankRowModern(col, "Continent Rank", data.Rank, data.TotalCountry, ReportThemeColors.RankGreen);
 
                         col.Item().PaddingTop(2);
 
@@ -1901,7 +1888,6 @@ namespace HornScope.Common.Implementation
                             .Text(value).FontSize(11).Bold().FontColor(ReportThemeColors.GrayTailwind900);
                     }
 
-                    Row("Continent Rank", FormatRank(data?.GlobalPillarRank ?? 0, data?.TotalPillarsInAllCountries ?? 0), false);
                     Row($"{data?.Region} Region Rank", FormatRank(data?.RegionPillarRank ?? 0, data?.TotalPillarsInRegion ?? 0), true);
                     Row("Country Level Rank", FormatRank(data?.CountryPillarRank ?? 0, data?.TotalPillars ?? 0), false);
                 });

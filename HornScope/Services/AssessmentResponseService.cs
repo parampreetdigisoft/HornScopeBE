@@ -758,10 +758,11 @@ namespace HornScope.Services
         {
             try
             {
-                // Fetch assessment with pillars & responses in one query
+                // Fetch assessment with pillars, responses & questions in one query
                 var assessment = await _context.Assessments
                     .Include(a => a.PillarAssessments)
                         .ThenInclude(pa => pa.Responses)
+                            .ThenInclude(r => r.Question)
                     .FirstOrDefaultAsync(a => a.AssessmentID == progressHistoryRequest.AssessmentID || a.UserCountryMappingID == progressHistoryRequest.UserCountryMappingID);
 
                 // Get total questions directly (avoid Include if not needed)
@@ -778,7 +779,9 @@ namespace HornScope.Services
                         TotalAnsPillar = 0,
                         TotalAnsQuestion = 0,
                         TotalQuestion = totalQuestions,
-                        CurrentProgress = 0
+                        CurrentProgress = 0,
+                        PillarScore = 0.0,
+                        OverallScore = 0.0
                     };
 
                     return ResultResponseDto<GetAssessmentHistoryDto>.Success(emptyResult, new[] { "No assessment found. Returning default progress." });
@@ -790,17 +793,51 @@ namespace HornScope.Services
                     .SelectMany(pa => pa.Responses)
                     .Count();
 
-                // Calculate score (sum only valid scores <= Score1)
+                // Calculate score (sum only valid scores)
                 var score = assessment.PillarAssessments
                     .SelectMany(pa => pa.Responses)
                     .Where(r => r.Score.HasValue)
                     .Sum(r => (int)r.Score!.Value);
 
+                var scoredResponses = assessment.PillarAssessments
+                    .SelectMany(pa => pa.Responses.Where(r => r.Score.HasValue && r.Question != null).Select(r => new
+                    {
+                        pa.PillarID,
+                        Score = (int)r.Score!.Value,
+                        Weight = r.Question.Weight
+                    }))
+                    .ToList();
+
+                var pillarScores = scoredResponses
+                    .GroupBy(r => r.PillarID)
+                    .Select(g => PillarScoreCalculator.CalculatePillarScore(
+                        g.Select(r => new PillarScoreCalculator.ScoredResponse
+                        {
+                            Score = r.Score,
+                            Weight = r.Weight
+                        })))
+                    .ToList();
+
+                var overallScore = (double)PillarScoreCalculator.CalculateTotalScore(pillarScores, totalPillars);
+
+                double pillarScore = 0.0;
+                if (progressHistoryRequest.PillarID.HasValue && progressHistoryRequest.PillarID.Value > 0)
+                {
+                    var selectedPillarResponses = scoredResponses
+                        .Where(r => r.PillarID == progressHistoryRequest.PillarID.Value)
+                        .Select(r => new PillarScoreCalculator.ScoredResponse
+                        {
+                            Score = r.Score,
+                            Weight = r.Weight
+                        });
+
+                    pillarScore = (double)PillarScoreCalculator.CalculatePillarScore(selectedPillarResponses);
+                }
 
                 // Build response
                 var result = new GetAssessmentHistoryDto
                 {
-                    AssessmentID = progressHistoryRequest.AssessmentID,
+                    AssessmentID = assessment.AssessmentID != 0 ? assessment.AssessmentID : progressHistoryRequest.AssessmentID,
                     Score = score,
                     TotalPillar = totalPillars,
                     TotalAnsPillar = assessment.PillarAssessments.Count,
@@ -808,7 +845,9 @@ namespace HornScope.Services
                     TotalQuestion = totalQuestions,
                     CurrentProgress = totalQuestions > 0
                         ? Math.Round((totalAnsweredQuestions / (double)totalQuestions) * 100)
-                        : 0
+                        : 0,
+                    PillarScore = pillarScore,
+                    OverallScore = overallScore
                 };
 
                 return ResultResponseDto<GetAssessmentHistoryDto>.Success(result, new[] { "Assessment history fetched successfully" });

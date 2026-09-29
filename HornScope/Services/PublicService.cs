@@ -135,7 +135,7 @@ namespace HornScope.Services
 
                 var pillarScores = await _commonService.GetCountriesProgressAsync(userId, role, currentYear);
 
-                int[] selectedPillars = { 1, 4, 7, 15, 22 };
+                int[] selectedPillars = { 1, 4, 7, 10, 11 };
                 pillarScores = pillarScores.Where(x => selectedPillars.Contains(x.PillarID)).ToList();
 
                 var topCountriesByPillar = pillarScores

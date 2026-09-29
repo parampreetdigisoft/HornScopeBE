@@ -43,6 +43,8 @@ namespace HornScope.Dtos.AssessmentDto
         public int TotalQuestion { get; set; }
         public int TotalAnsQuestion { get; set; }
         public double CurrentProgress { get; set; }
+        public double PillarScore { get; set; }
+        public double OverallScore { get; set; }
     }
 
     public class CountryPillarUserHistoryResponseDto : CountryPillarQuestionHistoryResponseDto

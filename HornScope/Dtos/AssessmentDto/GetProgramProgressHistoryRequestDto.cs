@@ -1,8 +1,9 @@
-﻿namespace HornScope.Dtos.AssessmentDto
+namespace HornScope.Dtos.AssessmentDto
 {
     public class GetProgramProgressHistoryRequestDto
     {
         public int UserCountryMappingID { get; set; }
         public int AssessmentID { get; set; }
+        public int? PillarID { get; set; }
     }
 }
