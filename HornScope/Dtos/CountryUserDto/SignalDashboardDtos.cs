@@ -15,7 +15,7 @@ namespace HornScope.Dtos.CountryUserDto
 
         public string Name { get; set; } = string.Empty;
 
-        public decimal AIValue { get; set; }
+        public decimal? AIValue { get; set; }
 
         public DateTime? ManualUpdatedAt { get; set; }
 
@@ -23,7 +23,7 @@ namespace HornScope.Dtos.CountryUserDto
 
         public string AICondition { get; set; } = string.Empty;
         
-        public decimal ManualValue { get; set; }
+        public decimal? ManualValue { get; set; }
 
         public string ManualCondition { get; set; } = string.Empty;
 
@@ -72,7 +72,7 @@ namespace HornScope.Dtos.CountryUserDto
 
         public int Year { get; set; }
 
-        public decimal Value { get; set; }
+        public decimal? Value { get; set; }
 
     }
 
@@ -105,11 +105,11 @@ namespace HornScope.Dtos.CountryUserDto
 
         public int Year { get; set; }
 
-        public decimal Vcp { get; set; }
+        public decimal? Vcp { get; set; }
 
-        public decimal ProgramScore { get; set; }
+        public decimal? ProgramScore { get; set; }
 
-        public decimal VcpDirectionalMovement { get; set; }
+        public decimal? VcpDirectionalMovement { get; set; }
 
         public string VcpCondition { get; set; } = string.Empty;
 
@@ -153,7 +153,7 @@ namespace HornScope.Dtos.CountryUserDto
 
         public string CountryName { get; set; } = string.Empty;
 
-        public decimal Scs { get; set; }
+        public decimal? Scs { get; set; }
         public int ScsRank { get; set; }
 
     }
@@ -167,13 +167,13 @@ namespace HornScope.Dtos.CountryUserDto
 
         public int Year { get; set; }
 
-        public decimal Scs { get; set; }
+        public decimal? Scs { get; set; }
 
         public int RegionalRank { get; set; }
 
         public int RegionSampleSize { get; set; }
 
-        public decimal PeerAverageScs { get; set; }
+        public decimal? PeerAverageScs { get; set; }
 
         public string InvestmentImplication { get; set; } = string.Empty;
 

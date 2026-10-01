@@ -16,7 +16,6 @@ namespace HornScope.Services
         private readonly IAppLogger _appLogger;
         private Dictionary<string, string> headers;
         private readonly ICommonService _commonService;
-        private readonly int ROSEWPillarID = 22;
         public AIAnalyzeService(HttpService httpService, IOptions<AppSettings> appSettings, 
             ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
@@ -27,21 +26,7 @@ namespace HornScope.Services
             headers = new Dictionary<string, string> { { "X-API-Key", appSettings?.Value?.AiToken ?? "" } };
             _commonService = commonService;
         }
-        public async Task RunWeeklyJob()
-        {
-            try
-            {
-                var newCountriesIds = _context.Countries.Where(x => x.IsActive && !x.IsDeleted).Select(x => x.CountryID).ToList();
-                foreach (var id in newCountriesIds)
-                {
-                    await AnalyzeQuestionsOfCountryPillar(id, ROSEWPillarID);
-                }
-            }
-            catch (Exception ex)
-            {
-                await _appLogger.LogAsync("Error in Run Weekly Job", ex);
-            }
-        }
+
 
         public async Task RunMonthlyJob()
         {

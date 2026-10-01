@@ -16,3 +16,5 @@ obj/
 # Ignore local secrets (optional)
 appsettings.json
 appsettings.*.json
+config.bat
+node_modules

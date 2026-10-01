@@ -731,7 +731,6 @@ namespace HornScope.Common.Implementation
                 AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, ReportThemeColors.AccentOperationalEvidence.TrimStart('#'));
 
                 AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.AccentOutcomeEvidence.TrimStart('#'));
-                AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.AccentPerceptionEvidence.TrimStart('#'));
 
                 AppendContentSection(body, "Reliability Assessment", data.ReliabilityAssessment, ReportThemeColors.AccentInstitutionalCapacity.TrimStart('#'));
                 AppendContentSection(body, "Temporal Reliability", data.TemporalReliability, ReportThemeColors.AccentTemporalScope.TrimStart('#'));
@@ -860,7 +859,6 @@ namespace HornScope.Common.Implementation
             AppendContentSection(body, "Operational Evidence", data.OperationalEvidence, ReportThemeColors.AccentCriticalRisks.TrimStart('#'));
 
             AppendContentSection(body, "Outcome Evidence", data.OutcomeEvidence, ReportThemeColors.AccentGaps.TrimStart('#'));
-            AppendContentSection(body, "Perception Evidence", data.PerceptionEvidence, ReportThemeColors.AccentPerceptionEvidenceAlt.TrimStart('#'));
 
             AppendContentSection(body, "Temporal Reliability", data.TemporalReliability, ReportThemeColors.AccentTemporalScopeAlt.TrimStart('#'));
             AppendContentSection(body, "Relational Integrity", data.RelationalIntegrity, ReportThemeColors.AccentRelationalIntegrityAlt.TrimStart('#'));
@@ -1024,6 +1022,7 @@ namespace HornScope.Common.Implementation
 
             string title = string.IsNullOrEmpty(sectionTitle) ? data.CountryName : sectionTitle;
             string subtitle = $"{data.CountryName}, {data.Continent} | Data Year: {data.Year}";
+            string overallScore = $"{ data.AIProgress.RoundOrNull(1)?.ToString() ?? "N/A" }";
             string generated = $"Generated: {DateTime.Now:MMM dd, yyyy}";
 
             const int pngWidth = 1460;
@@ -1031,7 +1030,7 @@ namespace HornScope.Common.Implementation
             long heightEmu = ContentWidthEmu * pngHeight / pngWidth;
 
             byte[] banner = RenderPng(
-                (canvas, size) => PaintCountryHeaderBanner(canvas, size, title!, subtitle, generated, ReportThemeColors.LogoPath),
+                (canvas, size) => PaintCountryHeaderBanner(canvas, size, title!, overallScore, subtitle, generated, ReportThemeColors.LogoPath),
                 pngWidth,
                 pngHeight);
 
@@ -1046,6 +1045,7 @@ namespace HornScope.Common.Implementation
             SKCanvas canvas,
             QPDF.Size size,
             string title,
+            string? overallScore,
             string subtitle,
             string generated,
             string logoPath)
@@ -1111,13 +1111,33 @@ namespace HornScope.Common.Implementation
                 IsAntialias = true,
                 Typeface = SKTypeface.FromFamilyName("Arial")
             };
+            using var scorePaint = new SKPaint
+            {
+                Color = SKColor.Parse(ReportThemeColors.Secondary),
+                TextSize = navyH * 0.13f,
+                IsAntialias = true,
+                Typeface = SKTypeface.FromFamilyName("Arial")
+            };
 
             float textX = pad * 1.15f;
             float maxTextW = logoLeft - pad - textX;
+
+            bool hasScore = !string.IsNullOrWhiteSpace(overallScore);
+
             float titleY = pad + titlePaint.TextSize * 0.95f;
+            float subY = titleY + subPaint.TextSize + 10;
+            float scoreY = subY + scorePaint.TextSize + 8;
+            float metaY = (hasScore ? scoreY : subY) + metaPaint.TextSize + 8;
+
             canvas.DrawText(FitHeaderText(title, titlePaint, maxTextW), textX, titleY, titlePaint);
-            canvas.DrawText(FitHeaderText(subtitle, subPaint, maxTextW), textX, titleY + subPaint.TextSize + 10, subPaint);
-            canvas.DrawText(generated, textX, titleY + subPaint.TextSize + metaPaint.TextSize + 22, metaPaint);
+            canvas.DrawText(FitHeaderText(subtitle, subPaint, maxTextW), textX, subY, subPaint);
+
+            if (hasScore)
+            {
+                canvas.DrawText(FitHeaderText($"Overall Score : {overallScore}", scorePaint, maxTextW), textX, scoreY, scorePaint);
+            }
+
+            canvas.DrawText(generated, textX, metaY, metaPaint);
         }
 
         private static SKBitmap RemoveLogoBackground(SKBitmap source)

@@ -24,7 +24,6 @@ namespace HornScope.Services
         private readonly IAppLogger _appLogger;
         private readonly Download _download;
         private readonly ICommonService _commonService;
-        int ROSEWPillarID = 22;
         public PillarService(ApplicationDbContext context, IAppLogger appLogger, Download download, ICommonService commonService)
         {
             _context = context;
@@ -291,10 +290,6 @@ namespace HornScope.Services
         {
             try
             {
-                if(id == ROSEWPillarID)
-                {
-                    return ResultResponseDto<bool>.Failure(new[] { "You cannot delete the ROSEW pillar." });
-                }
                 var pillar = await _context.Pillars.FindAsync(id);
                 if (pillar == null)
                     return ResultResponseDto<bool>.Failure(new[] { "Domain not found." });
@@ -303,6 +298,7 @@ namespace HornScope.Services
                     return ResultResponseDto<bool>.Failure(new[] { "Domain already deleted." });
 
                 pillar.IsDeleted = true;
+                pillar.IsActive = false;
                 _context.Pillars.Update(pillar);
 
                 var questions = await _context.Questions

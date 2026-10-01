@@ -174,7 +174,6 @@ namespace HornScope.Common.Implementation
         public const string AccentStructuralEvidence = "#C9A24A";
         public const string AccentOperationalEvidence = "#8A5A2B";
         public const string AccentOutcomeEvidence = "#B7A25A";
-        public const string AccentPerceptionEvidence = "#C9C7BF";
         public const string AccentTemporalScope = "#6B6358";
         public const string AccentDistortionScreening = "#A67C3D";
         public const string AccentRelationalIntegrity = "#D4B45E";
@@ -192,7 +191,6 @@ namespace HornScope.Common.Implementation
         public const string AccentConflictRisk = "#B5502E";
         public const string AccentStrategicPolicy = "#C9A24A";
         public const string AccentDataTransparency = "#B7A25A";
-        public const string AccentPerceptionEvidenceAlt = "#C9C7BF";
         public const string AccentTemporalScopeAlt = "#6B6358";
         public const string AccentDistortionScreeningAlt = "#8A5A2B";
         public const string AccentRelationalIntegrityAlt = "#B7A25A";

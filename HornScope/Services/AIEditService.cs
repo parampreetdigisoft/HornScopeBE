@@ -78,7 +78,6 @@ namespace HornScope.Services
                 AddChange(changes, nameof(entity.StructuralEvidence), entity.StructuralEvidence, dto.StructuralEvidence);
                 AddChange(changes, nameof(entity.OperationalEvidence), entity.OperationalEvidence, dto.OperationalEvidence);
                 AddChange(changes, nameof(entity.OutcomeEvidence), entity.OutcomeEvidence, dto.OutcomeEvidence);
-                AddChange(changes, nameof(entity.PerceptionEvidence), entity.PerceptionEvidence, dto.PerceptionEvidence);
                 AddChange(changes, nameof(entity.ReliabilityAssessment), entity.ReliabilityAssessment, dto.ReliabilityAssessment);
                 AddChange(changes, nameof(entity.TemporalReliability), entity.TemporalReliability, dto.TemporalReliability);
                 AddChange(changes, nameof(entity.GeopoliticalShock), entity.GeopoliticalShock, dto.GeopoliticalShock);
@@ -113,7 +112,6 @@ namespace HornScope.Services
                 entity.StructuralEvidence = dto.StructuralEvidence;
                 entity.OperationalEvidence = dto.OperationalEvidence;
                 entity.OutcomeEvidence = dto.OutcomeEvidence;
-                entity.PerceptionEvidence = dto.PerceptionEvidence;
                 entity.ReliabilityAssessment = dto.ReliabilityAssessment;
                 entity.TemporalReliability = dto.TemporalReliability;
                 entity.GeopoliticalShock = dto.GeopoliticalShock;
@@ -165,7 +163,6 @@ namespace HornScope.Services
                 AddChange(changes, nameof(entity.StructuralEvidence), entity.StructuralEvidence, dto.StructuralEvidence);
                 AddChange(changes, nameof(entity.OperationalEvidence), entity.OperationalEvidence, dto.OperationalEvidence);
                 AddChange(changes, nameof(entity.OutcomeEvidence), entity.OutcomeEvidence, dto.OutcomeEvidence);
-                AddChange(changes, nameof(entity.PerceptionEvidence), entity.PerceptionEvidence, dto.PerceptionEvidence);
                 AddChange(changes, nameof(entity.TemporalReliability), entity.TemporalReliability, dto.TemporalReliability);
                 AddChange(changes, nameof(entity.RelationalIntegrity), entity.RelationalIntegrity, dto.RelationalIntegrity);
                 AddChange(changes, nameof(entity.StressGeopoliticalShock), entity.StressGeopoliticalShock, dto.StressGeopoliticalShock);
@@ -217,7 +214,6 @@ namespace HornScope.Services
                 entity.StructuralEvidence = dto.StructuralEvidence;
                 entity.OperationalEvidence = dto.OperationalEvidence;
                 entity.OutcomeEvidence = dto.OutcomeEvidence;
-                entity.PerceptionEvidence = dto.PerceptionEvidence;
                 entity.TemporalReliability = dto.TemporalReliability;
                 entity.RelationalIntegrity = dto.RelationalIntegrity;
                 entity.StressGeopoliticalShock = dto.StressGeopoliticalShock;
@@ -351,7 +347,6 @@ namespace HornScope.Services
                 AddChange(changes, nameof(entity.StructuralEvidence), entity.StructuralEvidence, dto.StructuralEvidence);
                 AddChange(changes, nameof(entity.OperationalEvidence), entity.OperationalEvidence, dto.OperationalEvidence);
                 AddChange(changes, nameof(entity.OutcomeEvidence), entity.OutcomeEvidence, dto.OutcomeEvidence);
-                AddChange(changes, nameof(entity.PerceptionEvidence), entity.PerceptionEvidence, dto.PerceptionEvidence);
                 AddChange(changes, nameof(entity.TemporalReliability), entity.TemporalReliability, dto.TemporalReliability);
                 AddChange(changes, nameof(entity.RelationalDependencies), entity.RelationalDependencies, dto.RelationalDependencies);
                 AddChange(changes, nameof(entity.StressGeopoliticalShock), entity.StressGeopoliticalShock, dto.StressGeopoliticalShock);
@@ -382,7 +377,6 @@ namespace HornScope.Services
                 entity.StructuralEvidence = dto.StructuralEvidence;
                 entity.OperationalEvidence = dto.OperationalEvidence;
                 entity.OutcomeEvidence = dto.OutcomeEvidence;
-                entity.PerceptionEvidence = dto.PerceptionEvidence;
                 entity.TemporalReliability = dto.TemporalReliability;
                 entity.RelationalDependencies = dto.RelationalDependencies;
                 entity.StressGeopoliticalShock = dto.StressGeopoliticalShock;

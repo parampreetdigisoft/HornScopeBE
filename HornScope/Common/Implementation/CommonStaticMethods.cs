@@ -3,6 +3,12 @@ using System.Text.RegularExpressions;
 
 namespace HornScope.Common.Implementation
 {
+   public static class DecimalExtensions
+   {
+        public static decimal? RoundOrNull(this decimal? value, int digits = 1)
+                => value.HasValue ? Math.Round(value.Value, digits) : null;
+   }
+
     public class CommonStaticMethods
     {
         public static string GetConditionByScore(decimal score)
@@ -33,6 +39,7 @@ namespace HornScope.Common.Implementation
             // Decode HTML entities (e.g., &mdash;)
             return WebUtility.HtmlDecode(noTags);
         }
+
 
         public static class PillarScoreCalculator
         {

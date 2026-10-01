@@ -17,7 +17,6 @@ namespace HornScope.Backgroundjob
             //_ = RunEvery2Hours(stoppingToken);
             //_ = RunEveryMonth(stoppingToken);
             _ = RunDaily(stoppingToken);
-            _ = RunEveryWeek(stoppingToken);
             await Task.CompletedTask;
         }
 
@@ -64,34 +63,7 @@ namespace HornScope.Backgroundjob
             }
         }
 
-        private async Task RunEveryWeek(CancellationToken token)
-        {
-            while (!token.IsCancellationRequested)
-            {
-                var now = DateTime.UtcNow;
-
-                // Run at 1st day of every month at 01:00 AM UTC
-                var nextRun = new DateTime(now.Year, now.Month, 1, 1, 0, 0, DateTimeKind.Utc)
-                                .AddDays(7);
-
-                var delay = nextRun - now;
-
-                await Task.Delay(delay, token); // wait until next month
-
-                try
-                {
-                    using var scope = _serviceProvider.CreateScope();
-                    var aiService = scope.ServiceProvider.GetRequiredService<IAIAnalyzeService>();
-
-                     await aiService.RunWeeklyJob();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.Message);
-                }
-            }
-        }
-
+      
         private async Task RunEveryMonth(CancellationToken token)
         {
             while (!token.IsCancellationRequested)

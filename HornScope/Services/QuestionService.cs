@@ -20,7 +20,6 @@ namespace HornScope.Services
         private readonly ApplicationDbContext _context;
         private readonly IAppLogger _appLogger;
         private readonly ICommonService _commonService;
-        int ROSEWPillarID = 22;
         public QuestionService(ApplicationDbContext context, IAppLogger appLogger, ICommonService commonService)
         {
             _context = context;

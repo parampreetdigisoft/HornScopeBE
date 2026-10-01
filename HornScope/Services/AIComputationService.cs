@@ -243,7 +243,6 @@ namespace HornScope.Services
                     StructuralEvidence = score != null ? score.StructuralEvidence : null,
                     OperationalEvidence = score != null ? score.OperationalEvidence : null,
                     OutcomeEvidence = score != null ? score.OutcomeEvidence : null,
-                    PerceptionEvidence = score != null ? score.PerceptionEvidence : null,
 
                     ReliabilityAssessment = score != null ? score.ReliabilityAssessment : null,
                     TemporalReliability = score != null ? score.TemporalReliability : null,
@@ -344,7 +343,6 @@ namespace HornScope.Services
                         r.StructuralEvidence = x.score.StructuralEvidence;
                         r.OperationalEvidence = x.score.OperationalEvidence;
                         r.OutcomeEvidence = x.score.OutcomeEvidence;
-                        r.PerceptionEvidence = x.score.PerceptionEvidence;
                         r.TemporalReliability = x.score.TemporalReliability;
                         r.RelationalIntegrity = x.score.RelationalIntegrity;
                         r.StressGeopoliticalShock = x.score.StressGeopoliticalShock;
@@ -461,7 +459,6 @@ namespace HornScope.Services
                         StructuralEvidence = x == null ? string.Empty : x.StructuralEvidence,
                         OperationalEvidence = x == null ? string.Empty : x.OperationalEvidence,
                         OutcomeEvidence = x == null ? string.Empty : x.OutcomeEvidence,
-                        PerceptionEvidence = x == null ? string.Empty : x.PerceptionEvidence,
                         TemporalReliability = x == null ? string.Empty : x.TemporalReliability,
                         RelationalDependencies = x == null ? string.Empty : x.RelationalDependencies,
                         StressGeopoliticalShock = x == null ? string.Empty : x.StressGeopoliticalShock,
@@ -1657,7 +1654,6 @@ namespace HornScope.Services
                                 r.StructuralEvidence = x.score.StructuralEvidence;
                                 r.OperationalEvidence = x.score.OperationalEvidence;
                                 r.OutcomeEvidence = x.score.OutcomeEvidence;
-                                r.PerceptionEvidence = x.score.PerceptionEvidence;
                                 r.TemporalReliability = x.score.TemporalReliability;
                                 r.RelationalIntegrity = x.score.RelationalIntegrity;
                                 r.StressGeopoliticalShock = x.score.StressGeopoliticalShock;

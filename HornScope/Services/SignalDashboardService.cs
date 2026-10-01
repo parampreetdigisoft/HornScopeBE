@@ -1,3 +1,4 @@
+using DocumentFormat.OpenXml.Drawing;
 using HornScope.Common.Implementation;
 using HornScope.Common.Interface;
 using HornScope.Common.Models;
@@ -91,9 +92,9 @@ namespace HornScope.Services
                     StrategicAction = "Review the score category and prioritize actions to strengthen resilience and improve overall performance.",
                     Code = "HS Score",
                     Name = "Country Score",
-                    AIValue = HSScores.Score ?? 0m,
+                    AIValue =  HSScores.Score.RoundOrNull(),
                     AiUpdatedAt = HSScores.AiUpdateAt,
-                    ManualValue = HSManualScores.Score ?? -1,
+                    ManualValue = HSManualScores.Score.RoundOrNull(),
                     ManualUpdatedAt = HSManualScores.ManualUpdateAt,
                     AIInterpretationValue =  HSAIInterpretation?.Condition,
                     ManualInterpretationValue =  HSManualInterpretation?.Condition,
@@ -109,10 +110,10 @@ namespace HornScope.Services
                         ModeName = dashboardMode.ModeName ?? string.Empty,
                         Description = dashboardMode.Description,
                         Year = year,
-                        HS = HSScores.Score ?? 0m,
-                        AICountryScore = HSScores.Score ?? 0m,
-                        ManualCountryScore = HSManualScores.Score ?? 0m,
-                        ManualValue = HSManualScores.Score ?? 0m,
+                        HS = HSScores.Score.RoundOrNull() ?? 0m,
+                        AICountryScore = HSScores.Score.RoundOrNull() ?? 0m,
+                        ManualCountryScore = HSManualScores.Score.RoundOrNull() ?? 0m,
+                        ManualValue = HSManualScores.Score.RoundOrNull() ?? 0m,
                         HSDirectionalMovement = HSScores.Delta,
                         HSCondition = HSAICondition,
                         ManualCondition = HSManualCondition,
@@ -196,9 +197,9 @@ namespace HornScope.Services
 
                         return new LayerScoreResult
                         {
-                            AIValue = Math.Round(aiScore?.AiCalValue5 ?? 0m, 2),
+                            AIValue = aiScore?.AiCalValue5.RoundOrNull(),
                             AIInterpretationId = aiScore?.AiInterpretationID,
-                            ManualValue = Math.Round(manualScore?.CalValue5 ?? 0m, 2),
+                            ManualValue = manualScore?.CalValue5.RoundOrNull(),
                             ManualInterpretationId = manualScore?.InterpretationID,
                             AiUpdatedAt = aiScore?.AiLastUpdated,
                             ManualUpdatedAt = manualScore?.LastUpdated
@@ -229,7 +230,7 @@ namespace HornScope.Services
 
             return new CountryHSScores
             {
-                Score = current ?? 0m,
+                Score = current.RoundOrNull(),
                 Previous = previous,
                 Delta = previous.HasValue ? Math.Round((current ?? 0m) - previous.Value, 2) : 0m,
                 AiUpdateAt = currentYearScore?.UpdatedAt
@@ -249,8 +250,8 @@ namespace HornScope.Services
                 countryID);
 
             var averageScoreProgress = progress != null && progress.Any()
-                ? progress.Average(x => x.ScoreProgress)
-                : 0m;
+                ? Math.Round(progress.Average(x => x.ScoreProgress), 1)
+                : (decimal?)null;
 
             // Get the latest manual update timestamp from assessment responses
             var latestManualUpdate = await _context.AssessmentResponses
@@ -279,8 +280,8 @@ namespace HornScope.Services
             {
                 kpiResults.TryGetValue(layer.LayerID, out var kpiResult);
 
-                var value = kpiResult?.AIValue ?? 0m;
-                var manualValue = kpiResult?.ManualValue ?? 0m;
+                var value = kpiResult?.AIValue ?? null;
+                var manualValue = kpiResult?.ManualValue ?? null;
 
                 if (HSOverride.HasValue &&
                     layer.LayerCode.Equals("HS", StringComparison.OrdinalIgnoreCase))
@@ -304,11 +305,11 @@ namespace HornScope.Services
                     Description = CommonStaticMethods.StripHtml(layer.Purpose),
                     Code = layer.LayerCode,
                     Name = layer.LayerName,
-                    AIValue = value,
+                    AIValue = value.RoundOrNull(),
                     AiUpdatedAt = kpiResult?.AiUpdatedAt,
                     ManualUpdatedAt = kpiResult?.ManualUpdatedAt,
                     AICondition = condition,
-                    ManualValue = manualValue,
+                    ManualValue = manualValue.RoundOrNull(),
                     ManualCondition = manualCondition ?? string.Empty,
                     AiDescriptor = aiInterpretation?.Descriptor ?? string.Empty,
                     ManualDescriptor = manualInterpretation?.Descriptor ?? string.Empty,
@@ -356,9 +357,9 @@ namespace HornScope.Services
             };
         }
 
-        private static string ResolveConditionByValue(AnalyticalLayer? layer, decimal value)
+        private static string ResolveConditionByValue(AnalyticalLayer? layer, decimal? value)
         {
-            return MatchInterpretationByValue(layer ?? new AnalyticalLayer(), value)?.Condition ?? "";
+            return MatchInterpretationByValue(layer ?? new AnalyticalLayer(), value ?? 0)?.Condition ?? "";
         }
 
         private static bool IsAlertCondition(string condition)
@@ -388,9 +389,9 @@ namespace HornScope.Services
 
         private sealed class LayerScoreResult
         {
-            public decimal AIValue { get; init; }
+            public decimal? AIValue { get; init; }
             public int? AIInterpretationId { get; init; }
-            public decimal ManualValue { get; init; }
+            public decimal? ManualValue { get; init; }
             public int? ManualInterpretationId { get; init; }
             public DateTime? AiUpdatedAt { get; init; }
             public DateTime? ManualUpdatedAt { get; init; }

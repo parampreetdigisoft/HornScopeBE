@@ -18,7 +18,6 @@ namespace HornScope.Models
         public string? StructuralEvidence { get; set; }
         public string? OperationalEvidence { get; set; }
         public string? OutcomeEvidence { get; set; }
-        public string? PerceptionEvidence { get; set; }
         public string? TemporalReliability { get; set; }
         public string? RelationalIntegrity { get; set; }
         public string? StressGeopoliticalShock { get; set; }

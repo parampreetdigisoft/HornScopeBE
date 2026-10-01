@@ -597,7 +597,7 @@ namespace HornScope.Common.Implementation
                 IsAntialias = true,
                 TextAlign = SKTextAlign.Center
             };
-            canvas.DrawText("country score", cx, cy + 21, subTxt);
+            //canvas.DrawText("country score", cx, cy + 21, subTxt);
         }
 
         // -----------------------------------------------------------------------------
@@ -1449,9 +1449,14 @@ namespace HornScope.Common.Implementation
                             .FontSize(10)
                             .FontColor(ReportThemeColors.Secondary);
 
+                        col.Item().Text($"Overall Score : {data.AIProgress.RoundOrNull(1)?.ToString() ?? "N/A"}")
+                            .FontSize(9)
+                            .FontColor(ReportThemeColors.Secondary);
+
                         col.Item().Text($"Generated: {DateTime.Now:MMM dd, yyyy}")
                             .FontSize(8)
                             .FontColor(ReportThemeColors.HeaderTextMuted);
+
                     });
 
                     if (File.Exists(logoPath))
@@ -1606,9 +1611,6 @@ namespace HornScope.Common.Implementation
                     column.Item().PaddingTop(8).Element(c =>
                         PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), ReportThemeColors.AccentOutcomeEvidence));
 
-                    column.Item().PaddingTop(8).Element(c =>
-                        PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), ReportThemeColors.AccentPerceptionEvidence));
-
 
                     //column.Item().PaddingTop(15).Text("Integrity Checks")
                     //    .FontSize(16).Bold();
@@ -1709,9 +1711,6 @@ namespace HornScope.Common.Implementation
 
                 column.Item().PaddingTop(8).Element(c =>
                     PillarContentSection(c, "Outcome Evidence", SanitizeText(data.OutcomeEvidence), ReportThemeColors.AccentGaps));
-
-                column.Item().PaddingTop(8).Element(c =>
-                    PillarContentSection(c, "Perception Evidence", SanitizeText(data.PerceptionEvidence), ReportThemeColors.AccentPerceptionEvidenceAlt));
 
                 // =====================================================
                 // INTEGRITY CHECKS
